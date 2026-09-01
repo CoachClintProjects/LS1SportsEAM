@@ -1,4 +1,7 @@
+'use client';
+
 import React, { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
 
@@ -13,8 +16,8 @@ function SuperUserLoading() {
 }
 
 function RoutedWorkspace() {
-  const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
-  const view = params.get('view') ?? 'command-center';
+  const searchParams = useSearchParams();
+  const view = searchParams.get('view') ?? 'command-center';
   return commandViews.has(view) ? <ProjectCommand /> : <SuperUserModuleWorkspace view={view} />;
 }
 
