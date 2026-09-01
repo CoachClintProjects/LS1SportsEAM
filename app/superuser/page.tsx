@@ -2,18 +2,17 @@
 
 // =====================================================
 // LS1Sports SuperUser Route
-//
-// SECTION: RESPONSIBILITY
-// - Mount the complete SuperUser workspace.
 // =====================================================
 
 import React from 'react';
 import SuperUserWorkspace from '@/components/hubs/superuser/SuperUserWorkspace';
-
-// =====================================================
-// SECTION: PAGE
-// =====================================================
+import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 
 export default function SuperUserPage(){
-  return <SuperUserWorkspace />;
+  return <>
+    <ProjectCommand />
+    <div className="mt-6">
+      <SuperUserWorkspace />
+    </div>
+  </>;
 }
