@@ -24,16 +24,16 @@ function NavigationItemView({ item, activeItem, onSelect, activeHubId }: { item:
   const router = useRouter(); const Icon = item.icon ? icons[item.icon] ?? File : File; const active = activeItem === item.id;
   const classes = `group flex min-h-9 w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors ${active ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`;
   const content = <><Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#FA4616]' : 'text-neutral-600 group-hover:text-neutral-300'}`} strokeWidth={1.8} /><span className="min-w-0 flex-1 truncate text-left">{item.label}</span>{active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}</>;
-
-  if (activeHubId === 'superuser' || activeHubId === 'athlete') {
-    return <button type="button" onClick={() => {
-      onSelect(item.id);
-      const next = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
-      next.set('view', item.id);
+  const select = () => {
+    onSelect(item.id);
+    if (activeHubId === 'superuser' || activeHubId === 'athlete') {
+      const next = new URLSearchParams(window.location.search); next.set('view', item.id);
       const base = activeHubId === 'superuser' ? '/superuser' : '/athlete';
+      window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: item.id }));
       router.push(`${base}?${next.toString()}`, { scroll: false });
-    }} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
-  }
+    }
+  };
+  if (activeHubId === 'superuser' || activeHubId === 'athlete') return <button type="button" onClick={select} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
   return <Link href={item.href ?? '#'} onClick={() => onSelect(item.id)} aria-current={active ? 'page' : undefined} className={classes}>{content}</Link>;
 }
 
