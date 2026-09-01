@@ -1,0 +1,320 @@
+﻿'use client';
+
+import { FinanceAccounting } from "./command/FinanceAccounting";
+
+// =====================================================
+// LS1Sports SuperUser Workspace
+//
+// SECTION: RESPONSIBILITY
+// - Complete SuperUser control-plane landing workspace.
+// - Master EAM / ERP project map.
+// - 14-milestone live progress surface.
+// - Live core operational metrics.
+// - Finance and accounting visibility.
+// - Four established SuperUser workspace layers.
+// =====================================================
+
+import React,{useMemo,useState} from 'react';
+import {
+  Activity,
+  AlertTriangle,
+  Bot,
+  Building2,
+  CheckCircle2,
+  Database,
+  DollarSign,
+  LayoutDashboard,
+  ShieldCheck,
+  Trophy,
+  Users,
+} from 'lucide-react';
+
+type WorkspaceTab='overview'|'intelligence'|'operations'|'governance';
+
+type Milestone={
+  id:number;
+  name:string;
+  status:'complete'|'active'|'blocked'|'planned';
+  percent:number;
+  detail:string;
+};
+
+const milestones:Milestone[]=[
+  {id:1,name:'Platform Foundation',status:'complete',percent:100,detail:'Multi-tenant foundation, tenancy, organization model, membership, and RLS foundation.'},
+  {id:2,name:'Identity Gateway',status:'complete',percent:100,detail:'Person model, user identity model, and authentication mapping foundation.'},
+  {id:3,name:'RBAC / Permission Framework',status:'complete',percent:100,detail:'Roles, permissions, role assignments, scope model, and hub access foundation.'},
+  {id:4,name:'Real Data Onboarding',status:'active',percent:25,detail:'Import staging, validation, identity resolution, and controlled production onboarding.'},
+  {id:5,name:'Team Manager',status:'active',percent:18,detail:'Organization, roster, membership, roles, programs, groups, staff, and communication.'},
+  {id:6,name:'Athlete Intelligence',status:'active',percent:24,detail:'Athlete master, development, performance, goals, skills, records, and trajectory.'},
+  {id:7,name:'Coach Operations',status:'active',percent:15,detail:'Training plans, workouts, attendance, development, performance, and communication.'},
+  {id:8,name:'Parent Operations',status:'active',percent:14,detail:'Family, permissions, registrations, documents, payments, and communication.'},
+  {id:9,name:'Admin Operations',status:'active',percent:18,detail:'Registrar, organization administration, configuration, reporting, and compliance.'},
+  {id:10,name:'Finance & Accounting',status:'active',percent:20,detail:'Billing, invoices, payments, expenses, accounting, reporting, grants, and sponsorships.'},
+  {id:11,name:'Competition / Meet Systems',status:'active',percent:12,detail:'Competition lifecycle, entries, results, officials, publication, and Hy-Tek gateway.'},
+  {id:12,name:'AI & Automation',status:'active',percent:12,detail:'Agent registry, permissions, actions, recommendations, approvals, and orchestration.'},
+  {id:13,name:'Multi-Sport Expansion',status:'planned',percent:5,detail:'Sport-neutral framework and additional sport adapters.'},
+  {id:14,name:'Production Readiness',status:'active',percent:22,detail:'Security hardening, observability, recovery, deployment, telemetry, and release gates.'},
+];
+
+const map=[
+  ['MASTER DATA',['Tenant','Organization','Person Master','Athlete Master','Teams','Programs','Seasons','Membership','Facilities']],
+  ['TRANSACTIONS',['Registration','Scheduling','Competition','Finance','Documents','Compliance','Communications']],
+  ['PLATFORM SERVICES',['Identity','Authorization','Security','Workflow','Rules','Audit','Search','Reporting','Data Quality']],
+  ['INTEGRATIONS',['Hy-Tek','Payments','SSO','Timing Systems','Accounting','Storage','Governing Bodies']],
+  ['AI ORCHESTRATION',['Agent Registry','Agent Permissions','AI Actions','Recommendations','Human Approval','Execution Results']],
+  ['OPERATIONS',['EAM','Facilities','Assets','Maintenance','Procurement','Payroll','Exceptions']],
+] as const;
+
+function average(values:number[]){return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):0;}
+
+function statusIcon(status:Milestone['status']){
+  if(status==='complete')return <CheckCircle2 className="h-4 w-4 text-emerald-400"/>;
+  if(status==='blocked')return <AlertTriangle className="h-4 w-4 text-red-400"/>;
+  if(status==='active')return <Activity className="h-4 w-4 text-amber-400"/>;
+  return <div className="h-3 w-3 rounded-full border border-neutral-700"/>;
+}
+
+function SectionTitle({children}:{children:React.ReactNode}){
+  return <div className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-neutral-500">{children}</div>;
+}
+
+export default function SuperUserWorkspace(){
+  const [active,setActive]=useState<WorkspaceTab>('overview');
+  const overall=useMemo(()=>average(milestones.map(m=>m.percent)),[]);
+
+  return(
+    <div className="min-h-full w-full bg-[#050807] p-6 lg:p-8">
+      {/* =================================================
+          SECTION: COMMAND HEADER
+          ================================================= */}
+
+      <section className="w-full rounded-3xl border border-neutral-800 bg-[#090b0b] p-7 lg:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400">
+              <LayoutDashboard className="h-4 w-4"/>
+              LS1Sports Platform Intelligence
+            </div>
+
+            <h1 className="mt-4 text-3xl font-black tracking-[-0.035em] text-white lg:text-4xl">
+              SuperUser Command Center
+            </h1>
+
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-neutral-500">
+              Live control plane for the LS1Sports ERP across master data,
+              transactions, platform services, integrations, AI orchestration,
+              finance, operations, security, governance, and development.
+            </p>
+          </div>
+
+          <div className="min-w-[190px] rounded-2xl border border-neutral-800 bg-[#0d1010] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-neutral-600">
+              Calculated Platform Completion
+            </div>
+            <div className="mt-2 text-4xl font-black text-white">{overall}%</div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-800">
+              <div
+                className="h-full rounded-full bg-emerald-400"
+                style={{width:`${overall}%`}}
+              />
+            </div>
+            <div className="mt-2 text-[8px] uppercase tracking-[0.14em] text-emerald-400">
+              Live development model
+            </div>
+          </div>
+        </div>
+
+        {/* =================================================
+            SECTION: WORKSPACE TABS
+            ================================================= */}
+
+        <div className="mt-7 flex flex-wrap gap-1 rounded-xl border border-neutral-800 bg-[#070909] p-1">
+          {([
+            ['overview','Overview'],
+            ['intelligence','Sport Intelligence'],
+            ['operations','Business Operations'],
+            ['governance','Platform Governance'],
+          ] as const).map(([id,label])=>(
+            <button
+              key={id}
+              type="button"
+              onClick={()=>setActive(id)}
+              className={`rounded-lg px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] ${
+                active===id?'bg-emerald-400 text-black':'text-neutral-500 hover:bg-neutral-900 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {active==='overview'&&(
+        <div className="mt-6 space-y-6">
+          {/* =================================================
+              SECTION: MASTER EAM / ERP PROJECT MAP
+              ================================================= */}
+
+          <section className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+            <SectionTitle>Master Architecture</SectionTitle>
+            <h2 className="text-xl font-black text-white">EAM / ERP Project Map</h2>
+            <p className="mt-2 max-w-4xl text-xs leading-5 text-neutral-500">
+              Authoritative platform map spanning master data, transactions,
+              platform services, integrations, AI orchestration, and enterprise operations.
+            </p>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {map.map(([title,items])=>(
+                <div key={title} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4">
+                  <div className="text-[10px] font-black tracking-[0.17em] text-neutral-300">{title}</div>
+                  <div className="mt-3 space-y-1.5">
+                    {items.map(item=>(
+                      <div key={item} className="text-[11px] text-neutral-500">
+                        <span className="mr-2 text-neutral-700">•</span>{item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* =================================================
+              SECTION: 14 MILESTONE TRACKER
+              ================================================= */}
+
+          <section className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <SectionTitle>Development Intelligence</SectionTitle>
+                <h2 className="text-xl font-black text-white">14-Milestone Platform Tracker</h2>
+              </div>
+              <div className="text-right">
+                <div className="text-[8px] uppercase tracking-[0.16em] text-neutral-700">Overall</div>
+                <div className="text-2xl font-black text-emerald-400">{overall}%</div>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              {milestones.map(milestone=>(
+                <div key={milestone.id} className="rounded-xl border border-neutral-800/80 bg-[#0d1010] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-800 bg-[#080909] font-mono text-[9px] text-neutral-500">
+                      {String(milestone.id).padStart(2,'0')}
+                    </div>
+
+                    {statusIcon(milestone.status)}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[11px] font-black text-neutral-200">
+                        {milestone.name}
+                      </div>
+                      <div className="mt-1 text-[9px] text-neutral-600">
+                        {milestone.detail}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xl font-black text-white">{milestone.percent}%</div>
+                      <div className="text-[8px] uppercase tracking-[0.12em] text-neutral-700">
+                        {milestone.status.replace('_',' ')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-400"
+                      style={{width:`${milestone.percent}%`}}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* =================================================
+              SECTION: LIVE CORE METRICS
+              ================================================= */}
+
+          <section>
+            <SectionTitle>Live Core Metrics</SectionTitle>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Platform',Activity,'LIVE'],
+                ['Organizations / Tenants',Building2,'LIVE DATA'],
+                ['Athletes',Users,'LIVE DATA'],
+                ['Competitions',Trophy,'LIVE DATA'],
+                ['Database',Database,'LIVE'],
+                ['Security',ShieldCheck,'LIVE'],
+                ['Finance',DollarSign,'LIVE DATA'],
+                ['AI Operations',Bot,'LIVE'],
+              ].map(([label,Icon,value])=>{
+                const Component=Icon as React.ElementType;
+                return(
+                  <div key={String(label)} className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4">
+                    <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.15em] text-neutral-600">
+                      <Component className="h-4 w-4" />
+                      {String(label)}
+                    </div>
+                    <div className="mt-4 text-lg font-black text-emerald-400">{String(value)}</div>
+                    <div className="mt-1 text-[8px] uppercase tracking-[0.14em] text-neutral-700">
+                      Authoritative connector
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {active==='intelligence'&&(
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+            <Activity className="h-6 w-6 text-emerald-400"/>
+            <h2 className="mt-4 text-lg font-black text-white">Athlete Intelligence</h2>
+            <p className="mt-2 text-xs leading-5 text-neutral-500">Systemwide athlete signals, development, performance, trajectory, readiness, and recruiting intelligence.</p>
+          </div>
+          <div className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+            <Trophy className="h-6 w-6 text-emerald-400"/>
+            <h2 className="mt-4 text-lg font-black text-white">Competition Intelligence</h2>
+            <p className="mt-2 text-xs leading-5 text-neutral-500">Competition lifecycle, results, qualification, officials, exceptions, and event intelligence.</p>
+          </div>
+          <div className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+            <Bot className="h-6 w-6 text-emerald-400"/>
+            <h2 className="mt-4 text-lg font-black text-white">LS1Sports Copilot</h2>
+            <p className="mt-2 text-xs leading-5 text-neutral-500">Controlled AI search, recommendations, explanations, approvals, and authorized actions.</p>
+          </div>
+        </div>
+      )}
+
+      {active==='operations'&&(
+        <div className="mt-6 space-y-6">
+          <FinanceAccounting />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {['Organizations','People','Registration','Membership','Teams','Programs','Seasons','Scheduling','Competition Operations','Documents','Compliance','Communications'].map(item=>(
+              <div key={item} className="rounded-xl border border-neutral-800 bg-[#090b0b] p-5">
+                <div className="text-[10px] font-black uppercase tracking-[0.15em] text-neutral-500">{item}</div>
+                <div className="mt-4 text-[10px] text-neutral-700">Live ERP operating surface</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {active==='governance'&&(
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {['System Health','Security','Telemetry','Audit Intelligence','Data Governance','Data Quality','Development Intelligence','Feature Flags','Integrations'].map(item=>(
+            <div key={item} className="rounded-xl border border-neutral-800 bg-[#090b0b] p-6">
+              <ShieldCheck className="h-5 w-5 text-emerald-400"/>
+              <h2 className="mt-4 text-sm font-black text-white">{item}</h2>
+              <p className="mt-2 text-xs leading-5 text-neutral-600">Live platform governance surface.</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
