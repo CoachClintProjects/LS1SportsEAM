@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
 
-const commandViews = new Set(['command-center', 'project-map', 'milestones', 'metrics', 'platform', 'organizations', 'people', 'team-manager', 'athletes', 'financial-overview', 'general-ledger', 'facilities', 'assets', 'maintenance', 'identity', 'roles', 'permissions', 'compliance', 'data-governance', 'privacy', 'audit', 'procurement', 'payroll', 'workflow', 'integrations', 'imports', 'reporting', 'agents', 'automation', 'alerts', 'insights', 'product', 'deployments', 'system-health', 'knowledge']);
+// Only these four views belong to the master project-control surface.
+// Every other SuperUser navigation item receives a domain-specific workspace.
+const projectControlViews = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
 function SuperUserLoading() {
   return <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6 lg:p-7">
@@ -18,7 +20,7 @@ function SuperUserLoading() {
 function RoutedWorkspace() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view') ?? 'command-center';
-  return commandViews.has(view) ? <ProjectCommand /> : <SuperUserModuleWorkspace view={view} />;
+  return projectControlViews.has(view) ? <ProjectCommand /> : <SuperUserModuleWorkspace view={view} />;
 }
 
 export default function SuperUserPage() {
