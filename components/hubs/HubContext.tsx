@@ -1,28 +1,13 @@
 ﻿'use client';
 
-// =====================================================
-// LS1Sports Hub Context
-//
-// SECTION: RESPONSIBILITY
-// - Define the seven primary human hubs.
-// - Store active hub context.
-// - Expose hub definitions to the experience engine.
-//
-// SECTION: NON-RESPONSIBILITIES
-// - No database calls.
-// - No authorization decisions.
-// - No business-domain calculations.
-// =====================================================
-
 import React, {
   createContext,
   useContext,
+  useEffect,
+  useMemo,
   useState,
 } from 'react';
-
-// =====================================================
-// SECTION: HUB TYPES
-// =====================================================
+import { usePathname } from 'next/navigation';
 
 export type HubType =
   | 'superuser'
@@ -33,20 +18,12 @@ export type HubType =
   | 'official'
   | 'scout';
 
-// =====================================================
-// SECTION: HUB DEFINITION
-// =====================================================
-
 export interface HubDefinition {
   id: HubType;
   name: string;
   description: string;
   codeLane: string;
 }
-
-// =====================================================
-// SECTION: HUB DEFINITIONS
-// =====================================================
 
 export const hubs: HubDefinition[] = [
   {
@@ -100,10 +77,6 @@ export const hubs: HubDefinition[] = [
   },
 ];
 
-// =====================================================
-// SECTION: CONTEXT CONTRACT
-// =====================================================
-
 export interface HubContextType {
   activeHub: HubDefinition;
   activeHubId: HubType;
@@ -112,35 +85,44 @@ export interface HubContextType {
   hubs: HubDefinition[];
 }
 
-// =====================================================
-// SECTION: CONTEXT
-// =====================================================
-
 export const HubContext =
   createContext<HubContextType | undefined>(undefined);
 
-// =====================================================
-// SECTION: PROVIDER
-// =====================================================
+const HUB_IDS = new Set<HubType>([
+  'superuser',
+  'athlete',
+  'parent',
+  'coach',
+  'admin',
+  'official',
+  'scout',
+]);
+
+function resolveHubFromPath(pathname: string | null | undefined): HubType {
+  const segment = pathname?.split('/').filter(Boolean)[0]?.toLowerCase() as HubType | undefined;
+  return segment && HUB_IDS.has(segment) ? segment : 'superuser';
+}
 
 export function HubProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [activeHubId, setActiveHubId] =
-    useState<HubType>('superuser');
+  const pathname = usePathname();
+  const routeHub = resolveHubFromPath(pathname);
+  const [activeHubId, setActiveHubId] = useState<HubType>(routeHub);
 
-  // ===================================================
-  // SECTION: ACTIVE HUB RESOLUTION
-  // ===================================================
+  // The URL is authoritative for the active operating hub. This prevents a
+  // direct /athlete load, browser refresh, back/forward navigation or pasted
+  // deep-link from retaining the previous hub's sidebar and shell context.
+  useEffect(() => {
+    setActiveHubId(routeHub);
+  }, [routeHub]);
 
-  const selectedHub =
-    hubs.find((hub) => hub.id === activeHubId) ?? hubs[0];
-
-  // ===================================================
-  // SECTION: PROVIDER
-  // ===================================================
+  const selectedHub = useMemo(
+    () => hubs.find((hub) => hub.id === activeHubId) ?? hubs[0],
+    [activeHubId],
+  );
 
   return (
     <HubContext.Provider
@@ -157,17 +139,11 @@ export function HubProvider({
   );
 }
 
-// =====================================================
-// SECTION: HOOK
-// =====================================================
-
 export function useHub(): HubContextType {
   const context = useContext(HubContext);
 
   if (!context) {
-    throw new Error(
-      'useHub must be used within HubProvider',
-    );
+    throw new Error('useHub must be used within HubProvider');
   }
 
   return context;
