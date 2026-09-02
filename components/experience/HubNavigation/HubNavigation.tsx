@@ -19,28 +19,40 @@ const superuserExtensions: NavigationSection[] = [
 ];
 
 const ageOptions = [
-  { id: '5-8', label: 'Ages 5–8' },
-  { id: '9-11', label: 'Ages 9–11' },
-  { id: '12-14', label: 'Ages 12–14' },
-  { id: '15-17', label: 'Ages 15–17' },
-  { id: '18+', label: '18+ / Advanced' },
+  { id: '5-8', label: 'Foundation · Ages 5–8' },
+  { id: '9-11', label: 'Development · Ages 9–11' },
+  { id: '12-14', label: 'Growth · Ages 12–14' },
+  { id: '15-17', label: 'Performance · Ages 15–17' },
+  { id: '18+', label: 'Elite · 18+' },
 ];
 
 const allowedByAge: Record<string, Set<string>> = {
-  '5-8': new Set(['overview', 'passport', 'stage', 'skills', 'goals', 'achievements', 'schedule']),
-  '9-11': new Set(['overview', 'passport', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'performance', 'results', 'schedule']),
-  '12-14': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'performance', 'records', 'training-history', 'habits', 'schedule', 'preparation', 'results']),
-  '15-17': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'trajectory', 'performance', 'records', 'standards', 'rankings', 'analysis', 'training-history', 'habits', 'readiness', 'schedule', 'preparation', 'results']),
-  '18+': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'trajectory', 'performance', 'records', 'standards', 'rankings', 'analysis', 'training-history', 'habits', 'readiness', 'schedule', 'preparation', 'results']),
+  '5-8': new Set(['overview', 'passport', 'stage', 'skills', 'goals', 'achievements', 'inspiration', 'schedule']),
+  '9-11': new Set(['overview', 'passport', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'inspiration', 'performance', 'results', 'schedule']),
+  '12-14': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'inspiration', 'performance', 'records', 'training-history', 'habits', 'schedule', 'preparation', 'results', 'documents']),
+  '15-17': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'inspiration', 'trajectory', 'performance', 'records', 'standards', 'rankings', 'analysis', 'training-history', 'habits', 'readiness', 'schedule', 'preparation', 'results', 'recruiting', 'documents']),
+  '18+': new Set(['overview', 'passport', 'chronometer', 'journey', 'development', 'stage', 'skills', 'goals', 'achievements', 'inspiration', 'trajectory', 'performance', 'records', 'standards', 'rankings', 'analysis', 'training-history', 'habits', 'readiness', 'schedule', 'preparation', 'results', 'recruiting', 'documents']),
 };
 
-function currentView() { if (typeof window === 'undefined') return ''; return new URLSearchParams(window.location.search).get('view') || ''; }
-function currentAge() { if (typeof window === 'undefined') return '5-8'; const value = new URLSearchParams(window.location.search).get('age') || '5-8'; return allowedByAge[value] ? value : '5-8'; }
+function currentView() {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('view') || '';
+}
+function currentAge() {
+  if (typeof window === 'undefined') return '5-8';
+  const value = new URLSearchParams(window.location.search).get('age') || '5-8';
+  return allowedByAge[value] ? value : '5-8';
+}
 
 function athleteNavigation(ageBand: string): NavigationSection[] {
   const base = getNavigation('athlete').map(section => ({ ...section, items: [...section.items] }));
   const development = base.find(section => section.id === 'development');
   if (development && !development.items.some(item => item.id === 'achievements')) development.items.push({ id: 'achievements', label: 'Achievements', icon: 'award' });
+  if (development && !development.items.some(item => item.id === 'inspiration')) development.items.push({ id: 'inspiration', label: 'Inspiration', icon: 'sparkles' });
+  base.push({ id: 'pathway', label: 'PATHWAY & RECORDS', items: [
+    { id: 'recruiting', label: 'Recruiting Passport', icon: 'medal' },
+    { id: 'documents', label: 'Document Vault', icon: 'file' },
+  ]});
   const allowed = allowedByAge[ageBand] ?? allowedByAge['5-8'];
   return base.map(section => ({ ...section, items: section.items.filter(item => allowed.has(item.id)) })).filter(section => section.items.length > 0);
 }
@@ -56,9 +68,9 @@ function NavigationItemView({ item, activeItem, onSelect, activeHubId }: { item:
     if (activeHubId === 'superuser' || activeHubId === 'athlete') {
       const next = new URLSearchParams(window.location.search);
       next.set('view', item.id);
-      const base = activeHubId === 'superuser' ? '/superuser' : '/athlete';
+      const basePath = activeHubId === 'superuser' ? '/superuser' : '/athlete';
       window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: item.id }));
-      router.push(`${base}?${next.toString()}`, { scroll: false });
+      router.push(`${basePath}?${next.toString()}`, { scroll: false });
     }
   };
   if (activeHubId === 'superuser' || activeHubId === 'athlete') return <button type="button" onClick={select} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
@@ -77,12 +89,27 @@ export function HubNavigation() {
   }, [activeHubId, ageBand]);
 
   useEffect(() => {
-    const sync = () => { setActiveItem(currentView() || sections[0]?.items[0]?.id || ''); if (activeHubId === 'athlete') setAgeBand(currentAge()); };
-    const ageSync = (event: Event) => { const next = (event as CustomEvent<string>).detail; if (next && allowedByAge[next]) setAgeBand(next); };
+    const sync = () => {
+      setActiveItem(currentView() || sections[0]?.items[0]?.id || '');
+      if (activeHubId === 'athlete') setAgeBand(currentAge());
+    };
+    const ageSync = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (next && allowedByAge[next]) setAgeBand(next);
+    };
+    const navSync = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (next) setActiveItem(next);
+    };
     sync();
     window.addEventListener('popstate', sync);
     window.addEventListener('ls1sports:athlete-age', ageSync);
-    return () => { window.removeEventListener('popstate', sync); window.removeEventListener('ls1sports:athlete-age', ageSync); };
+    window.addEventListener('ls1sports:navigation', navSync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('ls1sports:athlete-age', ageSync);
+      window.removeEventListener('ls1sports:navigation', navSync);
+    };
   }, [activeHubId, sections]);
 
   function selectAge(nextAge: string) {
@@ -97,10 +124,17 @@ export function HubNavigation() {
   }
 
   return <nav className="flex h-full w-full flex-col bg-[#080909]">
-    <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5"><div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">{currentHub.codeLane}</div><div className="mt-1.5 truncate text-[15px] font-black text-white">{currentHub.name}</div><div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">{currentHub.description}</div>
-      {activeHubId === 'athlete' && <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3"><div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">Demonstrate experience</div><div className="space-y-1">{ageOptions.map(option => <label key={option.id} className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${ageBand === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}><input type="radio" name="athlete-age-demo" checked={ageBand === option.id} onChange={() => selectAge(option.id)} className="accent-[#FA4616]"/><span>{option.label}</span></label>)}</div><div className="mt-2 text-[8px] leading-3 text-neutral-700">Changes both navigation and workspace complexity. Minor identities remain sanitized.</div></div>}
+    <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
+      <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">{currentHub.codeLane}</div>
+      <div className="mt-1.5 truncate text-[15px] font-black text-white">{currentHub.name}</div>
+      <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">{currentHub.description}</div>
+      {activeHubId === 'athlete' && <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
+        <div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">Demonstrate athlete experience</div>
+        <div className="space-y-1">{ageOptions.map(option => <label key={option.id} className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${ageBand === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}><input type="radio" name="athlete-age-demo" checked={ageBand === option.id} onChange={() => selectAge(option.id)} className="accent-[#FA4616]"/><span>{option.label}</span></label>)}</div>
+        <div className="mt-2 text-[8px] leading-3 text-neutral-700">Preview only changes progressive disclosure. The underlying Athlete Passport remains one longitudinal record.</div>
+      </div>}
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">{sections.map(section => <div key={section.id} className="mb-5"><div className="mb-1.5 px-3 text-[8px] font-bold tracking-[0.2em] text-neutral-700">{section.label}</div><div className="space-y-0.5">{section.items.map(item => <NavigationItemView key={item.id} item={item} onSelect={setActiveItem} activeItem={activeItem} activeHubId={activeHubId} />)}</div></div>)}</div>
-    <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3"><div className="flex items-center justify-between"><span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-neutral-700">LS1Sports EAM / EAP</span><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /></div></div>
+    <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3"><div className="flex items-center justify-between"><span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-neutral-700">LS1SPORTS OS</span><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /></div></div>
   </nav>;
 }
