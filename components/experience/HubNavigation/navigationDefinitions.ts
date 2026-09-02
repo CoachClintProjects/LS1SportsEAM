@@ -295,43 +295,33 @@ const adminNavigation: NavigationSection[] = [
 // =====================================================
 
 const parentNavigation: NavigationSection[] = [
-  {
-    id: 'family',
-    label: 'FAMILY',
-    items: [
-      { id: 'household', label: 'Household Overview', icon: 'home', href: '/parent' },
-      { id: 'members', label: 'Family Members', icon: 'users' },
-      { id: 'athletes', label: 'Athletes', icon: 'medal' },
-    ],
-  },
-  {
-    id: 'athlete-development',
-    label: 'ATHLETE DEVELOPMENT',
-    items: [
-      { id: 'development', label: 'Development', icon: 'trending' },
-      { id: 'trajectory', label: 'Trajectories', icon: 'route' },
-      { id: 'competition', label: 'Competition', icon: 'trophy' },
-      { id: 'schedule', label: 'Schedule', icon: 'calendar' },
-    ],
-  },
-  {
-    id: 'registration',
-    label: 'REGISTRATION',
-    items: [
-      { id: 'registrations', label: 'Registrations', icon: 'clipboard' },
-      { id: 'documents', label: 'Documents', icon: 'file' },
-      { id: 'compliance', label: 'Compliance / Waivers', icon: 'shield' },
-    ],
-  },
-  {
-    id: 'financial',
-    label: 'FINANCIAL',
-    items: [
-      { id: 'accounts', label: 'Financial Accounts', icon: 'wallet' },
-      { id: 'invoices', label: 'Invoices', icon: 'receipt' },
-      { id: 'payments', label: 'Payments', icon: 'dollar' },
-    ],
-  },
+  { id:'family',label:'FAMILY OS',items:[
+    {id:'household',label:'Today',icon:'home',href:'/parent'},
+    {id:'tasks',label:'Task Center',icon:'check'},
+    {id:'messages',label:'Family Inbox',icon:'bell'},
+    {id:'members',label:'Family & Permissions',icon:'users'},
+    {id:'athletes',label:'My Athletes',icon:'medal'},
+  ]},
+  { id:'logistics',label:'LOGISTICS',items:[
+    {id:'schedule',label:'Family Schedule',icon:'calendar'},
+    {id:'transport',label:'Transport & Custody',icon:'route'},
+    {id:'volunteer',label:'Participation',icon:'users'},
+  ]},
+  { id:'athlete-context',label:'ATHLETE CONTEXT',items:[
+    {id:'development',label:'Development',icon:'trending'},
+    {id:'trajectory',label:'Journey & Trajectory',icon:'route'},
+    {id:'competition',label:'Competition',icon:'trophy'},
+  ]},
+  { id:'readiness',label:'READINESS & DOCUMENTS',items:[
+    {id:'documents',label:'Document Vault',icon:'file'},
+    {id:'compliance',label:'Compliance / Waivers',icon:'shield'},
+    {id:'registrations',label:'Registrations',icon:'clipboard'},
+  ]},
+  { id:'financial',label:'FINANCIAL',items:[
+    {id:'financial',label:'Financial Center',icon:'wallet'},
+    {id:'invoices',label:'Invoices',icon:'receipt'},
+    {id:'payments',label:'Payments',icon:'dollar'},
+  ]},
 ];
 
 // =====================================================
