@@ -151,6 +151,17 @@ export default function AthleteWorkspace() {
   const teamsLabel = (data?.teams ?? []).map((team: Row) => String(team.name ?? '')).filter(Boolean).join(', ') || 'No active team';
   const meta = VIEW_META[view] ?? VIEW_META.overview;
 
+  const NAV = [
+    ['overview','Home'],['passport','Passport'],['chronometer','Timeline'],['development','Development'],['goals','Goals'],
+    ['achievements','Achievements'],['inspiration','Inspiration'],['schedule','Schedule'],['results','Results'],['records','Personal Records'],
+    ['standards','Standards'],['trajectory','Trajectory'],['performance','Performance'],['training-history','Training'],['recruiting','Recruiting'],['documents','Document Vault']
+  ] as const;
+  function changeView(nextView: string) {
+    const next = new URLSearchParams(params.toString());
+    next.set('view', nextView);
+    router.push(`/athlete?${next.toString()}`, { scroll: false });
+  }
+
   const personalRecords = useMemo<Row[]>(() => {
     const best = new Map<string, Row>();
     for (const result of data?.results ?? []) {
@@ -235,6 +246,10 @@ export default function AthleteWorkspace() {
     {error && <Panel className="mb-5 border-red-900/50"><div className="flex gap-3 text-sm text-red-300"><AlertTriangle className="h-5 w-5 shrink-0"/><div>{error}</div></div></Panel>}
 
     <Panel className="mb-6"><div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-400"/><span className="text-[9px] font-black uppercase tracking-[.2em] text-emerald-400">LIVE SANITIZED DEMONSTRATION</span></div><h2 className="mt-2 text-xl font-black text-white">{String(athlete?.name ?? 'Athlete experience')}</h2><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-400"><span>{athlete ? `${String(athlete.age)} years` : '—'}</span><span>{sportsLabel}</span><span>{teamsLabel}</span><span>{stage.tone}</span></div></div><div className="flex flex-wrap gap-2">{(data?.availableBands ?? []).map((band: Row) => <button key={String(band.id)} onClick={() => changeBand(String(band.id))} className={`rounded-full border px-3 py-2 text-[10px] font-bold ${String(band.id) === ageBand ? 'border-[#FA4616] bg-[#FA4616]/10 text-white' : 'border-neutral-800 text-neutral-500 hover:text-white'}`}>{String(band.label)} · {String(band.count)}</button>)}</div></div></Panel>
+
+    <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
+      {NAV.map(([id,label]) => <button key={id} onClick={() => changeView(id)} className={`shrink-0 rounded-full border px-3 py-2 text-[10px] font-bold ${view===id ? 'border-[#FA4616] bg-[#FA4616]/10 text-white' : 'border-neutral-800 text-neutral-500 hover:text-white'}`}>{label}</button>)}
+    </div>
 
     {renderView()}
 
