@@ -65,15 +65,15 @@ function NavigationItemView({ item, activeItem, onSelect, activeHubId }: { item:
   const content = <><Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#FA4616]' : 'text-neutral-600 group-hover:text-neutral-300'}`} strokeWidth={1.8} /><span className="min-w-0 flex-1 truncate text-left">{item.label}</span>{active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}</>;
   const select = () => {
     onSelect(item.id);
-    if (activeHubId === 'superuser' || activeHubId === 'athlete') {
+    if (activeHubId === 'superuser' || activeHubId === 'athlete' || activeHubId === 'parent') {
       const next = new URLSearchParams(window.location.search);
       next.set('view', item.id);
-      const basePath = activeHubId === 'superuser' ? '/superuser' : '/athlete';
+      const basePath = activeHubId === 'superuser' ? '/superuser' : activeHubId === 'athlete' ? '/athlete' : '/parent';
       window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: item.id }));
       router.push(`${basePath}?${next.toString()}`, { scroll: false });
     }
   };
-  if (activeHubId === 'superuser' || activeHubId === 'athlete') return <button type="button" onClick={select} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
+  if (activeHubId === 'superuser' || activeHubId === 'athlete' || activeHubId === 'parent') return <button type="button" onClick={select} aria-current={active ? 'page' : undefined} className={classes}>{content}</button>;
   return <Link href={item.href ?? '#'} onClick={() => onSelect(item.id)} aria-current={active ? 'page' : undefined} className={classes}>{content}</Link>;
 }
 
