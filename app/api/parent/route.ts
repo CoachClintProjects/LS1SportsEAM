@@ -15,7 +15,7 @@ export async function GET(request:NextRequest){
   if(!KEY) throw new Error('Supabase server credentials are not configured.');
   let familyId=request.nextUrl.searchParams.get('family');
   if(!familyId){const first=await rest('families?select=id&order=created_at.asc&limit=1'); familyId=first?.[0]?.id||null;}
-  if(!familyId) return NextResponse.json({family:null,members:[],athletes:[],tasks:[],messages:[],invoices:[],documents:[],trips:[],custody:[],volunteer:[],metrics:{},source:'LS1SportsEAM Supabase',setupRequired:true});
+  if(!familyId){const candidates=await rest('athletes?select=id,person_id,athlete_number,status,people(first_name,last_name)&order=created_at.asc&limit=229'); return NextResponse.json({family:null,members:[],athletes:[],tasks:[],messages:[],invoices:[],documents:[],trips:[],custody:[],volunteer:[],metrics:{},source:'LS1SportsEAM Supabase',setupRequired:true,candidates});}
   const response=await fetch(`${URL}/rest/v1/rpc/get_parent_hub`,{method:'POST',headers:{...h(),Accept:'application/json'},body:JSON.stringify({p_family_id:familyId}),cache:'no-store'});
   const body=await response.text(); if(!response.ok) throw new Error(`Supabase Parent Hub RPC returned ${response.status}: ${body.slice(0,300)}`);
   return NextResponse.json(JSON.parse(body),{headers:{'Cache-Control':'no-store, max-age=0'}});
