@@ -43,3 +43,6 @@ create index if not exists idx_reflections_athlete on public.athlete_reflections
 alter table public.contracts enable row level security;
 alter table public.contract_versions enable row level security;
 alter table public.athlete_reflections enable row level security;
+
+grant select,insert,update,delete on public.contracts,public.contract_versions,public.athlete_reflections to service_role;
+revoke all on public.contracts,public.contract_versions,public.athlete_reflections from anon,authenticated;
