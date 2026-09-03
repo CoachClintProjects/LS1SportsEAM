@@ -1,288 +1,64 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Award, CalendarDays, CheckCircle2, ChevronRight, Flag, RefreshCw, Route, ShieldCheck, Sparkles, Star, Target, Trophy, Users, X } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React,{useCallback,useEffect,useMemo,useState}from'react';
+import{Activity,AlertTriangle,Award,CalendarDays,CheckCircle2,ChevronRight,FileText,Flag,RefreshCw,ShieldCheck,Sparkles,Star,Target,Trophy,Upload,Users,X}from'lucide-react';
+import{useSearchParams}from'next/navigation';
 
-type Row = Record<string, any>;
-type AthletePayload = {
-  athlete: Row | null;
-  availableBands: Row[];
-  sports: Row[];
-  teams: Row[];
-  results: Row[];
-  goals: Row[];
-  development: Row[];
-  schedule: Row[];
-  badges: Row[];
-  challenges: Row[];
-  recruiting: { cycles?: Row[]; outreachCount?: number };
-  documents: Row[];
-  metrics: Record<string, number>;
-  reconciliation: Record<string, number>;
-  generatedAt: string;
-  source: string;
-  projection: string;
-  error?: string;
+type Row=Record<string,any>;
+type Payload={athlete:Row|null;availableBands:Row[];sports:Row[];teams:Row[];results:Row[];goals:Row[];development:Row[];schedule:Row[];badges:Row[];challenges:Row[];recruiting:{cycles?:Row[];outreachCount?:number};documents:Row[];metrics:Record<string,number>;reconciliation:Record<string,number>;generatedAt:string;source:string;projection:string;error?:string};
+type Stage={label:string;short:string;tone:string;intro:string};
+const STAGES:Record<string,Stage>={
+ '5-8':{label:'Ages 5–8',short:'Foundation',tone:'Play · learn · belong',intro:'Your sports world should feel fun, simple and exciting.'},
+ '9-11':{label:'Ages 9–11',short:'Development',tone:'Explore · practice · improve',intro:'See what happened, what is next and how you are growing.'},
+ '12-14':{label:'Ages 12–14',short:'Growth',tone:'Own · understand · progress',intro:'Results, goals, training and preparation become part of your own sports story.'},
+ '15-17':{label:'Ages 15–17',short:'Performance',tone:'Prepare · perform · learn',intro:'Performance, rankings, standards, recruiting and planning come together in one athlete workspace.'},
+ '18+':{label:'18+ / Advanced',short:'Advanced',tone:'Analyze · decide · lead',intro:'The full longitudinal Athlete Passport with performance, planning, documents and career context.'}
 };
 
-type StageConfig = {
-  label: string;
-  short: string;
-  tone: string;
-  intro: string;
-  focus: string[];
-  quests: string[];
-};
+function time(v:any){const n=Number(v);if(!Number.isFinite(n))return'—';const m=Math.floor(n/60),s=n-m*60;return m?`${m}:${s.toFixed(2).padStart(5,'0')}`:s.toFixed(2)}
+function Card({eyebrow,title,value,detail,icon:Icon=Star,onClick,accent=false,children}:{eyebrow:string;title:string;value?:React.ReactNode;detail?:string;icon?:React.ElementType;onClick:()=>void;accent?:boolean;children?:React.ReactNode}){return <button onClick={onClick} className={`group w-full rounded-2xl border p-5 text-left transition ${accent?'border-[#FA4616]/50 bg-[#FA4616]/8':'border-neutral-800 bg-[#090b0b] hover:border-neutral-600'}`}><div className="flex items-start justify-between gap-4"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">{eyebrow}</div><h3 className="mt-1 text-lg font-black text-white">{title}</h3></div><Icon className={`h-5 w-5 ${accent?'text-[#FA4616]':'text-neutral-600 group-hover:text-[#FA4616]'}`}/></div>{value!==undefined&&<div className="mt-4 text-3xl font-black text-white">{value}</div>}{detail&&<div className="mt-2 text-xs leading-5 text-neutral-500">{detail}</div>}{children}<div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-[#FA4616]">Open <ChevronRight className="h-3 w-3"/></div></button>}
+function Empty({children}:{children:React.ReactNode}){return <div className="rounded-xl border border-dashed border-neutral-800 bg-black/20 p-5 text-xs leading-5 text-neutral-500">{children}</div>}
+function CalendarStrip({entries,onOpen}:{entries:Row[];onOpen:(row:Row)=>void}){const start=new Date();start.setHours(0,0,0,0);return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">{Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);const hits=entries.filter(e=>{const raw=e.competition?.startsAt||e.startsAt||e.start;return raw&&new Date(raw).toDateString()===d.toDateString()});return <button key={d.toISOString()} onClick={()=>onOpen({kind:'calendar-day',date:d.toISOString(),entries:hits})} className="min-h-24 rounded-xl border border-neutral-800 bg-[#0d1010] p-3 text-left hover:border-neutral-600"><div className="text-[9px] font-black uppercase tracking-[.15em] text-neutral-600">{d.toLocaleDateString(undefined,{weekday:'short'})}</div><div className="mt-1 text-lg font-black text-white">{d.getDate()}</div><div className="mt-2 space-y-1">{hits.slice(0,2).map((e:any,n:number)=><div key={n} className="truncate rounded bg-[#FA4616]/10 px-2 py-1 text-[9px] font-bold text-[#FA4616]">{e.competition?.name||e.title||'Event'}</div>)}</div></button>})}</div>}
 
-const STAGES: Record<string, StageConfig> = {
-  '5-8': {
-    label: 'Ages 5–8', short: 'Foundation', tone: 'Play · learn · belong',
-    intro: 'Swimming should feel exciting. This view keeps the athlete experience visual, simple and positive.',
-    focus: ['Show up and have fun', 'Learn one skill at a time', 'Celebrate effort and courage'],
-    quests: ['Pack my swim gear', 'Try one skill my coach gives me', 'Tell someone one thing I enjoyed'],
-  },
-  '9-11': {
-    label: 'Ages 9–11', short: 'Development', tone: 'Explore · practice · improve',
-    intro: 'Athletes begin to understand practice, goals and progress without turning development into a spreadsheet.',
-    focus: ['Build consistent habits', 'Understand basic goals', 'Recognize progress'],
-    quests: ['Choose today’s focus', 'Complete my practice goal', 'Record one thing I learned'],
-  },
-  '12-14': {
-    label: 'Ages 12–14', short: 'Growth', tone: 'Own · understand · progress',
-    intro: 'The athlete gets more ownership: training history, goals, results and development evidence become more visible.',
-    focus: ['Own preparation', 'Connect training to performance', 'Build healthy routines'],
-    quests: ['Review my goal', 'Prepare for the next session', 'Add a reflection after practice'],
-  },
-  '15-17': {
-    label: 'Ages 15–17', short: 'Performance', tone: 'Prepare · perform · learn',
-    intro: 'Performance analysis, trajectory and competition context layer in while the athlete remains protected as a minor.',
-    focus: ['Use evidence to improve', 'Prepare independently', 'Understand longer-term trajectory'],
-    quests: ['Review my next competition', 'Check my current development goal', 'Capture one performance learning'],
-  },
-  '18+': {
-    label: '18+ / Advanced', short: 'Advanced', tone: 'Analyze · decide · lead',
-    intro: 'The complete athlete intelligence experience: longitudinal performance, development, training and competition evidence.',
-    focus: ['Own the complete athlete record', 'Use performance evidence', 'Plan long-term development'],
-    quests: ['Review current priorities', 'Check performance evidence', 'Set the next development action'],
-  },
-};
+function GoalForm({initial,saving,onSave,onCancel}:{initial:Row;saving:boolean;onSave:(v:Row)=>void;onCancel:()=>void}){const[v,setV]=useState<Row>(initial);return <form className="mt-6 space-y-4" onSubmit={e=>{e.preventDefault();onSave(v)}}><label className="block text-xs text-neutral-400">Goal title<input autoFocus value={v.title||''} onChange={e=>setV({...v,title:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="block text-xs text-neutral-400">Why this matters<textarea value={v.description||''} onChange={e=>setV({...v,description:e.target.value})} className="mt-1 min-h-28 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><div className="grid grid-cols-2 gap-3"><label className="text-xs text-neutral-400">Target<input value={v.targetValue??''} onChange={e=>setV({...v,targetValue:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="text-xs text-neutral-400">Unit<input value={v.targetUnit||''} onChange={e=>setV({...v,targetUnit:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label></div><label className="block text-xs text-neutral-400">Due date<input type="date" value={v.dueOn||''} onChange={e=>setV({...v,dueOn:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-white">Cancel</button><button disabled={saving} className="rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black">{saving?'Saving…':'Save Goal'}</button></div></form>}
+function DocumentUpload({athleteId,saving,setSaving,onDone,onError}:{athleteId:string;saving:boolean;setSaving:(v:boolean)=>void;onDone:()=>void;onError:(s:string)=>void}){const[file,setFile]=useState<File|null>(null);const[title,setTitle]=useState('');return <form className="mt-6 space-y-4" onSubmit={async e=>{e.preventDefault();if(!file){onError('Choose a file.');return}setSaving(true);try{const fd=new FormData();fd.set('athleteId',athleteId);fd.set('title',title||file.name);fd.set('file',file);fd.set('classification','restricted');const r=await fetch('/api/documents',{method:'POST',body:fd});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Upload failed');onDone()}catch(e){onError(e instanceof Error?e.message:'Upload failed')}finally{setSaving(false)}}}><label className="block text-xs text-neutral-400">Document title<input value={title} onChange={e=>setTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><input type="file" onChange={e=>setFile(e.target.files?.[0]||null)} className="block w-full text-sm text-neutral-300"/><button disabled={saving} className="w-full rounded-lg bg-[#FA4616] px-4 py-3 text-sm font-black text-black">{saving?'Uploading…':'Upload & Save'}</button></form>}
 
-const VIEW_META: Record<string, { title: string; description: string }> = {
-  overview: { title: 'My Home', description: 'What matters now, what is next, and how am I progressing?' },
-  passport: { title: 'My Athlete Passport', description: 'One athlete identity across teams, sports and seasons.' },
-  chronometer: { title: 'My Timeline', description: 'A chronological view of recorded athlete evidence.' },
-  journey: { title: 'My Journey', description: 'My development story built from recorded facts.' },
-  development: { title: 'My Development', description: 'Goals, assessments and development evidence.' },
-  stage: { title: 'My Stage', description: 'What this development stage means and what comes next.' },
-  skills: { title: 'My Skills', description: 'Simple development focus without invented skill scores.' },
-  goals: { title: 'My Goals', description: 'Recorded goals plus a simple demonstration focus.' },
-  achievements: { title: 'Achievements', description: 'Positive milestones derived from real athlete evidence.' },
-  trajectory: { title: 'My Trajectory', description: 'Direction over time when enough evidence exists.' },
-  performance: { title: 'Performance', description: 'Canonical performance records only.' },
-  records: { title: 'Personal Records', description: 'Best canonical performances by event.' },
-  standards: { title: 'Time Standards', description: 'Qualification comparisons when standards are connected.' },
-  rankings: { title: 'Rankings', description: 'Rank evidence when ranking data is connected.' },
-  analysis: { title: 'Competition Analysis', description: 'Competition performance and context.' },
-  'training-history': { title: 'Training History', description: 'Recorded athlete training evidence.' },
-  habits: { title: 'Training Habits', description: 'Patterns only when sufficient training history exists.' },
-  readiness: { title: 'Readiness', description: 'Readiness evidence when the organization records it.' },
-  schedule: { title: 'My Schedule', description: 'Upcoming competition entries and obligations.' },
-  preparation: { title: 'Meet Preparation', description: 'What is coming and what needs attention.' },
-  results: { title: 'My Results', description: 'Canonical result history and source evidence.' },
-  inspiration: { title: 'My Inspiration', description: 'The reasons, people and milestones that keep me moving forward.' },
-  recruiting: { title: 'Recruiting Passport', description: 'Athlete-owned recruiting readiness, cycles and outreach — never a fake score.' },
-  documents: { title: 'My Document Vault', description: 'Versioned, permissioned documents and verification evidence.' },
-};
+export default function AthleteWorkspace(){
+ const params=useSearchParams();const ageBand=STAGES[params.get('age')||'5-8']?params.get('age')||'5-8':'5-8';const stage=STAGES[ageBand];
+ const[data,setData]=useState<Payload|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[drawer,setDrawer]=useState<Row|null>(null),[saving,setSaving]=useState(false);
+ const load=useCallback(async()=>{setLoading(true);try{const r=await fetch(`/api/athlete?age=${encodeURIComponent(ageBand)}`,{cache:'no-store'});const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||'Athlete data unavailable');setData(j);setError('')}catch(e){setError(e instanceof Error?e.message:'Athlete data unavailable')}finally{setLoading(false)}},[ageBand]);
+ useEffect(()=>{void load()},[load]);
+ const athlete=data?.athlete,metrics=data?.metrics||{},results=data?.results||[],goals=data?.goals||[],schedule=data?.schedule||[],badges=data?.badges||[],challenges=data?.challenges||[];
+ const latest=results[0];const records=useMemo(()=>{const m=new Map<string,Row>();for(const r of results){const k=String(r.event?.code||r.event?.name||r.id),n=Number(r.resultValue),old=m.get(k);if(Number.isFinite(n)&&(!old||n<Number(old.resultValue)))m.set(k,r)}return[...m.values()]},[results]);const activeGoal=goals.find(g=>String(g.status).toLowerCase()!=='completed')||goals[0];const next=schedule[0];
+ async function saveGoal(v:Row){if(!athlete?.id)return;setSaving(true);try{const r=await fetch('/api/athlete/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:v.id?'update_goal':'create_goal',athleteId:athlete.id,goalId:v.id,title:v.title,description:v.description,goalType:v.goalType||v.type||'development',targetValue:v.targetValue,targetUnit:v.targetUnit,dueOn:v.dueOn,status:v.status||'open'})});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Unable to save goal');setDrawer(null);await load()}catch(e){setError(e instanceof Error?e.message:'Unable to save goal')}finally{setSaving(false)}}
+ async function advanceChallenge(ch:Row){if(!athlete?.id)return;setSaving(true);try{const progress=Number(ch.progress||0)+1;const r=await fetch('/api/athlete/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update_challenge',athleteId:athlete.id,challengeId:ch.id,progressValue:progress,status:'active'})});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Unable to save mission progress');setDrawer(null);await load()}catch(e){setError(e instanceof Error?e.message:'Unable to save mission')}finally{setSaving(false)}}
+ const open=(kind:string,payload:Row={})=>setDrawer({kind,...payload});
+ if(!data&&loading)return <main className="p-8 text-neutral-500">Loading Athlete World…</main>;
+ if(!data)return <main className="p-8 text-red-300">{error||'Athlete data unavailable'}</main>;
+ const young=ageBand==='5-8',developing=ageBand==='9-11',growth=ageBand==='12-14',performance=ageBand==='15-17'||ageBand==='18+';
+ return <main className="mx-auto max-w-[1600px] space-y-6 p-5 lg:p-8">
+  <section className={`overflow-hidden rounded-3xl border p-6 lg:p-8 ${young?'border-[#FA4616]/40 bg-gradient-to-br from-[#FA4616]/15 via-[#090b0b] to-[#090b0b]':'border-neutral-800 bg-[#090b0b]'}`}><div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.25em] text-[#FA4616]">{young?'MY LS1 ADVENTURE':'ATHLETE WORLD'} · {stage.label}</div><h1 className="mt-2 text-3xl font-black text-white lg:text-4xl">{young?'Ready for your next adventure?':`Welcome back, ${athlete?.name||'Athlete'}`}</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-400">{stage.intro}</p></div><button onClick={()=>void load()} className="self-start rounded-xl border border-neutral-700 bg-black/30 p-3 text-neutral-400"><RefreshCw className={loading?'h-4 w-4 animate-spin':'h-4 w-4'}/></button></div></section>
 
-function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-2xl border border-neutral-800 bg-[#090b0b] p-5 ${className}`}>{children}</section>;
-}
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-neutral-800 bg-[#0b0d0d] p-5 text-xs leading-5 text-neutral-500">{children}</div>;
-}
-function Metric({ label, value, detail }: { label: string; value: React.ReactNode; detail: string }) {
-  return <div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-[8px] font-black uppercase tracking-[.18em] text-neutral-500">{label}</div><div className="mt-2 text-2xl font-black text-white">{value}</div><div className="mt-1 text-[10px] leading-4 text-neutral-500">{detail}</div></div>;
-}
-function formatTime(value: unknown) {
-  const seconds = Number(value);
-  if (!Number.isFinite(seconds)) return '—';
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds - minutes * 60;
-  return minutes > 0 ? `${minutes}:${remainder.toFixed(2).padStart(5, '0')}` : remainder.toFixed(2);
-}
+  {error&&<div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-200">{error}</div>}
 
-function CalendarStrip({entries}:{entries:Row[]}){const start=new Date();start.setHours(0,0,0,0);const days=Array.from({length:14},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">{days.map(d=>{const same=entries.filter(e=>{const raw=e.competition?.startsAt||e.startsAt||e.start;return raw&&new Date(raw).toDateString()===d.toDateString()});return <div key={d.toISOString()} className="min-h-28 rounded-xl border border-neutral-800 bg-[#0d1010] p-3"><div className="text-[9px] font-black uppercase tracking-[.15em] text-neutral-600">{d.toLocaleDateString(undefined,{weekday:'short'})}</div><div className="mt-1 text-sm font-black text-white">{d.getDate()}</div><div className="mt-2 space-y-1">{same.map((e:any,i:number)=><div key={i} className="rounded bg-[#FA4616]/10 px-2 py-1 text-[9px] font-bold text-[#FA4616]">{String(e.competition?.name||e.title||'Scheduled event')}</div>)}</div></div>})}</div>}
-function GoalEditor({initial,saving,onCancel,onSave}:{initial:Row;saving:boolean;onCancel:()=>void;onSave:(x:Row)=>void}){const [v,setV]=useState<Row>(initial);return <form className="mt-6 space-y-4" onSubmit={e=>{e.preventDefault();onSave(v)}}><label className="block text-xs text-neutral-400">Goal title<input autoFocus value={v.title||''} onChange={e=>setV({...v,title:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="block text-xs text-neutral-400">Description<textarea value={v.description||''} onChange={e=>setV({...v,description:e.target.value})} className="mt-1 min-h-28 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><div className="grid grid-cols-2 gap-3"><label className="text-xs text-neutral-400">Target value<input value={v.targetValue??''} onChange={e=>setV({...v,targetValue:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="text-xs text-neutral-400">Target unit<input value={v.targetUnit||''} onChange={e=>setV({...v,targetUnit:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label></div><label className="block text-xs text-neutral-400">Due date<input type="date" value={v.dueOn||''} onChange={e=>setV({...v,dueOn:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-white">Cancel</button><button disabled={saving} className="rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black">{saving?'Saving…':'Save Goal'}</button></div></form>}
-function DocumentUploader({athleteId,saving,setSaving,onCancel,onSaved,onError}:{athleteId:string;saving:boolean;setSaving:(v:boolean)=>void;onCancel:()=>void;onSaved:()=>void;onError:(v:string)=>void}){const[file,setFile]=useState<File|null>(null);const[title,setTitle]=useState('');return <form className="mt-6 space-y-4" onSubmit={async e=>{e.preventDefault();if(!file)return onError('Choose a file to upload.');setSaving(true);onError('');try{const fd=new FormData();fd.set('athleteId',athleteId);fd.set('title',title||file.name);fd.set('file',file);fd.set('classification','restricted');const r=await fetch('/api/documents',{method:'POST',body:fd});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Upload failed');onSaved();}catch(e){onError(e instanceof Error?e.message:'Upload failed');}finally{setSaving(false);}}><label className="block text-xs text-neutral-400">Document title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Leave blank to use file name" className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="block text-xs text-neutral-400">Choose file<input type="file" onChange={e=>setFile(e.target.files?.[0]||null)} className="mt-1 block w-full text-sm text-neutral-300"/></label>{file&&<div className="rounded-lg border border-neutral-800 p-3 text-xs text-neutral-400">{file.name} · {(file.size/1024/1024).toFixed(2)} MB</div>}<div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-white">Cancel</button><button disabled={saving} className="rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black">{saving?'Uploading…':'Upload & Save'}</button></div></form>}
-function ReflectionEditor({initial,saving,onCancel,onSave}:{initial:Row;saving:boolean;onCancel:()=>void;onSave:(x:Row)=>void}){const[v,setV]=useState<Row>(initial);return <form className="mt-6 space-y-4" onSubmit={e=>{e.preventDefault();onSave(v)}}><label className="block text-xs text-neutral-400">Title<input autoFocus value={v.title||''} onChange={e=>setV({...v,title:e.target.value})} className="mt-1 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><label className="block text-xs text-neutral-400">Reflection<textarea value={v.body||''} onChange={e=>setV({...v,body:e.target.value})} className="mt-1 min-h-36 w-full rounded-lg border border-neutral-700 bg-black p-3 text-white"/></label><div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-white">Cancel</button><button disabled={saving} className="rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black">{saving?'Saving…':'Save Reflection'}</button></div></form>}
+  {young&&<>
+   <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]"><Card eyebrow="My mission" title={challenges[0]?.name||'Try something brave today'} detail={challenges[0]?.description||'Your coach and LS1 will give you simple missions to explore.'} icon={Target} accent onClick={()=>open('challenge',challenges[0]||{})}><div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-800"><div className="h-full bg-[#FA4616]" style={{width:`${Math.min(100,Number(challenges[0]?.progress||0)*20)}%`}}/></div></Card><Card eyebrow="What’s next" title={next?.competition?.name||'Your next swim adventure'} detail={next?`${next.event?.name||next.event?.code||'Event'} · ${new Date(next.competition?.startsAt).toLocaleString()}`:'Your schedule will appear here as soon as it is assigned.'} icon={CalendarDays} onClick={()=>open('schedule',{items:schedule})}/></div>
+   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Card eyebrow="My wins" title={badges[0]?.name||'Your wins live here'} detail={badges[0]?'Earned from real evidence.':'Effort, courage, teamwork and improvement all count as wins.'} icon={Award} onClick={()=>open('badges',{items:badges})}/><Card eyebrow="My goal" title={activeGoal?.title||'Choose my next mission'} detail={activeGoal?.description||'Create a simple goal with help from your parent or coach.'} icon={Star} onClick={()=>open('goal-editor',activeGoal||{})}/><Card eyebrow="My team" title={data.teams[0]?.name||'My Team'} detail={data.teams[0]?.organization||'Your people and team belong here.'} icon={Users} onClick={()=>open('team',data.teams[0]||{})}/><Card eyebrow="My latest swim" title={latest?String(latest.event?.name||latest.event?.code||'Latest result'):'When I race'} value={latest?time(latest.resultValue):'—'} detail={latest?'A real recorded swim — tap to see what happened.':'Results appear here when you compete. No fake times.'} icon={Trophy} onClick={()=>open('result',latest||{})}/></div>
+   <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#FA4616]"/><h2 className="text-lg font-black text-white">My Adventure Trail</h2></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{(challenges.length?challenges:[{name:'First Practice'},{name:'Try a New Skill'},{name:'Help a Teammate'},{name:'My First Race'}]).slice(0,4).map((c:any,i:number)=><button key={c.id||i} onClick={()=>open('challenge',c)} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FA4616]/10 text-[#FA4616]"><Star className="h-4 w-4"/></div><div className="mt-3 font-bold text-white">{c.name}</div><div className="mt-1 text-xs text-neutral-500">{Number(c.progress||0)>0?'Adventure in progress':'Ready when you are'}</div></button>)}</div></section>
+  </>}
 
-export default function AthleteWorkspace() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const view = params.get('view') ?? 'overview';
-  const ageBand = STAGES[params.get('age') ?? '5-8'] ? (params.get('age') ?? '5-8') : '5-8';
-  const stage = STAGES[ageBand];
-  const [data, setData] = useState<AthletePayload | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [drawer, setDrawer] = useState<Row | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [questDone, setQuestDone] = useState<boolean[]>([false, false, false]);
+  {!young&&<>
+   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Card eyebrow="Front page news" title={latest?String(latest.event?.name||latest.event?.code||'Latest result'):'Latest result'} value={latest?time(latest.resultValue):'—'} detail={latest?`${latest.competition||'Competition'}${latest.rank?` · placed #${latest.rank}`:''}`:'No canonical result is connected yet.'} icon={Trophy} accent onClick={()=>open('result',latest||{})}/><Card eyebrow="Personal best" title={records[0]?String(records[0].event?.name||records[0].event?.code||'Best event'):'Personal records'} value={records[0]?time(records[0].resultValue):'—'} detail={records.length?`${records.length} event bests from canonical results`:'PBs will calculate automatically from verified results.'} icon={Award} onClick={()=>open('records',{items:records})}/><Card eyebrow="My goal" title={activeGoal?.title||'Set my next goal'} detail={activeGoal?.description||'Create and update your own development goal.'} icon={Target} onClick={()=>open('goal-editor',activeGoal||{})}/><Card eyebrow="Up next" title={next?.competition?.name||'Schedule'} detail={next?new Date(next.competition?.startsAt).toLocaleString():'No athlete-specific upcoming event is connected yet.'} icon={CalendarDays} onClick={()=>open('schedule',{items:schedule})}/></div>
+   <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">My calendar</div><h2 className="mt-1 text-lg font-black text-white">The week ahead</h2></div><CalendarDays className="h-5 w-5 text-neutral-600"/></div><div className="mt-5"><CalendarStrip entries={schedule} onOpen={setDrawer}/></div></section>
+   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Card eyebrow="How I’m progressing" title="Performance & development" value={`${metrics.officialResults||0} results`} detail={`${metrics.trainingSessions||0} training records · ${metrics.assessments||0} assessments`} icon={Activity} onClick={()=>open('performance',{results,development:data.development,metrics})}/><Card eyebrow="Achievements" title={badges[0]?.name||'Milestones & badges'} value={badges.length||0} detail="Achievements only appear when supported by recorded evidence." icon={Sparkles} onClick={()=>open('badges',{items:badges})}/><Card eyebrow="My team" title={data.teams[0]?.name||'Current team'} detail={data.teams[0]?.organization||'No active team context'} icon={Users} onClick={()=>open('team',data.teams[0]||{})}/></div>
+  </>}
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/athlete?age=${encodeURIComponent(ageBand)}`, { cache: 'no-store' });
-      const payload = (await response.json()) as AthletePayload;
-      setData(payload);
-      if (!response.ok || payload.error) setError(payload.error ?? 'Athlete data unavailable');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Athlete data unavailable');
-    } finally {
-      setLoading(false);
-    }
-  }, [ageBand]);
+  {(growth||performance)&&<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Card eyebrow="Standards" title="Qualification status" value="—" detail="Time-standard data exists in LS1; athlete comparison remains unverified until event/course matching is completed." icon={Flag} onClick={()=>open('standards',{status:'not-yet-verified'})}/><Card eyebrow="Rankings" title="Where do I stand?" value={latest?.rank?`#${latest.rank}`:'—'} detail={latest?.rank?'This is latest recorded competition placing, not a regional ranking.':'Ranking engine data is not connected yet; LS1 will not invent it.'} icon={Trophy} onClick={()=>open('rankings',{latest})}/><Card eyebrow="Training" title="My training evidence" value={metrics.trainingSessions||0} detail={`${metrics.attendanceRecords||0} attendance records`} icon={Activity} onClick={()=>open('training',{metrics})}/><Card eyebrow="Documents" title="My Vault" value={data.documents.length} detail="Private, versioned athlete documents." icon={ShieldCheck} onClick={()=>open('documents',{items:data.documents})}/></div>}
 
-  useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 30000); return () => window.clearInterval(timer); }, [load]);
-  useEffect(() => {
-    const key = `ls1-athlete-quest-${ageBand}`;
-    try { const stored = window.localStorage.getItem(key); setQuestDone(stored ? JSON.parse(stored) : [false, false, false]); } catch { setQuestDone([false, false, false]); }
-  }, [ageBand]);
+  {performance&&<div className="grid gap-4 md:grid-cols-2"><Card eyebrow="Recruiting" title={data.recruiting?.cycles?.[0]?.name||'Recruiting Passport'} detail={`${data.recruiting?.outreachCount||0} recorded outreach actions · verified evidence only`} icon={Flag} onClick={()=>open('recruiting',{...data.recruiting})}/><Card eyebrow="Athlete Passport" title="My complete record" detail="Identity, teams, sports, results, goals, development, documents and history stay attached to one athlete asset." icon={ShieldCheck} onClick={()=>open('passport',{athlete,sports:data.sports,teams:data.teams})}/></div>}
 
-  const athlete = data?.athlete ?? null;
-  const metrics = data?.metrics ?? {};
-  const sportsLabel = (data?.sports ?? []).map((sport: Row) => String(sport.name ?? '')).filter(Boolean).join(', ') || 'Swimming';
-  const teamsLabel = (data?.teams ?? []).map((team: Row) => String(team.name ?? '')).filter(Boolean).join(', ') || 'No active team';
-  const meta = VIEW_META[view] ?? VIEW_META.overview;
-
-  const NAV = [
-    ['overview','Home'],['passport','Passport'],['chronometer','Timeline'],['development','Development'],['goals','Goals'],
-    ['achievements','Achievements'],['inspiration','Inspiration'],['schedule','Schedule'],['results','Results'],['records','Personal Records'],
-    ['standards','Standards'],['trajectory','Trajectory'],['performance','Performance'],['training-history','Training'],['recruiting','Recruiting'],['documents','Document Vault']
-  ] as const;
-  function changeView(nextView: string) {
-    const next = new URLSearchParams(params.toString());
-    next.set('view', nextView);
-    router.push(`/athlete?${next.toString()}`, { scroll: false });
-  }
-
-  const personalRecords = useMemo<Row[]>(() => {
-    const best = new Map<string, Row>();
-    for (const result of data?.results ?? []) {
-      const key = String(result.event?.code ?? result.event?.name ?? 'event');
-      const current = best.get(key);
-      if (!current || Number(result.resultValue) < Number(current.resultValue)) best.set(key, result);
-    }
-    return Array.from(best.values());
-  }, [data?.results]);
-
-  function changeBand(nextBand: string) {
-    const next = new URLSearchParams(params.toString());
-    next.set('age', nextBand);
-    next.set('view', 'overview');
-    router.push(`/athlete?${next.toString()}`, { scroll: false });
-  }
-
-  async function saveGoal(input: Row) {
-    if (!athlete?.id) { setError('No canonical athlete is loaded.'); return; }
-    setSaving(true); setError('');
-    try {
-      const action = input.id ? 'update_goal' : 'create_goal';
-      const response = await fetch('/api/athlete/actions', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action, athleteId: athlete.id, goalId: input.id, title: input.title, description: input.description, goalType: input.goalType || input.type || 'development', targetValue: input.targetValue, targetUnit: input.targetUnit, dueOn: input.dueOn, status: input.status || 'open' }) });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to save goal');
-      setDrawer(null); await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save goal'); } finally { setSaving(false); }
-  }
-
-  async function saveReflection(input: Row) {
-    if (!athlete?.id) return;
-    setSaving(true); setError('');
-    try {
-      const response = await fetch('/api/athlete/actions', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'create_reflection',athleteId:athlete.id,title:input.title,body:input.body,reflectionType:input.reflectionType||'general',occurredOn:input.occurredOn})});
-      const result=await response.json(); if(!response.ok||!result.ok)throw new Error(result.error||'Unable to save reflection');
-      setDrawer(null); await load();
-    } catch(e){setError(e instanceof Error?e.message:'Unable to save reflection');} finally{setSaving(false);}
-  }
-
-  function toggleQuest(index: number) {
-    const next = questDone.map((done, i) => i === index ? !done : done);
-    setQuestDone(next);
-    try { window.localStorage.setItem(`ls1-athlete-quest-${ageBand}`, JSON.stringify(next)); } catch { /* browser storage unavailable */ }
-  }
-
-  const resultList = (data?.results ?? []).length ? <div className="space-y-2">{(data?.results ?? []).map((result: Row) => (
-    <button key={String(result.id)} onClick={() => setDrawer({ kind: 'result', ...result })} className="grid w-full gap-2 rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-neutral-600 sm:grid-cols-[1fr_auto] sm:items-center">
-      <div><div className="text-sm font-bold text-white">{String(result.event?.name ?? result.event?.code ?? 'Competition result')}</div><div className="mt-1 text-[10px] text-neutral-500">{String(result.competition ?? 'Competition')} · {String(result.validationStatus ?? result.status ?? 'recorded')}</div></div>
-      <div className="text-xl font-black text-white">{formatTime(result.resultValue)}</div>
-    </button>
-  ))}</div> : <Empty>No canonical performance records are connected for this athlete yet. Historical meet ingestion remains outstanding; no times are invented here.</Empty>;
-
-  const teamCards = (data?.teams ?? []).length ? <div className="space-y-2">{(data?.teams ?? []).map((team: Row) => (
-    <button key={String(team.id)} onClick={() => setDrawer({ kind: 'team', ...team })} className="w-full rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-neutral-600">
-      <div className="flex items-center justify-between gap-3"><div><div className="font-bold text-white">{String(team.name)}</div><div className="mt-1 text-xs text-neutral-500">{String(team.organization ?? '')} · {String(team.sport ?? '')}</div></div><ChevronRight className="h-4 w-4 text-neutral-600"/></div>
-    </button>
-  ))}</div> : <Empty>No active team membership is connected.</Empty>;
-
-  const achievements = [
-    { earned: Number(metrics.teams ?? 0) > 0, name: 'Team Member', detail: 'Active canonical team membership' },
-    { earned: Number(metrics.goals ?? 0) > 0, name: 'Goal Setter', detail: 'At least one recorded development goal' },
-    { earned: Number(metrics.attendanceRecords ?? 0) > 0, name: 'Showed Up', detail: 'Attendance evidence exists' },
-    { earned: Number(metrics.officialResults ?? 0) > 0, name: 'Competition Ready', detail: 'Canonical result evidence exists' },
-  ];
-
-  function renderOverview() {
-    if (ageBand === '5-8') return <div className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
-        <Panel className="overflow-hidden"><div className="flex items-center gap-2 text-[#FA4616]"><Sparkles className="h-5 w-5"/><span className="text-[10px] font-black uppercase tracking-[.2em]">Today’s Quest</span></div><h2 className="mt-3 text-2xl font-black text-white">Three little wins</h2><p className="mt-2 text-sm leading-6 text-neutral-400">Simple demo actions stay in this browser only. They are not written into the canonical athlete record.</p><div className="mt-5 space-y-2">{stage.quests.map((quest, i) => <button key={quest} onClick={() => toggleQuest(i)} className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left ${questDone[i] ? 'border-emerald-800 bg-emerald-950/20' : 'border-neutral-800 bg-[#0d1010]'}`}><span className={`flex h-8 w-8 items-center justify-center rounded-full ${questDone[i] ? 'bg-emerald-500 text-black' : 'bg-neutral-900 text-neutral-500'}`}>{questDone[i] ? <CheckCircle2 className="h-5 w-5"/> : <Star className="h-4 w-4"/>}</span><span className="font-bold text-white">{quest}</span></button>)}</div></Panel>
-        <Panel><div className="flex items-center gap-2"><Users className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">My Team</h3></div><div className="mt-4">{teamCards}</div></Panel>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{achievements.map(item => <div key={item.name} className={`rounded-2xl border p-5 ${item.earned ? 'border-[#FA4616]/50 bg-[#FA4616]/10' : 'border-neutral-800 bg-[#090b0b]'}`}><Award className={`h-6 w-6 ${item.earned ? 'text-[#FA4616]' : 'text-neutral-700'}`}/><div className="mt-3 font-black text-white">{item.name}</div><div className="mt-1 text-xs leading-5 text-neutral-500">{item.detail}</div></div>)}</div>
-    </div>;
-
-    return <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Active teams" value={metrics.teams ?? 0} detail="Canonical memberships"/><Metric label="Goals" value={metrics.goals ?? 0} detail="Recorded development goals"/><Metric label="Training records" value={metrics.trainingSessions ?? 0} detail="Connected athlete training logs"/><Metric label="Official results" value={metrics.officialResults ?? 0} detail="Canonical performance evidence"/></div>
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]"><Panel><div className="flex items-center gap-2"><Target className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Current focus</h3></div><div className="mt-4 grid gap-3">{stage.focus.map(item => <div key={item} className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><CheckCircle2 className="h-4 w-4 text-neutral-600"/><span className="text-sm font-bold text-white">{item}</span></div>)}</div></Panel><Panel><div className="flex items-center gap-2"><Users className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Current team context</h3></div><div className="mt-4">{teamCards}</div></Panel></div>
-      {(ageBand === '15-17' || ageBand === '18+') && <Panel><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Recent performance</h3></div><div className="mt-4">{resultList}</div></Panel>}
-    </div>;
-  }
-
-  function renderView(): React.ReactNode {
-    if (view === 'overview') return renderOverview();
-    if (view === 'passport') return <div className="grid gap-6 lg:grid-cols-2"><Panel><h3 className="font-black text-white">Athlete identity</h3><div className="mt-4 grid gap-3 sm:grid-cols-2"><Metric label="Demo identity" value={String(athlete?.athleteNumber ?? '—')} detail="Sanitized live-record projection"/><Metric label="Age" value={athlete?.age ?? '—'} detail={stage.label}/><Metric label="Stage" value={String(athlete?.stage ?? stage.short)} detail={stage.tone}/><Metric label="Privacy" value={String(athlete?.privacyLevel ?? '—')} detail="Minor-safe server projection"/></div></Panel><Panel><h3 className="font-black text-white">Associations</h3><div className="mt-4">{teamCards}</div></Panel></div>;
-    if (view === 'chronometer' || view === 'journey') return <div className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]"><Panel><div className="flex items-center gap-2"><Route className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Journey context</h3></div><div className="mt-4 space-y-3"><Metric label="Stage" value={stage.short} detail={stage.tone}/><Metric label="Teams" value={metrics.teams ?? 0} detail="Active memberships"/><Metric label="Assessments" value={metrics.assessments ?? 0} detail="Recorded development assessments"/></div></Panel><Panel><h3 className="font-black text-white">Recorded timeline</h3><div className="mt-4">{resultList}</div></Panel></div>;
-    if (view === 'development' || view === 'goals') return <div className="grid gap-6 lg:grid-cols-2"><Panel><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Target className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Goals</h3></div><button onClick={()=>setDrawer({kind:'goal-editor',title:'',description:'',goalType:'development',status:'open'})} className="rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black">+ Add Goal</button></div><p className="mt-2 text-xs text-neutral-500">Goals are athlete-owned. Create, edit and update them here.</p><div className="mt-4 space-y-2">{(data?.goals ?? []).length ? data!.goals.map((goal: Row) => <button key={String(goal.id)} onClick={() => setDrawer({kind:'goal-editor',...goal})} className="w-full rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-neutral-600"><div className="flex items-center justify-between gap-3"><div className="font-bold text-white">{String(goal.title)}</div><span className="text-[9px] font-black uppercase text-[#FA4616]">Edit</span></div><div className="mt-1 text-xs text-neutral-500">{String(goal.status ?? '')} · due {String(goal.dueOn ?? 'not set')}</div></button>) : <Empty>No goals yet. Create the first athlete-owned goal using Add Goal.</Empty>}</div></Panel><Panel><div className="flex items-center justify-between"><h3 className="font-black text-white">Assessments</h3><button onClick={()=>setDrawer({kind:'reflection-editor',title:'',body:'',reflectionType:'training'})} className="text-xs font-bold text-[#FA4616]">+ Add reflection</button></div><div className="mt-4 space-y-2">{(data?.development ?? []).length ? data!.development.map((assessment: Row) => <div key={String(assessment.id)} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="font-bold text-white">{String(assessment.assessmentType)}</div><div className="mt-1 text-xs text-neutral-500">{String(assessment.assessedAt ?? '')}</div></div>) : <Empty>No development assessment has been recorded yet.</Empty>}</div></Panel></div>;
-    if (view === 'stage' || view === 'skills') return <div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]"><Panel><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">{stage.label}</div><h3 className="mt-2 text-2xl font-black text-white">{stage.short}</h3><p className="mt-3 text-sm leading-6 text-neutral-400">{stage.intro}</p></Panel><Panel><h3 className="font-black text-white">What matters now</h3><div className="mt-4 space-y-2">{stage.focus.map(item => <div key={item} className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><Flag className="h-4 w-4 text-[#FA4616]"/><span className="text-sm font-bold text-white">{item}</span></div>)}</div></Panel></div>;
-    if (view === 'achievements') return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{achievements.map(item => <Panel key={item.name} className={item.earned ? 'border-[#FA4616]/50' : ''}><Award className={`h-7 w-7 ${item.earned ? 'text-[#FA4616]' : 'text-neutral-700'}`}/><div className="mt-4 font-black text-white">{item.name}</div><div className="mt-1 text-xs leading-5 text-neutral-500">{item.detail}</div><div className="mt-3 text-[9px] font-black uppercase tracking-[.18em] text-neutral-600">{item.earned ? 'Earned from live evidence' : 'Not earned yet'}</div></Panel>)}</div>;
-    if (view === 'trajectory' || view === 'performance' || view === 'results' || view === 'analysis') return <Panel><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Canonical performance evidence</h3></div><div className="mt-4">{resultList}</div></Panel>;
-    if (view === 'records') return <Panel><div className="flex items-center gap-2"><Trophy className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Personal records</h3></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{personalRecords.length ? personalRecords.map(result => <Metric key={String(result.id)} label={String(result.event?.name ?? result.event?.code ?? 'Event')} value={formatTime(result.resultValue)} detail={String(result.competition ?? 'Canonical result')}/>) : <Empty>No canonical results are connected yet, so no personal records are calculated.</Empty>}</div></Panel>;
-    if (view === 'standards' || view === 'rankings') return <Panel><Empty>{meta.title} is intentionally blank until standards/ranking source data is connected. The hub will not manufacture qualification or ranking status.</Empty></Panel>;
-    if (view === 'training-history' || view === 'habits' || view === 'readiness') return <div className="grid gap-3 md:grid-cols-3"><Metric label="Training records" value={metrics.trainingSessions ?? 0} detail="Canonical training-athlete logs"/><Metric label="Attendance records" value={metrics.attendanceRecords ?? 0} detail="Recorded attendance evidence"/><Metric label="Derived readiness" value="—" detail="Requires a defined readiness data source"/></div>;
-    if (view === 'inspiration') return <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]"><Panel><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">My reasons to keep going</h3></div><p className="mt-3 text-sm leading-6 text-neutral-400">This space is intentionally athlete-authored and positive. Inspiration never alters verified performance data.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{['People who inspire me','My next big dream','A moment I am proud of','Something I want to learn'].map((item,i)=><div key={item} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-[9px] font-black uppercase tracking-[.18em] text-neutral-600">Inspiration {i+1}</div><div className="mt-3 font-bold text-white">{item}</div><div className="mt-2 text-xs text-neutral-500">Personal content is unlocked progressively and governed by age/privacy policy.</div></div>)}</div></Panel><Panel><h3 className="font-black text-white">Badges & challenges</h3><div className="mt-4 space-y-2">{(data?.badges ?? []).length ? data!.badges.map((b:Row)=><div key={String(b.id)} className="rounded-xl border border-[#FA4616]/30 bg-[#FA4616]/5 p-4"><div className="font-bold text-white">{String(b.name)}</div><div className="mt-1 text-xs text-neutral-500">Awarded {String(b.awardedAt ?? 'from live evidence')}</div></div>) : <Empty>Badges will appear only when earned evidence is recorded.</Empty>}{(data?.challenges ?? []).slice(0,3).map((ch:Row)=><div key={String(ch.id)} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="font-bold text-white">{String(ch.name)}</div><div className="mt-1 text-xs text-neutral-500">{String(ch.description ?? 'Challenge available')}</div></div>)}</div></Panel></div>;
-    if (view === 'recruiting') return <div className="grid gap-6 xl:grid-cols-[1fr_.8fr]"><Panel><div className="flex items-center gap-2"><Trophy className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Recruiting readiness</h3></div><p className="mt-2 text-sm text-neutral-500">LS1Sports separates eligibility, package completeness and competitive fit. No pseudo recruiting score is manufactured.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{[['Verified performance',(metrics.officialResults??0)>0],['Athlete goals',(metrics.goals??0)>0],['Document evidence',(data?.documents??[]).length>0],['Recruiting cycle',(data?.recruiting?.cycles??[]).length>0]].map(([label,ready]:any)=><div key={label} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="flex items-center justify-between"><span className="font-bold text-white">{label}</span>{ready?<CheckCircle2 className="h-4 w-4 text-emerald-400"/>:<AlertTriangle className="h-4 w-4 text-neutral-600"/>}</div><div className="mt-2 text-xs text-neutral-500">{ready?'Evidence connected':'Outstanding'}</div></div>)}</div></Panel><Panel><h3 className="font-black text-white">Recruiting cycles</h3><div className="mt-4 space-y-2">{(data?.recruiting?.cycles??[]).length ? data!.recruiting.cycles!.map((cycle:Row)=><div key={String(cycle.id)} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="font-bold text-white">{String(cycle.name)}</div><div className="mt-1 text-xs text-neutral-500">{String(cycle.status ?? 'active')}</div></div>) : <Empty>No recruiting cycle is active for this athlete. This is expected for younger athletes and must not be treated as missing data.</Empty>}<div className="rounded-xl border border-neutral-800 p-4 text-xs text-neutral-500">Recorded outreach: {data?.recruiting?.outreachCount ?? 0}</div></div></Panel></div>;
-    if (view === 'documents') return <Panel><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Document Vault</h3></div><button onClick={()=>setDrawer({kind:'document-upload'})} className="rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black">Upload Document</button></div><p className="mt-2 text-sm text-neutral-500">Centralized, versioned and permission-governed. Uploads are stored in the private LS1 document repository; metadata is written to the canonical document and version tables.</p><div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{(data?.documents??[]).length ? data!.documents.map((doc:Row)=><button key={String(doc.id)} onClick={()=>setDrawer({kind:'document',...doc})} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-neutral-600"><div className="font-bold text-white">{String(doc.title)}</div><div className="mt-2 text-xs text-neutral-500">{String(doc.verificationStatus ?? 'unverified')} · {String(doc.classification ?? 'restricted')}</div></button>) : <Empty>No athlete-owned document records are connected yet. Upload the first document to establish the repository.</Empty>}</div></Panel>;
-
-    if (view === 'schedule' || view === 'preparation') return <div className="space-y-6"><Panel><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#FA4616]"/><div><h3 className="font-black text-white">My Calendar</h3><p className="mt-1 text-xs text-neutral-500">A persistent calendar surface exists even before schedule records are populated.</p></div></div><div className="mt-5"><CalendarStrip entries={data?.schedule??[]}/></div></Panel><Panel><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#FA4616]"/><h3 className="font-black text-white">Upcoming competition & obligations</h3></div><div className="mt-4 space-y-2">{(data?.schedule ?? []).length ? data!.schedule.map((entry: Row) => <button key={String(entry.entryId)} onClick={() => setDrawer({kind:'schedule',...entry})} className="w-full rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-neutral-600"><div className="font-bold text-white">{String(entry.competition?.name ?? 'Competition')}</div><div className="mt-1 text-xs text-neutral-500">{String(entry.event?.name ?? entry.event?.code ?? 'Event')} · {String(entry.entryStatus ?? '')}</div></button>) : <Empty>No athlete-specific upcoming competition entries are connected yet. When practices, competitions and assigned events are loaded, they render directly into this calendar.</Empty>}</div></Panel></div>;
-    return <Panel><Empty>This athlete surface has no connected domain evidence yet.</Empty></Panel>;
-  }
-
-  return <div className="min-h-full w-full bg-[#050707] p-6 lg:p-8">
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4"><div><div className="text-[9px] font-black uppercase tracking-[.25em] text-[#FA4616]">ATHLETE · {stage.label}</div><h1 className="mt-2 text-3xl font-black text-white">{meta.title}</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-500">{meta.description}</p></div><button onClick={() => void load()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-neutral-800 px-3 py-2 text-xs text-neutral-300 hover:text-white"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}/>Refresh live data</button></div>
-
-    {error && <Panel className="mb-5 border-red-900/50"><div className="flex gap-3 text-sm text-red-300"><AlertTriangle className="h-5 w-5 shrink-0"/><div>{error}</div></div></Panel>}
-
-    <Panel className="mb-6"><div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-400"/><span className="text-[9px] font-black uppercase tracking-[.2em] text-emerald-400">LIVE SANITIZED DEMONSTRATION</span></div><h2 className="mt-2 text-xl font-black text-white">{String(athlete?.name ?? 'Athlete experience')}</h2><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-400"><span>{athlete ? `${String(athlete.age)} years` : '—'}</span><span>{sportsLabel}</span><span>{teamsLabel}</span><span>{stage.tone}</span></div></div><div className="flex flex-wrap gap-2">{(data?.availableBands ?? []).map((band: Row) => <button key={String(band.id)} onClick={() => changeBand(String(band.id))} className={`rounded-full border px-3 py-2 text-[10px] font-bold ${String(band.id) === ageBand ? 'border-[#FA4616] bg-[#FA4616]/10 text-white' : 'border-neutral-800 text-neutral-500 hover:text-white'}`}>{String(band.label)} · {String(band.count)}</button>)}</div></div></Panel>
-
-    <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
-      {NAV.map(([id,label]) => <button key={id} onClick={() => changeView(id)} className={`shrink-0 rounded-full border px-3 py-2 text-[10px] font-bold ${view===id ? 'border-[#FA4616] bg-[#FA4616]/10 text-white' : 'border-neutral-800 text-neutral-500 hover:text-white'}`}>{label}</button>)}
-    </div>
-
-    {renderView()}
-
-    <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="HPAC source rows" value={data?.reconciliation?.stagingRows ?? '—'} detail="Imported roster source rows"/><Metric label="Distinct roster profiles" value={data?.reconciliation?.distinctProfileKeys ?? '—'} detail="Name + birthdate profile keys"/><Metric label="Canonical athletes" value={data?.reconciliation?.canonicalAthletes ?? '—'} detail="Current canonical athlete records"/><Metric label="Duplicate source rows" value={data?.reconciliation?.duplicateProfileRows ?? '—'} detail="Explains 234 source rows → 229 athletes"/></div>
-
-    {drawer && <div className="fixed inset-0 z-50 bg-black/70" onClick={() => setDrawer(null)}><aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-neutral-800 bg-[#090b0b] p-6" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">ATHLETE EVIDENCE</div><h3 className="mt-2 text-xl font-black text-white">{String(drawer.name ?? drawer.title ?? drawer.competition?.name ?? drawer.event?.name ?? 'Record detail')}</h3></div><button onClick={() => setDrawer(null)} className="rounded-lg border border-neutral-800 p-2 text-neutral-400 hover:text-white"><X className="h-4 w-4"/></button></div>{drawer.kind==='goal-editor' ? <GoalEditor initial={drawer} saving={saving} onCancel={()=>setDrawer(null)} onSave={saveGoal}/> : drawer.kind==='reflection-editor' ? <ReflectionEditor initial={drawer} saving={saving} onCancel={()=>setDrawer(null)} onSave={saveReflection}/> : drawer.kind==='document-upload' ? <DocumentUploader athleteId={String(athlete?.id||'')} saving={saving} setSaving={setSaving} onCancel={()=>setDrawer(null)} onSaved={async()=>{setDrawer(null);await load();}} onError={setError}/> : <><div className="mt-6 space-y-3">{Object.entries(drawer).filter(([key,value]) => key !== 'kind' && key !== 'id' && value !== null && value !== undefined && typeof value !== 'object').map(([key,value]) => <div key={key} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-[8px] font-black uppercase tracking-[.18em] text-neutral-600">{key.replaceAll(/([A-Z])/g,' $1').replaceAll('_',' ')}</div><div className="mt-2 text-sm font-bold text-white">{String(value)}</div></div>)}</div><div className="mt-6 rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-xs leading-5 text-neutral-500">This record is drillable evidence. Where the role has permission, this drawer becomes the edit surface rather than a dead-end display.</div></>}</aside></div>}
-  </div>;
+  {drawer&&<div className="fixed inset-0 z-50 bg-black/75" onClick={()=>setDrawer(null)}><aside className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-neutral-800 bg-[#080909] p-6" onClick={e=>e.stopPropagation()}><div className="flex items-start justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">Athlete action drawer</div><h2 className="mt-2 text-xl font-black capitalize text-white">{String(drawer.kind||'Details').replaceAll('-',' ')}</h2></div><button onClick={()=>setDrawer(null)} className="rounded-lg border border-neutral-800 p-2"><X className="h-4 w-4 text-neutral-400"/></button></div>
+   {drawer.kind==='goal-editor'?<GoalForm initial={drawer} saving={saving} onSave={saveGoal} onCancel={()=>setDrawer(null)}/>:drawer.kind==='challenge'?<div className="mt-6"><div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-5"><div className="text-lg font-black text-white">{drawer.name||'My Mission'}</div><p className="mt-2 text-sm text-neutral-500">{drawer.description||'Take one small step and save your progress.'}</p><div className="mt-4 text-sm font-bold text-white">Progress: {Number(drawer.progress||0)}</div></div>{drawer.id&&<button disabled={saving} onClick={()=>void advanceChallenge(drawer)} className="mt-4 w-full rounded-lg bg-[#FA4616] px-4 py-3 text-sm font-black text-black">{saving?'Saving…':'I made progress +1'}</button>}</div>:drawer.kind==='documents'?<div className="mt-6 space-y-3">{drawer.items?.length?drawer.items.map((d:Row)=><div key={d.id} className="rounded-xl border border-neutral-800 p-4"><div className="font-bold text-white">{d.title}</div><div className="mt-1 text-xs text-neutral-500">{d.verificationStatus||'unverified'} · {d.classification||'restricted'}</div></div>):<Empty>No documents yet.</Empty>}<button onClick={()=>setDrawer({kind:'document-upload'})} className="w-full rounded-lg bg-[#FA4616] px-4 py-3 text-sm font-black text-black">Upload Document</button></div>:drawer.kind==='document-upload'?<DocumentUpload athleteId={String(athlete?.id||'')} saving={saving} setSaving={setSaving} onDone={async()=>{setDrawer(null);await load()}} onError={setError}/>:<div className="mt-6 space-y-3">{drawer.items&&Array.isArray(drawer.items)?drawer.items.map((item:Row,i:number)=><button key={item.id||i} className="w-full rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left"><div className="font-bold text-white">{item.title||item.name||item.event?.name||item.competition?.name||`Record ${i+1}`}</div><div className="mt-1 text-xs text-neutral-500">{item.description||item.status||item.entryStatus||item.verificationStatus||''}</div></button>):<pre className="whitespace-pre-wrap rounded-xl border border-neutral-800 bg-black p-4 text-xs leading-5 text-neutral-400">{JSON.stringify(Object.fromEntries(Object.entries(drawer).filter(([k])=>k!=='kind')),null,2)}</pre>}</div>}
+  </aside></div>}
+ </main>;
 }
