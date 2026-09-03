@@ -13,7 +13,8 @@ export async function POST(req:NextRequest){
   const textTypes=['text/plain','text/csv','application/json','application/xml','text/xml',''];
   let staged=0;
   if(textTypes.includes(file.type)||['CSV','JSON','TXT','XML'].includes(format)){
-   const text=await file.text(); const lines=format==='JSON'?[text]:text.split(/\r?\n/).filter(Boolean);
+   const text=await file.text(); const lines=format==='JSON'?[text]:text.split(/\r?
+/).filter(Boolean);
    const batch=lines.slice(0,20000).map((line,i)=>({import_file_id:row.id,record_type:'RAW',line_number:i+1,raw_record:{raw:line},validation_status:'PENDING',validation_errors:[]}));
    if(batch.length){await rest('competition_import_records',{method:'POST',body:JSON.stringify(batch)});staged=batch.length;}
    await rest(`competition_import_files?id=eq.${row.id}`,{method:'PATCH',body:JSON.stringify({parse_status:'STAGED',parse_summary:{mime:file.type,received_via:'SuperUser live upload',staged_records:staged}})});
