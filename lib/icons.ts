@@ -101,45 +101,8 @@ const fallbackIconMap: Record<string, React.ComponentType<any>> = {
   'flag': LucideIcons.Flag,
 };
 
-// Cache for database-driven icon registry
-let iconRegistry: Record<string, React.ComponentType<any>> | null = null;
-let isLoading = false;
-
-async function loadIconRegistry(): Promise<Record<string, React.ComponentType<any>>> {
-  if (iconRegistry) return iconRegistry;
-  
-  try {
-    const response = await fetch('/api/icons');
-    const data = await response.json();
-    if (data.icons && Array.isArray(data.icons)) {
-      const registry: Record<string, React.ComponentType<any>> = {};
-      for (const entry of data.icons) {
-        const Icon = (LucideIcons as any)[entry.lucide_component];
-        if (Icon) {
-          registry[entry.icon_name] = Icon;
-        }
-      }
-      iconRegistry = registry;
-      return registry;
-    }
-  } catch (error) {
-    console.error('Failed to load icon registry from database, using fallback:', error);
-  }
-  
-  return fallbackIconMap;
-}
-
-export async function renderIcon(iconName: string | null | undefined, className: string = 'h-4 w-4'): Promise<React.ReactNode> {
-  if (!iconName) return null;
-  const registry = await loadIconRegistry();
-  const Icon = registry[iconName];
-  if (!Icon) return null;
-  return React.createElement(Icon, { className });
-}
-
 export function renderIconSync(iconName: string | null | undefined, className: string = 'h-4 w-4'): React.ReactNode {
   if (!iconName) return null;
-  // Use fallback map synchronously (for components that can't wait)
   const Icon = fallbackIconMap[iconName];
   if (!Icon) return null;
   return React.createElement(Icon, { className });
