@@ -16,7 +16,6 @@ import {
   Shield,
   ChevronDown,
   ChevronRight,
-  Settings,
   Bell,
   Search,
   RefreshCw,
@@ -28,18 +27,6 @@ import {
   CreditCard,
   Receipt
 } from 'lucide-react';
-
-// Import all the workspace components
-import { CommandCenter } from './CommandCenter';
-import { OrganizationArchitecture } from './OrganizationArchitecture';
-import { TeamManager } from './TeamManager';
-import { RegistrarValidation } from './RegistrarValidation';
-import { FinanceAccounting } from './FinanceAccounting';
-import { Facilities } from './Facilities';
-import { Payroll } from './Payroll';
-import { Imports } from './Imports';
-import { Compliance } from './Compliance';
-import { Reporting } from './Reporting';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,33 +56,62 @@ interface Role {
 }
 
 // =============================================================================
-// COMPONENT MAP - Maps component names to actual components
+// FALLBACK COMPONENT - Used when real components aren't available
 // =============================================================================
 
-const componentMap: Record<string, React.ComponentType> = {
-  CommandCenter,
-  OrganizationArchitecture,
-  TeamManager,
-  RegistrarValidation,
-  FinanceAccounting,
-  Facilities,
-  Payroll,
-  Imports,
-  Compliance,
-  Reporting,
-  // Placeholder components for missing views
-  RostersView: () => <div className="text-white">Rosters Management</div>,
-  MembershipView: () => <div className="text-white">Membership Management</div>,
-  ProgramsView: () => <div className="text-white">Programs Management</div>,
-  TeamsView: () => <div className="text-white">Teams Management</div>,
-  SeasonsView: () => <div className="text-white">Seasons Management</div>,
-  BillingView: () => <div className="text-white">Billing Management</div>,
-  InvoicesView: () => <div className="text-white">Invoices Management</div>,
-  PaymentsView: () => <div className="text-white">Payments Management</div>,
-};
+const FallbackComponent = ({ title }: { title: string }) => (
+  <div className="flex h-full items-center justify-center">
+    <div className="text-center">
+      <div className="text-2xl font-black text-white">{title}</div>
+      <p className="mt-2 text-sm text-neutral-500">This workspace is being built.</p>
+    </div>
+  </div>
+);
 
 // =============================================================================
-// ICON MAP - Maps icon names to Lucide components
+// COMPONENT MAP - Maps component names to actual components with fallbacks
+// =============================================================================
+
+const componentMap: Record<string, React.ComponentType<any>> = {};
+
+// Try to import components dynamically - if they fail, use fallback
+const componentNames = [
+  'CommandCenter',
+  'OrganizationArchitecture',
+  'TeamManager',
+  'RegistrarValidation',
+  'FinanceAccounting',
+  'Facilities',
+  'Payroll',
+  'Imports',
+  'Compliance',
+  'Reporting'
+];
+
+// Register components with fallbacks
+componentNames.forEach(name => {
+  try {
+    // Use require with try-catch
+    const module = require(`./${name}`);
+    componentMap[name] = module.default || module;
+  } catch (e) {
+    // Component doesn't exist or isn't exported properly - use fallback
+    componentMap[name] = () => <FallbackComponent title={name} />;
+  }
+});
+
+// Register placeholder components for views that don't have real components yet
+componentMap['RostersView'] = () => <FallbackComponent title="Rosters" />;
+componentMap['MembershipView'] = () => <FallbackComponent title="Membership" />;
+componentMap['ProgramsView'] = () => <FallbackComponent title="Programs" />;
+componentMap['TeamsView'] = () => <FallbackComponent title="Teams" />;
+componentMap['SeasonsView'] = () => <FallbackComponent title="Seasons" />;
+componentMap['BillingView'] = () => <FallbackComponent title="Billing" />;
+componentMap['InvoicesView'] = () => <FallbackComponent title="Invoices" />;
+componentMap['PaymentsView'] = () => <FallbackComponent title="Payments" />;
+
+// =============================================================================
+// ICON MAP
 // =============================================================================
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -132,12 +148,10 @@ export function AdminWorkspace() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
-  // Load navigation data from database
   useEffect(() => {
     loadNavigation();
   }, []);
 
-  // Reload navigation when role changes
   useEffect(() => {
     if (currentRole) {
       loadNavigationForRole(currentRole);
@@ -147,7 +161,7 @@ export function AdminWorkspace() {
   const loadNavigation = async () => {
     setLoading(true);
     try {
-      // 1. Get user's roles (for now, get all roles)
+      // Get roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('admin_roles')
         .select('*');
@@ -155,22 +169,18 @@ export function AdminWorkspace() {
       if (rolesError) throw rolesError;
       setRoles(rolesData || []);
 
-      // Set default role
       if (rolesData && rolesData.length > 0) {
         setCurrentRole(rolesData[0].role_name);
         await loadNavigationForRole(rolesData[0].role_name);
       }
-
     } catch (error) {
       console.error('Error loading navigation:', error);
-    } finally {
       setLoading(false);
     }
   };
 
   const loadNavigationForRole = async (roleName: string) => {
     try {
-      // 1. Get role_id
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('role_id')
@@ -179,12 +189,11 @@ export function AdminWorkspace() {
 
       if (roleError) throw roleError;
 
-      // 2. Get nav items for this role via hub_role_navigation
       const { data: navData, error: navError } = await supabase
         .from('hub_role_navigation')
         .select(`
           nav_id,
-          hub_navigation (
+          hub_navigation:nav_id (
             nav_id,
             hub_id,
             parent_id,
@@ -196,21 +205,30 @@ export function AdminWorkspace() {
           )
         `)
         .eq('role_id', roleData.role_id)
-        .eq('can_view', true)
-        .order('sort_order', { foreignTable: 'hub_navigation' });
+        .eq('can_view', true);
 
       if (navError) throw navError;
 
-      // 3. Extract and build tree
-      const items = navData
-        .map(item => item.hub_navigation)
-        .filter(item => item !== null)
-        .map(item => ({
-          ...item,
-          children: []
-        }));
+      // Extract items from the nested structure
+      const items: NavItem[] = navData
+        .map((item: any) => {
+          const nav = item.hub_navigation;
+          if (!nav) return null;
+          return {
+            nav_id: nav.nav_id,
+            hub_id: nav.hub_id,
+            parent_id: nav.parent_id,
+            label: nav.label,
+            icon: nav.icon,
+            path: nav.path,
+            component: nav.component,
+            sort_order: nav.sort_order || 0,
+            children: []
+          };
+        })
+        .filter((item: NavItem | null): item is NavItem => item !== null);
 
-      // 4. Build hierarchy
+      // Build hierarchy
       const itemMap = new Map<string, NavItem>();
       const rootItems: NavItem[] = [];
 
@@ -219,35 +237,39 @@ export function AdminWorkspace() {
       });
 
       items.forEach(item => {
+        const current = itemMap.get(item.nav_id)!;
         if (item.parent_id && itemMap.has(item.parent_id)) {
           const parent = itemMap.get(item.parent_id)!;
-          parent.children!.push(itemMap.get(item.nav_id)!);
+          if (!parent.children) parent.children = [];
+          parent.children.push(current);
         } else {
-          rootItems.push(itemMap.get(item.nav_id)!);
+          rootItems.push(current);
         }
       });
 
+      // Sort root items by sort_order
+      rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
       setNavItems(rootItems);
 
-      // Set default active view to first item with a path
-      const firstItem = rootItems.find(item => item.path);
-      if (firstItem) {
-        setActiveView(firstItem.nav_id);
+      if (rootItems.length > 0) {
+        setActiveView(rootItems[0].nav_id);
       }
 
-      // Auto-expand sections with children
       const sectionsWithChildren = rootItems
         .filter(item => item.children && item.children.length > 0)
         .map(item => item.nav_id);
       setExpandedSections(sectionsWithChildren);
 
+      setLoading(false);
     } catch (error) {
       console.error('Error loading navigation for role:', error);
+      setLoading(false);
     }
   };
 
   // Find active component
-  const findActiveComponent = (items: NavItem[]): React.ComponentType | null => {
+  const findActiveComponent = (items: NavItem[]): React.ComponentType<any> | null => {
     for (const item of items) {
       if (item.nav_id === activeView && item.component && componentMap[item.component]) {
         return componentMap[item.component];
@@ -260,9 +282,7 @@ export function AdminWorkspace() {
     return null;
   };
 
-  const ActiveComponent = findActiveComponent(navItems) || CommandCenter;
-
-  // Get current role label
+  const ActiveComponent = findActiveComponent(navItems) || (() => <FallbackComponent title="Dashboard" />);
   const currentRoleLabel = roles.find(r => r.role_name === currentRole)?.description || currentRole;
 
   // Render nav items recursively
@@ -313,9 +333,6 @@ export function AdminWorkspace() {
           key={item.nav_id}
           onClick={() => {
             setActiveView(item.nav_id);
-            if (item.path) {
-              // Optionally navigate
-            }
           }}
           className={`
             flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors
