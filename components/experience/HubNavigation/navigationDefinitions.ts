@@ -3,7 +3,7 @@
 // =====================================================
 // SECTION: RESPONSIBILITY
 // - Define contextual navigation for all seven hubs.
-// - Keep navigation structure separate from rendering.
+// - Filter navigation based on role switcher value.
 // =====================================================
 
 export type NavigationItem = {
@@ -20,7 +20,146 @@ export type NavigationSection = {
 };
 
 // =====================================================
-// SECTION: SUPERUSER
+// SECTION: ROLE TO NAVIGATION MAPPING (Admin Hub)
+// =====================================================
+
+const adminRoleNavigationMap: Record<string, string[]> = {
+  org_admin: [
+    'Command Center',
+    'Organization',
+    'Hierarchy',
+    'TEAM MANAGER',
+    'Registrar',
+    'Rosters',
+    'Membership',
+    'Programs',
+    'Teams',
+    'Seasons',
+    'FINANCE',
+    'Financial Overview',
+    'Billing',
+    'Invoices',
+    'Payments',
+    'OPERATIONS',
+    'Facilities',
+    'Payroll',
+    'Imports',
+    'Reporting'
+  ],
+  team_manager: [
+    'Command Center',
+    'TEAM MANAGER',
+    'Registrar',
+    'Rosters',
+    'Membership',
+    'Programs',
+    'Teams',
+    'Seasons'
+  ],
+  registrar: [
+    'Command Center',
+    'TEAM MANAGER',
+    'Registrar',
+    'Rosters',
+    'Membership'
+  ],
+  treasurer: [
+    'Command Center',
+    'FINANCE',
+    'Financial Overview',
+    'Billing',
+    'Invoices',
+    'Payments'
+  ],
+  operations: [
+    'Command Center',
+    'OPERATIONS',
+    'Facilities',
+    'Payroll',
+    'Imports'
+  ],
+  compliance: [
+    'Command Center',
+    'Compliance'
+  ],
+  reporting: [
+    'Command Center',
+    'Reporting'
+  ]
+};
+
+// =====================================================
+// SECTION: OFFICIAL ROLE TO NAVIGATION MAPPING
+// =====================================================
+
+const officialRoleNavigationMap: Record<string, string[]> = {
+  official: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Availability',
+    'Conflicts',
+    'ASSIGNMENTS',
+    'Assignments',
+    'Assignment History',
+    'Check-In'
+  ],
+  meet_referee: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Conflicts',
+    'ASSIGNMENTS',
+    'Assignments',
+    'Assignment History'
+  ],
+  starter: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Availability',
+    'Conflicts',
+    'ASSIGNMENTS',
+    'Assignments',
+    'Check-In'
+  ],
+  stroke_turn: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Availability',
+    'ASSIGNMENTS',
+    'Assignments'
+  ],
+  judge: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Availability',
+    'ASSIGNMENTS',
+    'Assignments'
+  ],
+  meet_director: [
+    'Profile',
+    'Credentials',
+    'Certification',
+    'AVAILABILITY',
+    'Availability',
+    'Conflicts',
+    'ASSIGNMENTS',
+    'Assignments',
+    'Assignment History',
+    'Check-In'
+  ]
+};
+
+// =====================================================
+// SECTION: SUPERUSER (Hardcoded)
 // =====================================================
 
 const superuserNavigation: NavigationSection[] = [
@@ -130,7 +269,7 @@ const superuserNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: ATHLETE
+// SECTION: ATHLETE (Hardcoded)
 // =====================================================
 
 const athleteNavigation: NavigationSection[] = [
@@ -138,56 +277,13 @@ const athleteNavigation: NavigationSection[] = [
     id: 'athlete',
     label: 'ATHLETE',
     items: [
-      { id: 'overview', label: 'Overview', icon: 'home', href: '/athlete' },
-      { id: 'passport', label: 'Athlete Passport', icon: 'id' },
-      { id: 'chronometer', label: 'Chronometer', icon: 'clock' },
-      { id: 'journey', label: 'Athlete Journey', icon: 'route' },
-    ],
-  },
-  {
-    id: 'development',
-    label: 'DEVELOPMENT',
-    items: [
-      { id: 'development', label: 'Development', icon: 'trending' },
-      { id: 'stage', label: 'Development Stage', icon: 'layers' },
-      { id: 'skills', label: 'Skills', icon: 'target' },
-      { id: 'goals', label: 'Goals', icon: 'target' },
-      { id: 'trajectory', label: 'Trajectory', icon: 'chart' },
-    ],
-  },
-  {
-    id: 'performance',
-    label: 'PERFORMANCE',
-    items: [
-      { id: 'performance', label: 'Performance', icon: 'activity' },
-      { id: 'records', label: 'Personal Records', icon: 'award' },
-      { id: 'standards', label: 'Time Standards', icon: 'timer' },
-      { id: 'rankings', label: 'Rankings', icon: 'chart' },
-      { id: 'analysis', label: 'Competition Analysis', icon: 'search' },
-    ],
-  },
-  {
-    id: 'training',
-    label: 'TRAINING',
-    items: [
-      { id: 'training-history', label: 'Training History', icon: 'history' },
-      { id: 'habits', label: 'Training Habits', icon: 'repeat' },
-      { id: 'readiness', label: 'Readiness', icon: 'heart' },
-    ],
-  },
-  {
-    id: 'competition',
-    label: 'COMPETITION',
-    items: [
-      { id: 'schedule', label: 'Schedule', icon: 'calendar' },
-      { id: 'preparation', label: 'Meet Preparation', icon: 'clipboard' },
-      { id: 'results', label: 'Results', icon: 'list' },
+      { id: 'overview', label: 'My World', icon: 'home', href: '/athlete' }
     ],
   },
 ];
 
 // =====================================================
-// SECTION: COACH
+// SECTION: COACH (Hardcoded)
 // =====================================================
 
 const coachNavigation: NavigationSection[] = [
@@ -243,10 +339,10 @@ const coachNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: ADMIN
+// SECTION: ADMIN (Hardcoded with filtering)
 // =====================================================
 
-const adminNavigation: NavigationSection[] = [
+const adminNavigationFull: NavigationSection[] = [
   {
     id: 'admin',
     label: 'ADMIN',
@@ -291,7 +387,7 @@ const adminNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: PARENT
+// SECTION: PARENT (Hardcoded)
 // =====================================================
 
 const parentNavigation: NavigationSection[] = [
@@ -325,10 +421,10 @@ const parentNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: OFFICIAL
+// SECTION: OFFICIAL (Hardcoded with filtering)
 // =====================================================
 
-const officialNavigation: NavigationSection[] = [
+const officialNavigationFull: NavigationSection[] = [
   {
     id: 'official',
     label: 'OFFICIAL',
@@ -358,7 +454,7 @@ const officialNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: SCOUT
+// SECTION: SCOUT (Hardcoded)
 // =====================================================
 
 const scoutNavigation: NavigationSection[] = [
@@ -392,6 +488,92 @@ const scoutNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
+// SECTION: FILTERING FUNCTIONS
+// =====================================================
+
+function filterAdminNavigation(role: string): NavigationSection[] {
+  const allowedLabels = adminRoleNavigationMap[role] || adminRoleNavigationMap.org_admin;
+
+  const filteredSections: NavigationSection[] = [];
+
+  for (const section of adminNavigationFull) {
+    // Check if section label itself is allowed
+    const sectionAllowed = allowedLabels.some(label => label === section.label);
+    // Filter items in this section
+    const filteredItems = section.items.filter(item =>
+      allowedLabels.includes(item.label)
+    );
+
+    // Include section if:
+    // 1. Section label is directly allowed, OR
+    // 2. There are filtered items in the section
+    if (sectionAllowed || filteredItems.length > 0) {
+      filteredSections.push({
+        ...section,
+        items: sectionAllowed ? section.items.filter(item => allowedLabels.includes(item.label)) : filteredItems
+      });
+    }
+  }
+
+  // Ensure Command Center is always present
+  const hasCommandCenter = filteredSections.some(s =>
+    s.items.some(i => i.id === 'command-center')
+  );
+  if (!hasCommandCenter) {
+    const adminSection = filteredSections.find(s => s.id === 'admin');
+    if (adminSection) {
+      if (!adminSection.items.some(i => i.id === 'command-center')) {
+        adminSection.items.unshift({ id: 'command-center', label: 'Command Center', icon: 'command', href: '/admin' });
+      }
+    } else {
+      filteredSections.unshift({
+        id: 'admin',
+        label: 'ADMIN',
+        items: [{ id: 'command-center', label: 'Command Center', icon: 'command', href: '/admin' }]
+      });
+    }
+  }
+
+  return filteredSections;
+}
+
+function filterOfficialNavigation(role: string): NavigationSection[] {
+  const allowedLabels = officialRoleNavigationMap[role] || officialRoleNavigationMap.official;
+
+  const filteredSections: NavigationSection[] = [];
+
+  for (const section of officialNavigationFull) {
+    const filteredItems = section.items.filter(item =>
+      allowedLabels.includes(item.label)
+    );
+    if (filteredItems.length > 0) {
+      filteredSections.push({ ...section, items: filteredItems });
+    }
+  }
+
+  // Ensure Profile is always present
+  const hasProfile = filteredSections.some(s =>
+    s.items.some(i => i.id === 'profile')
+  );
+  if (!hasProfile) {
+    const officialSection = filteredSections.find(s => s.id === 'official');
+    if (officialSection) {
+      if (!officialSection.items.some(i => i.id === 'profile')) {
+        officialSection.items.unshift({ id: 'profile', label: 'Profile', icon: 'user', href: '/official' });
+      }
+    } else {
+      filteredSections.unshift({
+        id: 'official',
+        label: 'OFFICIAL',
+        items: [{ id: 'profile', label: 'Profile', icon: 'user', href: '/official' }]
+      });
+    }
+  }
+
+  return filteredSections;
+}
+
+// =====================================================
 // SECTION: REGISTRY
 // =====================================================
 
@@ -399,18 +581,28 @@ export const navigationRegistry: Record<string, NavigationSection[]> = {
   superuser: superuserNavigation,
   athlete: athleteNavigation,
   coach: coachNavigation,
-  admin: adminNavigation,
   parent: parentNavigation,
-  official: officialNavigation,
   scout: scoutNavigation,
 };
 
 // =====================================================
-// SECTION: LOOKUP
+// SECTION: LOOKUP (with filtering)
 // =====================================================
 
 export function getNavigation(
   hubId: string,
+  switcherValue: string = ''
 ): NavigationSection[] {
+  // Admin Hub - filter by role
+  if (hubId === 'admin') {
+    return filterAdminNavigation(switcherValue || 'org_admin');
+  }
+
+  // Official Hub - filter by role
+  if (hubId === 'official') {
+    return filterOfficialNavigation(switcherValue || 'official');
+  }
+
+  // All other hubs - return full navigation
   return navigationRegistry[hubId] ?? superuserNavigation;
 }
