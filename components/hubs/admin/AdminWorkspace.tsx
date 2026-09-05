@@ -1,5 +1,9 @@
 'use client';
 
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -28,6 +32,10 @@ import {
   Receipt
 } from 'lucide-react';
 
+// =============================================================================
+// SUPABASE CLIENT
+// =============================================================================
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -37,6 +45,7 @@ const supabase = createClient(
 // TYPE DEFINITIONS
 // =============================================================================
 
+// Navigation item structure from database
 interface NavItem {
   nav_id: string;
   hub_id: string;
@@ -49,6 +58,7 @@ interface NavItem {
   children?: NavItem[];
 }
 
+// Role structure from database
 interface Role {
   role_id: string;
   role_name: string;
@@ -56,8 +66,9 @@ interface Role {
 }
 
 // =============================================================================
-// FALLBACK COMPONENT - Used when real components aren't available
+// FALLBACK COMPONENT
 // =============================================================================
+// Rendered when a real component isn't available yet
 
 const FallbackComponent = ({ title }: { title: string }) => (
   <div className="flex h-full items-center justify-center">
@@ -69,12 +80,14 @@ const FallbackComponent = ({ title }: { title: string }) => (
 );
 
 // =============================================================================
-// COMPONENT MAP - Maps component names to actual components with fallbacks
+// COMPONENT MAP
 // =============================================================================
+// Maps database component names to actual React components
+// Add new components here when they're built
 
 const componentMap: Record<string, React.ComponentType<any>> = {};
 
-// Try to import components dynamically - if they fail, use fallback
+// Try to import each component from the admin folder
 const componentNames = [
   'CommandCenter',
   'OrganizationArchitecture',
@@ -88,19 +101,17 @@ const componentNames = [
   'Reporting'
 ];
 
-// Register components with fallbacks
+// Register each component with a fallback if it doesn't exist
 componentNames.forEach(name => {
   try {
-    // Use require with try-catch
     const module = require(`./${name}`);
     componentMap[name] = module.default || module;
   } catch (e) {
-    // Component doesn't exist or isn't exported properly - use fallback
     componentMap[name] = () => <FallbackComponent title={name} />;
   }
 });
 
-// Register placeholder components for views that don't have real components yet
+// Placeholder components for views that don't have real components yet
 componentMap['RostersView'] = () => <FallbackComponent title="Rosters" />;
 componentMap['MembershipView'] = () => <FallbackComponent title="Membership" />;
 componentMap['ProgramsView'] = () => <FallbackComponent title="Programs" />;
@@ -113,6 +124,8 @@ componentMap['PaymentsView'] = () => <FallbackComponent title="Payments" />;
 // =============================================================================
 // ICON MAP
 // =============================================================================
+// Maps database icon names to Lucide components
+// Add new icons here as needed
 
 const iconMap: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="h-4 w-4" />,
@@ -135,10 +148,14 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 // =============================================================================
-// MAIN COMPONENT
+// MAIN COMPONENT: AdminWorkspace
 // =============================================================================
 
 export function AdminWorkspace() {
+  // ===========================================================================
+  // STATE
+  // ===========================================================================
+
   const [loading, setLoading] = useState(true);
   const [navItems, setNavItems] = useState<NavItem[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -148,20 +165,31 @@ export function AdminWorkspace() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
+  // ===========================================================================
+  // EFFECTS
+  // ===========================================================================
+
+  // Load navigation data on mount
   useEffect(() => {
     loadNavigation();
   }, []);
 
+  // Reload navigation when role changes
   useEffect(() => {
     if (currentRole) {
       loadNavigationForRole(currentRole);
     }
   }, [currentRole]);
 
+  // ===========================================================================
+  // DATA LOADING FUNCTIONS
+  // ===========================================================================
+
+  // Load roles and set default role
   const loadNavigation = async () => {
     setLoading(true);
     try {
-      // Get roles
+      // Get all roles from database
       const { data: rolesData, error: rolesError } = await supabase
         .from('admin_roles')
         .select('*');
@@ -169,9 +197,12 @@ export function AdminWorkspace() {
       if (rolesError) throw rolesError;
       setRoles(rolesData || []);
 
+      // Set first role as default
       if (rolesData && rolesData.length > 0) {
         setCurrentRole(rolesData[0].role_name);
         await loadNavigationForRole(rolesData[0].role_name);
+      } else {
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading navigation:', error);
@@ -179,8 +210,10 @@ export function AdminWorkspace() {
     }
   };
 
+  // Load navigation items for a specific role
   const loadNavigationForRole = async (roleName: string) => {
     try {
+      // 1. Get the role ID
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('role_id')
@@ -189,6 +222,7 @@ export function AdminWorkspace() {
 
       if (roleError) throw roleError;
 
+      // 2. Get navigation items for this role via the junction table
       const { data: navData, error: navError } = await supabase
         .from('hub_role_navigation')
         .select(`
@@ -209,7 +243,7 @@ export function AdminWorkspace() {
 
       if (navError) throw navError;
 
-      // Extract items from the nested structure
+      // 3. Extract and filter out null values
       const items: NavItem[] = navData
         .map((item: any) => {
           const nav = item.hub_navigation;
@@ -228,14 +262,16 @@ export function AdminWorkspace() {
         })
         .filter((item: NavItem | null): item is NavItem => item !== null);
 
-      // Build hierarchy
+      // 4. Build parent-child hierarchy
       const itemMap = new Map<string, NavItem>();
       const rootItems: NavItem[] = [];
 
+      // First pass: create map of all items
       items.forEach(item => {
         itemMap.set(item.nav_id, { ...item, children: [] });
       });
 
+      // Second pass: build tree structure
       items.forEach(item => {
         const current = itemMap.get(item.nav_id)!;
         if (item.parent_id && itemMap.has(item.parent_id)) {
@@ -247,15 +283,18 @@ export function AdminWorkspace() {
         }
       });
 
-      // Sort root items by sort_order
+      // 5. Sort by sort_order
       rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
+      // 6. Update state
       setNavItems(rootItems);
 
+      // Set first item as active view
       if (rootItems.length > 0) {
         setActiveView(rootItems[0].nav_id);
       }
 
+      // Auto-expand sections that have children
       const sectionsWithChildren = rootItems
         .filter(item => item.children && item.children.length > 0)
         .map(item => item.nav_id);
@@ -268,7 +307,11 @@ export function AdminWorkspace() {
     }
   };
 
-  // Find active component
+  // ===========================================================================
+  // HELPER FUNCTIONS
+  // ===========================================================================
+
+  // Find the active component by searching the nav tree
   const findActiveComponent = (items: NavItem[]): React.ComponentType<any> | null => {
     for (const item of items) {
       if (item.nav_id === activeView && item.component && componentMap[item.component]) {
@@ -282,10 +325,11 @@ export function AdminWorkspace() {
     return null;
   };
 
-  const ActiveComponent = findActiveComponent(navItems) || (() => <FallbackComponent title="Dashboard" />);
-  const currentRoleLabel = roles.find(r => r.role_name === currentRole)?.description || currentRole;
+  // ===========================================================================
+  // RENDER FUNCTIONS
+  // ===========================================================================
 
-  // Render nav items recursively
+  // Render navigation items recursively
   const renderNavItems = (items: NavItem[], level: number = 0) => {
     return items.map((item) => {
       const hasChildren = item.children && item.children.length > 0;
@@ -294,6 +338,9 @@ export function AdminWorkspace() {
       const paddingLeft = level > 0 ? `${level * 12 + 12}px` : '12px';
       const icon = item.icon && iconMap[item.icon] ? iconMap[item.icon] : <FileText className="h-4 w-4" />;
 
+      // =========================================================================
+      // SECTION HEADER (has children - expandable)
+      // =========================================================================
       if (hasChildren) {
         return (
           <div key={item.nav_id}>
@@ -328,6 +375,9 @@ export function AdminWorkspace() {
         );
       }
 
+      // =========================================================================
+      // NAV ITEM (no children - clickable)
+      // =========================================================================
       return (
         <button
           key={item.nav_id}
@@ -348,6 +398,10 @@ export function AdminWorkspace() {
     });
   };
 
+  // ===========================================================================
+  // LOADING STATE
+  // ===========================================================================
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#050707]">
@@ -356,9 +410,19 @@ export function AdminWorkspace() {
     );
   }
 
+  // ===========================================================================
+  // MAIN RENDER
+  // ===========================================================================
+
+  const ActiveComponent = findActiveComponent(navItems) || (() => <FallbackComponent title="Dashboard" />);
+  const currentRoleLabel = roles.find(r => r.role_name === currentRole)?.description || currentRole;
+
   return (
     <div className="flex h-screen bg-[#050707]">
-      {/* ===== SIDEBAR ===== */}
+
+      {/* =====================================================================
+           SIDEBAR
+           ===================================================================== */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-40 w-64 transform border-r border-neutral-800 bg-[#090b0b] transition-transform duration-300 ease-in-out
@@ -366,7 +430,7 @@ export function AdminWorkspace() {
           lg:relative lg:translate-x-0
         `}
       >
-        {/* Header */}
+        {/* --- Sidebar Header --- */}
         <div className="flex items-center justify-between border-b border-neutral-800 p-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-[#FA4616]" />
@@ -380,7 +444,7 @@ export function AdminWorkspace() {
           </button>
         </div>
 
-        {/* Role Selector */}
+        {/* --- Role Selector --- */}
         <div className="border-b border-neutral-800 p-3">
           <div className="relative">
             <button
@@ -394,6 +458,7 @@ export function AdminWorkspace() {
               <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
+            {/* --- Role Dropdown --- */}
             {isRoleDropdownOpen && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
                 {roles.map((role) => (
@@ -420,14 +485,14 @@ export function AdminWorkspace() {
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* --- Navigation --- */}
         <nav className="flex-1 overflow-y-auto p-3">
           <div className="space-y-0.5">
             {renderNavItems(navItems)}
           </div>
         </nav>
 
-        {/* Footer */}
+        {/* --- Sidebar Footer --- */}
         <div className="border-t border-neutral-800 p-4">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -439,11 +504,16 @@ export function AdminWorkspace() {
         </div>
       </aside>
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* =====================================================================
+           MAIN CONTENT AREA
+           ===================================================================== */}
       <main className="flex-1 overflow-y-auto bg-[#050707]">
-        {/* Top Bar */}
+
+        {/* --- Top Bar --- */}
         <div className="sticky top-0 z-10 border-b border-neutral-800 bg-[#090b0b]/80 backdrop-blur-sm">
           <div className="flex items-center justify-between px-6 py-3">
+
+            {/* Left side: Mobile toggle + breadcrumb */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -468,6 +538,7 @@ export function AdminWorkspace() {
               </div>
             </div>
 
+            {/* Right side: Search + actions */}
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-lg border border-neutral-800 bg-black px-3 py-1.5 lg:flex">
                 <Search className="h-3.5 w-3.5 text-neutral-500" />
@@ -482,6 +553,7 @@ export function AdminWorkspace() {
                 <RefreshCw className="h-4 w-4" />
               </button>
 
+              {/* User avatar */}
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FA4616]/20 text-xs font-bold text-[#FA4616]">
                 CK
               </div>
@@ -489,13 +561,18 @@ export function AdminWorkspace() {
           </div>
         </div>
 
-        {/* Page Content */}
+        {/* --- Page Content --- */}
         <div className="p-6">
           <ActiveComponent />
         </div>
+
       </main>
     </div>
   );
 }
+
+// =============================================================================
+// EXPORT
+// =============================================================================
 
 export default AdminWorkspace;
