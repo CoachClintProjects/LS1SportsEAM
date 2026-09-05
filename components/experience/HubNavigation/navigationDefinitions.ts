@@ -19,7 +19,7 @@ export type NavigationItem = {
   href?: string;
   icon?: string;
   description?: string;
-  sort_order?: number;  // ADD THIS
+  sort_order?: number;
   children?: NavigationItem[];
 };
 
@@ -64,25 +64,69 @@ export async function getNavigation(
       return [];
     }
 
-    // Build navigation tree
+    // ================================================================
+    // FILTER BY SWITCHER VALUE (Role/Age)
+    // ================================================================
+    let filteredItems = navItems;
+
+    // For Admin Hub - filter by role
+    if (hubId === 'admin' && switcherValue) {
+      // Get the role ID for this switcher value
+      const { data: roleData } = await supabase
+        .from('admin_roles')
+        .select('role_id')
+        .eq('role_name', switcherValue)
+        .single();
+
+      if (roleData) {
+        // Get navigation items allowed for this role
+        const { data: roleNavData } = await supabase
+          .from('hub_role_navigation')
+          .select('nav_id')
+          .eq('role_id', roleData.role_id)
+          .eq('can_view', true);
+
+        if (roleNavData && roleNavData.length > 0) {
+          const allowedNavIds = roleNavData.map((item: any) => item.nav_id);
+          // Filter: only keep items that are in the allowed list OR are parent items
+          filteredItems = navItems.filter(item => {
+            // Always include parent sections (items with children that have no parent_id)
+            const isParent = item.parent_id === null && navItems.some(child => child.parent_id === item.nav_id);
+            // Always include items that are explicitly allowed
+            const isAllowed = allowedNavIds.includes(item.nav_id);
+            // Always include the command-center (dashboard)
+            const isCommandCenter = item.label === 'Command Center' || item.path === '/admin';
+            return isAllowed || isParent || isCommandCenter;
+          });
+        }
+      }
+    }
+
+    // For Athlete Hub - navigation stays the same for all ages
+    // The age changes the AthleteWorkspace content, not the sidebar
+    if (hubId === 'athlete') {
+      // Athlete navigation stays the same regardless of age
+    }
+
+    // Build navigation tree with filtered items
     const itemMap = new Map<string, NavigationItem>();
     const rootItems: NavigationItem[] = [];
 
-    // First pass: create all items
-    for (const item of navItems) {
+    for (const item of filteredItems) {
       const navItem: NavigationItem = {
         id: item.nav_id,
         label: item.label,
         href: item.path || undefined,
         icon: item.icon || undefined,
         description: item.description || undefined,
+        sort_order: item.sort_order || 0,
         children: []
       };
       itemMap.set(item.nav_id, navItem);
     }
 
-    // Second pass: build hierarchy
-    for (const item of navItems) {
+    // Build hierarchy
+    for (const item of filteredItems) {
       const current = itemMap.get(item.nav_id);
       if (!current) continue;
 
@@ -126,7 +170,30 @@ export async function getNavigation(
       });
     }
 
-    return sections;
+    // Ensure sections have content
+    const filteredSections = sections.filter(section => section.items.length > 0);
+    
+    // If no sections after filtering, return fallback
+    if (filteredSections.length === 0) {
+      // Return at least a default section with Command Center
+      const commandCenterItem = navItems.find(item => item.label === 'Command Center' || item.path === '/admin');
+      if (commandCenterItem) {
+        return [{
+          id: 'default',
+          label: hubId.toUpperCase(),
+          items: [{
+            id: commandCenterItem.nav_id,
+            label: commandCenterItem.label,
+            href: commandCenterItem.path || '/admin',
+            icon: commandCenterItem.icon || undefined,
+            description: commandCenterItem.description || undefined,
+            sort_order: commandCenterItem.sort_order || 0
+          }]
+        }];
+      }
+    }
+
+    return filteredSections;
 
   } catch (error) {
     console.error('Error in getNavigation:', error);
@@ -140,7 +207,6 @@ export async function getNavigation(
 
 export async function getSwitcherConfig(hubId: string): Promise<SwitcherConfig> {
   // Return default config for now
-  // This will be database-driven once the switcher tables are populated
   return {
     type: null,
     displayStyle: 'none',
