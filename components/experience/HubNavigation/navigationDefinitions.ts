@@ -13,11 +13,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// =====================================================
+// TYPES
+// =====================================================
+
 export type NavigationItem = {
   id: string;
   label: string;
   href?: string;
   icon?: string;
+  children?: NavigationItem[];  // Added for hierarchy
 };
 
 export type NavigationSection = {
@@ -49,20 +54,13 @@ export async function getNavigation(
     }
 
     // 2. Get navigation items for this hub
-    let query = supabase
+    const { data: navItems, error: navError } = await supabase
       .from('hub_navigation')
       .select('*')
       .eq('hub_id', hubId)
       .order('sort_order', { ascending: true });
 
-    const { data: navItems, error: navError } = await query;
-
-    if (navError) {
-      console.error('Error fetching navigation:', navError);
-      return [];
-    }
-
-    if (!navItems || navItems.length === 0) {
+    if (navError || !navItems || navItems.length === 0) {
       return [];
     }
 
@@ -93,7 +91,8 @@ export async function getNavigation(
         id: item.nav_id,
         label: item.label,
         href: item.path || undefined,
-        icon: item.icon || undefined
+        icon: item.icon || undefined,
+        children: []
       };
       itemMap.set(item.nav_id, navItem);
     }
@@ -110,8 +109,7 @@ export async function getNavigation(
       if (item.parent_id && itemMap.has(item.parent_id)) {
         // This is a child item - add to parent's children
         const parent = itemMap.get(item.parent_id);
-        if (parent) {
-          if (!parent.children) parent.children = [];
+        if (parent && parent.children) {
           parent.children.push(current);
         }
       } else {
@@ -149,34 +147,6 @@ export async function getNavigation(
         label: hubId.toUpperCase(),
         items: standaloneItems
       });
-    }
-
-    // 6. Ensure Command Center is always first for admin
-    if (hubId === 'admin') {
-      const hasCommandCenter = sections.some(s =>
-        s.items.some(i => i.id === 'command-center' || i.label === 'Command Center')
-      );
-      if (!hasCommandCenter) {
-        // Check if command-center exists in the database but got filtered out
-        const { data: ccData } = await supabase
-          .from('hub_navigation')
-          .select('*')
-          .eq('hub_id', 'admin')
-          .eq('label', 'Command Center')
-          .single();
-
-        if (ccData) {
-          const adminSection = sections.find(s => s.id === 'admin' || s.label === 'ADMIN');
-          if (adminSection) {
-            adminSection.items.unshift({
-              id: ccData.nav_id,
-              label: ccData.label,
-              href: ccData.path || '/admin',
-              icon: ccData.icon || undefined
-            });
-          }
-        }
-      }
     }
 
     return sections;
