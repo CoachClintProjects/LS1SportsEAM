@@ -1,12 +1,11 @@
 'use client';
 
 // =============================================================================
-// TEAM MANAGER - Roster Management with Drawer (REAL DATA)
+// TEAM MANAGER - Roster Management with Drawer (REAL DATA - NO ICONS)
 // =============================================================================
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { renderIconSync } from '@/lib/icons';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const supabase = createClient(
@@ -51,18 +50,12 @@ function AthleteDrawer({
     ? new Date().getFullYear() - new Date(athlete.people.date_of_birth).getFullYear()
     : null;
 
-  const XIcon = renderIconSync('x');
-  const CheckCircle2Icon = renderIconSync('check-circle-2');
-  const Edit2Icon = renderIconSync('edit-2');
-  const MailIcon = renderIconSync('mail');
-
   return (
     <div className="fixed inset-0 z-50 bg-black/70" onClick={onClose}>
       <aside
         className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-neutral-800 bg-[#090b0b] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drawer Header */}
         <div className="flex items-start justify-between border-b border-neutral-800 pb-4">
           <div>
             <div className="flex items-center gap-2">
@@ -81,19 +74,17 @@ function AthleteDrawer({
             onClick={onClose}
             className="rounded-lg border border-neutral-800 p-2 hover:border-neutral-600 transition-colors"
           >
-            {XIcon}
+            ✕
           </button>
         </div>
 
-        {/* About Section */}
         <div className="mt-6">
           <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-neutral-500">About</h3>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
               <div className="text-[10px] text-neutral-500">Status</div>
               <div className="flex items-center gap-1.5 text-sm font-bold text-white">
-                {CheckCircle2Icon}
-                {athlete.status || 'ACTIVE'}
+                ✅ {athlete.status || 'ACTIVE'}
               </div>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
@@ -103,15 +94,12 @@ function AthleteDrawer({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="mt-6 flex gap-2 border-t border-neutral-800 pt-6">
           <button className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#FA4616] px-4 py-2.5 text-sm font-bold text-black hover:bg-[#FA4616]/90 transition-colors">
-            {Edit2Icon}
-            Edit Profile
+            ✏️ Edit Profile
           </button>
           <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-800 px-4 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors">
-            {MailIcon}
-            Email
+            📧 Email
           </button>
         </div>
       </aside>
@@ -132,17 +120,6 @@ export function TeamManager() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const SearchIcon = renderIconSync('search');
-  const PlusIcon = renderIconSync('plus');
-  const DownloadIcon = renderIconSync('download');
-  const FilterIcon = renderIconSync('filter');
-  const ChevronDownIcon = renderIconSync('chevron-down');
-  const EyeIcon = renderIconSync('eye');
-  const Edit2Icon = renderIconSync('edit-2');
-
-  // =========================================================================
-  // LOAD REAL DATA FROM SUPABASE
-  // =========================================================================
   useEffect(() => {
     loadAthletes();
   }, []);
@@ -168,7 +145,6 @@ export function TeamManager() {
 
       if (error) throw error;
 
-      // FIX: people is returned as an array, take the first item
       const mappedData: Athlete[] = (data || []).map((athlete: any) => ({
         id: athlete.id,
         person_id: athlete.person_id,
@@ -219,7 +195,6 @@ export function TeamManager() {
 
   return (
     <div className="p-6 text-white">
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="text-[9px] font-black uppercase tracking-[0.24em] text-[#FA4616]">
@@ -232,22 +207,17 @@ export function TeamManager() {
         </div>
         <div className="flex gap-2">
           <button className="flex items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors">
-            {DownloadIcon}
-            Export
+            ⬇️ Export
           </button>
           <button className="flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-2 text-sm font-bold text-black hover:bg-[#FA4616]/90 transition-colors">
-            {PlusIcon}
-            Add Swimmer
+            ➕ Add Swimmer
           </button>
         </div>
       </div>
 
-      {/* Search */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-            {SearchIcon}
-          </span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">🔍</span>
           <input
             type="text"
             placeholder="Search swimmers..."
@@ -257,16 +227,13 @@ export function TeamManager() {
           />
         </div>
         <button className="flex items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2.5 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors">
-          {FilterIcon}
-          Filter
+          🔽 Filter
         </button>
         <button className="flex items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2.5 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors">
-          {ChevronDownIcon}
-          Squad
+          🔽 Squad
         </button>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-2xl border border-neutral-800 bg-[#090b0b]">
         <table className="w-full text-sm">
           <thead>
@@ -318,7 +285,7 @@ export function TeamManager() {
                         }}
                         className="mr-2 rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-800 hover:text-white transition-colors"
                       >
-                        {EyeIcon}
+                        👁️
                       </button>
                       <button
                         onClick={(e) => {
@@ -326,7 +293,7 @@ export function TeamManager() {
                         }}
                         className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-800 hover:text-white transition-colors"
                       >
-                        {Edit2Icon}
+                        ✏️
                       </button>
                     </td>
                   </tr>
@@ -337,7 +304,6 @@ export function TeamManager() {
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-neutral-500">
           Showing {((currentPage - 1) * pageSize) + 1}-
@@ -377,7 +343,6 @@ export function TeamManager() {
         </div>
       </div>
 
-      {/* Drawer */}
       <AthleteDrawer
         athlete={selectedAthlete}
         isOpen={isDrawerOpen}
@@ -386,5 +351,3 @@ export function TeamManager() {
     </div>
   );
 }
-
-export default TeamManager;
