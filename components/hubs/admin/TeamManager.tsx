@@ -145,20 +145,27 @@ export function TeamManager() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('athletes')
-        .select(`
-          id,
-          person_id,
-          athlete_number,
-          status,
-          people:person_id (
-            first_name,
-            last_name,
-            date_of_birth,
-            gender
-          )
-        `)
-        .order('athlete_number', { ascending: true });
+  .from('athletes')
+  .select(`
+    id,
+    person_id,
+    athlete_number,
+    status,
+    people:person_id (
+      first_name,
+      last_name,
+      date_of_birth,
+      gender
+    )
+  `)
+  .order('athlete_number', { ascending: true });
+
+// Fix: people is an array, take the first item
+const mappedData = data?.map((athlete: any) => ({
+  ...athlete,
+  people: athlete.people?.[0] || null
+}));
+setAthletes(mappedData || []);
 
       if (error) throw error;
       setAthletes(data || []);

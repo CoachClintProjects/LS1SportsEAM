@@ -21,7 +21,7 @@ const supabase = createClient(
 
 type Row = Record<string, any>;
 type CommandPayload = { project: Row|null; milestones: Row[]; tasks: Row[]; raci: Row[]; counts: Record<string,number|null>; generatedAt:string; source?:string; error?:string };
-type MetricRow = { table:string; label:string; count:number|null };
+type MetricRow = { id?: string; table: string; label: string; count: number|null };
 type ModulePayload = { view:string; label:string; metrics:MetricRow[]; generatedAt:string; source:string; error?:string };
 
 // =============================================================================
