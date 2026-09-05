@@ -269,7 +269,7 @@ const superuserNavigation: NavigationSection[] = [
 ];
 
 // =====================================================
-// SECTION: ATHLETE (Hardcoded)
+// SECTION: ATHLETE (Full Navigation Restored)
 // =====================================================
 
 const athleteNavigation: NavigationSection[] = [
@@ -277,7 +277,50 @@ const athleteNavigation: NavigationSection[] = [
     id: 'athlete',
     label: 'ATHLETE',
     items: [
-      { id: 'overview', label: 'My World', icon: 'home', href: '/athlete' }
+      { id: 'overview', label: 'Overview', icon: 'home', href: '/athlete' },
+      { id: 'passport', label: 'Athlete Passport', icon: 'id' },
+      { id: 'chronometer', label: 'Chronometer', icon: 'clock' },
+      { id: 'journey', label: 'Athlete Journey', icon: 'route' },
+    ],
+  },
+  {
+    id: 'development',
+    label: 'DEVELOPMENT',
+    items: [
+      { id: 'development', label: 'Development', icon: 'trending' },
+      { id: 'stage', label: 'Development Stage', icon: 'layers' },
+      { id: 'skills', label: 'Skills', icon: 'target' },
+      { id: 'goals', label: 'Goals', icon: 'target' },
+      { id: 'trajectory', label: 'Trajectory', icon: 'chart' },
+    ],
+  },
+  {
+    id: 'performance',
+    label: 'PERFORMANCE',
+    items: [
+      { id: 'performance', label: 'Performance', icon: 'activity' },
+      { id: 'records', label: 'Personal Records', icon: 'award' },
+      { id: 'standards', label: 'Time Standards', icon: 'timer' },
+      { id: 'rankings', label: 'Rankings', icon: 'chart' },
+      { id: 'analysis', label: 'Competition Analysis', icon: 'search' },
+    ],
+  },
+  {
+    id: 'training',
+    label: 'TRAINING',
+    items: [
+      { id: 'training-history', label: 'Training History', icon: 'history' },
+      { id: 'habits', label: 'Training Habits', icon: 'repeat' },
+      { id: 'readiness', label: 'Readiness', icon: 'heart' },
+    ],
+  },
+  {
+    id: 'competition',
+    label: 'COMPETITION',
+    items: [
+      { id: 'schedule', label: 'Schedule', icon: 'calendar' },
+      { id: 'preparation', label: 'Meet Preparation', icon: 'clipboard' },
+      { id: 'results', label: 'Results', icon: 'list' },
     ],
   },
 ];
