@@ -438,46 +438,45 @@ export function AdminWorkspace() {
           </button>
         </div>
 
-        {/* --- Role Selector --- */}
-        <div className="border-b border-neutral-800 p-3">
-          <div className="relative">
-            <button
-              onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-              className="flex w-full items-center justify-between rounded-xl border border-neutral-800 bg-black px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-[#FA4616]" />
-                <span className="truncate">{currentRoleLabel}</span>
-              </div>
-              <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
+        // --- Role Selector ---
+<div className="border-b border-neutral-800 p-3">
+  <div className="relative">
+    <button
+      onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+      className="flex w-full items-center justify-between rounded-xl border border-neutral-800 bg-black px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <Shield className="h-4 w-4 text-[#FA4616]" />
+        <span className="truncate">{currentRoleLabel}</span>
+      </div>
+      <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+    </button>
 
-            {/* --- Role Dropdown --- */}
-            {isRoleDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
-                {roles.map((role) => (
-                  <button
-                    key={role.role_id}
-                    onClick={() => {
-                      setCurrentRole(role.role_name);
-                      setIsRoleDropdownOpen(false);
-                    }}
-                    className={`
-                      flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
-                      ${currentRole === role.role_name ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
-                    `}
-                  >
-                    <Shield className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">{role.description}</div>
-                      <div className="text-[10px] text-neutral-500">{role.role_name}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+    {isRoleDropdownOpen && (
+      <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
+        {roles.map((role) => (
+          <button
+            key={role.role_id}
+            onClick={() => {
+              setCurrentRole(role.role_name);
+              setIsRoleDropdownOpen(false);
+            }}
+            className={`
+              flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
+              ${currentRole === role.role_name ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
+            `}
+          >
+            <Shield className="h-4 w-4" />
+            <div>
+              <div className="font-medium">{role.description}</div>
+              <div className="text-[10px] text-neutral-500">{role.role_name}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+</div>
 
         {/* --- Navigation --- */}
         <nav className="flex-1 overflow-y-auto p-3">
