@@ -23,11 +23,10 @@ import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
 
 // =============================================================================
-// ICON MAP (No duplicates)
+// ICON MAP
 // =============================================================================
 
 const icons: Record<string, React.ElementType> = {
-  // General
   activity: Activity,
   archive: Archive,
   award: Award,
@@ -80,16 +79,11 @@ const icons: Record<string, React.ElementType> = {
   wrench: Wrench,
   workflow: Workflow,
   milestone: Activity,
-  down: TrendingUp,
-  up: TrendingUp,
   cash: DollarSign,
-  box: Boxes,
-  id: User,
   cart: Package,
   reports: BarChart3,
   clock: Timer,
   alert: Bell,
-  // Admin-specific
   'layout-dashboard': LayoutDashboard,
   'building2': Building2,
   'folder-tree': FolderTree,
@@ -101,16 +95,14 @@ const icons: Record<string, React.ElementType> = {
   'bar-chart-3': ChartIcon,
   'clipboard-check': ClipboardCheck,
   'dollar-sign': DollarIcon,
-  'users': UsersIcon,
   'warehouse': Warehouse,
-  // Official-specific
   'gavel': Gavel,
   'flag': Flag,
   'trophy': Trophy
 };
 
 // =============================================================================
-// SWITCHER CONFIGURATION TYPES
+// SWITCHER CONFIGURATION
 // =============================================================================
 
 interface SwitcherOption {
@@ -127,7 +119,7 @@ interface SwitcherConfig {
 }
 
 // =============================================================================
-// SWITCHER DATA (Hardcoded for now - will be database-driven in future)
+// SWITCHER DATA
 // =============================================================================
 
 const switcherConfigs: Record<string, SwitcherConfig> = {
@@ -135,36 +127,36 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
     type: 'age',
     defaultOption: '5-8',
     options: [
-      { id: '5-8', label: 'Foundation · Ages 5–8', description: 'Basic / Fun / Gamey' },
-      { id: '9-11', label: 'Development · Ages 9–11', description: 'Fun / Development / Emerging Skills' },
-      { id: '12-14', label: 'Growth · Ages 12–14', description: 'Own · Understand · Progress' },
-      { id: '15-17', label: 'Performance · Ages 15–17', description: 'Prepare · Perform · Learn' },
-      { id: '18+', label: 'Elite · 18+', description: 'Analyze · Decide · Lead' }
+      { id: '5-8', label: 'Foundation · Ages 5–8' },
+      { id: '9-11', label: 'Development · Ages 9–11' },
+      { id: '12-14', label: 'Growth · Ages 12–14' },
+      { id: '15-17', label: 'Performance · Ages 15–17' },
+      { id: '18+', label: 'Elite · 18+' }
     ]
   },
   admin: {
     type: 'role',
     defaultOption: 'org_admin',
     options: [
-      { id: 'org_admin', label: 'Organization Admin', description: 'Full organization access', icon: 'shield' },
-      { id: 'team_manager', label: 'Team Manager', description: 'Team operations', icon: 'users' },
-      { id: 'registrar', label: 'Registrar', description: 'Registration & eligibility', icon: 'user-check' },
-      { id: 'treasurer', label: 'Treasurer', description: 'Finance & accounting', icon: 'dollar-sign' },
-      { id: 'operations', label: 'Operations', description: 'Facilities & equipment', icon: 'warehouse' },
-      { id: 'compliance', label: 'Compliance', description: 'Compliance & safety', icon: 'clipboard-check' },
-      { id: 'reporting', label: 'Reporting', description: 'Reports & analytics', icon: 'bar-chart-3' }
+      { id: 'org_admin', label: 'Organization Admin', icon: 'shield' },
+      { id: 'team_manager', label: 'Team Manager', icon: 'users' },
+      { id: 'registrar', label: 'Registrar', icon: 'user-check' },
+      { id: 'treasurer', label: 'Treasurer', icon: 'dollar-sign' },
+      { id: 'operations', label: 'Operations', icon: 'warehouse' },
+      { id: 'compliance', label: 'Compliance', icon: 'clipboard-check' },
+      { id: 'reporting', label: 'Reporting', icon: 'bar-chart-3' }
     ]
   },
   official: {
     type: 'official_role',
     defaultOption: 'official',
     options: [
-      { id: 'official', label: 'Official', description: 'Competition governance & operations', icon: 'shield' },
-      { id: 'meet_referee', label: 'Meet Referee', description: 'Final authority on competition rules', icon: 'gavel' },
-      { id: 'starter', label: 'Starter', description: 'Starts events and manages false starts', icon: 'flag' },
-      { id: 'stroke_turn', label: 'Stroke & Turn', description: 'Judges strokes and turns', icon: 'eye' },
-      { id: 'judge', label: 'Judge', description: 'Evaluates competition performance', icon: 'clipboard' },
-      { id: 'meet_director', label: 'Meet Director', description: 'Manages overall competition', icon: 'trophy' }
+      { id: 'official', label: 'Official', icon: 'shield' },
+      { id: 'meet_referee', label: 'Meet Referee', icon: 'gavel' },
+      { id: 'starter', label: 'Starter', icon: 'flag' },
+      { id: 'stroke_turn', label: 'Stroke & Turn', icon: 'eye' },
+      { id: 'judge', label: 'Judge', icon: 'clipboard' },
+      { id: 'meet_director', label: 'Meet Director', icon: 'trophy' }
     ]
   },
   scout: {
@@ -348,9 +340,6 @@ function SwitcherRenderer({
                     </span>
                     <div>
                       <div className="font-medium">{option.label}</div>
-                      {option.description && (
-                        <div className="text-[10px] text-neutral-500">{option.description}</div>
-                      )}
                     </div>
                   </button>
                 );
@@ -358,11 +347,6 @@ function SwitcherRenderer({
             </div>
           )}
         </div>
-        {currentOption?.description && (
-          <div className="mt-1.5 text-[8px] leading-3 text-neutral-600">
-            {currentOption.description}
-          </div>
-        )}
       </div>
     );
   }
