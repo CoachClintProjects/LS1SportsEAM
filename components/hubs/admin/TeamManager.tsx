@@ -34,3 +34,4 @@ const loadAthletes = async () => {
     setLoading(false);
   }
 };
+export default TeamManager;
