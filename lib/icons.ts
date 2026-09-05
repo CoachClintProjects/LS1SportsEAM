@@ -2,29 +2,11 @@
 // ICON REGISTRY - Database-Driven
 // =============================================================================
 
-import * as LucideIcons from 'lucide-react';
 import React from 'react';
+import * as LucideIcons from 'lucide-react';
 
-const iconMap: Record<string, React.ComponentType<any>> = {
-  // ... all icons
-};
-
-export function renderIconSync(iconName: string | null | undefined, className: string = 'h-4 w-4'): React.ReactNode {
-  if (!iconName) return null;
-  const Icon = iconMap[iconName];
-  if (!Icon) return null;
-  return React.createElement(Icon, { className });
-}
-
-export function getIconSync(iconName: string | null | undefined): React.ComponentType<any> | null {
-  if (!iconName) return null;
-  return iconMap[iconName] || null;
-}
-// =============================================================================
-// ICON REGISTRY - Fallback hardcoded map (for now)
-// =============================================================================
-
-const iconMap: Record<string, React.ComponentType<any>> = {
+// Fallback hardcoded map (only used if database fetch fails)
+const fallbackIconMap: Record<string, React.ComponentType<any>> = {
   'layout-dashboard': LucideIcons.LayoutDashboard,
   'building2': LucideIcons.Building2,
   'users': LucideIcons.Users,
@@ -119,18 +101,51 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   'flag': LucideIcons.Flag,
 };
 
-// =============================================================================
-// EXPORT FUNCTIONS
-// =============================================================================
+// Cache for database-driven icon registry
+let iconRegistry: Record<string, React.ComponentType<any>> | null = null;
+let isLoading = false;
+
+async function loadIconRegistry(): Promise<Record<string, React.ComponentType<any>>> {
+  if (iconRegistry) return iconRegistry;
+  
+  try {
+    const response = await fetch('/api/icons');
+    const data = await response.json();
+    if (data.icons && Array.isArray(data.icons)) {
+      const registry: Record<string, React.ComponentType<any>> = {};
+      for (const entry of data.icons) {
+        const Icon = (LucideIcons as any)[entry.lucide_component];
+        if (Icon) {
+          registry[entry.icon_name] = Icon;
+        }
+      }
+      iconRegistry = registry;
+      return registry;
+    }
+  } catch (error) {
+    console.error('Failed to load icon registry from database, using fallback:', error);
+  }
+  
+  return fallbackIconMap;
+}
+
+export async function renderIcon(iconName: string | null | undefined, className: string = 'h-4 w-4'): Promise<React.ReactNode> {
+  if (!iconName) return null;
+  const registry = await loadIconRegistry();
+  const Icon = registry[iconName];
+  if (!Icon) return null;
+  return React.createElement(Icon, { className });
+}
 
 export function renderIconSync(iconName: string | null | undefined, className: string = 'h-4 w-4'): React.ReactNode {
   if (!iconName) return null;
-  const Icon = iconMap[iconName];
+  // Use fallback map synchronously (for components that can't wait)
+  const Icon = fallbackIconMap[iconName];
   if (!Icon) return null;
-  return <Icon className={className} />;
+  return React.createElement(Icon, { className });
 }
 
 export function getIconSync(iconName: string | null | undefined): React.ComponentType<any> | null {
   if (!iconName) return null;
-  return iconMap[iconName] || null;
+  return fallbackIconMap[iconName] || null;
 }
