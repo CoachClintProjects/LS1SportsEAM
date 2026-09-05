@@ -3,6 +3,7 @@
 // =====================================================
 // SECTION: RESPONSIBILITY
 // - Fetch navigation from the database.
+// - Fetch switcher options from the database.
 // - Filter by role using hub_role_navigation table.
 // =====================================================
 
@@ -22,7 +23,7 @@ export type NavigationItem = {
   label: string;
   href?: string;
   icon?: string;
-  children?: NavigationItem[];  // Added for hierarchy
+  children?: NavigationItem[];
 };
 
 export type NavigationSection = {
@@ -31,8 +32,121 @@ export type NavigationSection = {
   items: NavigationItem[];
 };
 
+export type SwitcherOption = {
+  id: string;
+  label: string;
+  description?: string;
+};
+
+export type SwitcherConfig = {
+  type: 'age' | 'role' | 'official_role' | 'scout' | null;
+  displayStyle: 'radio' | 'dropdown' | 'none';
+  options: SwitcherOption[];
+  defaultOption: string;
+};
+
 // =====================================================
-// SECTION: GET NAVIGATION FROM DATABASE
+// FETCH SWITCHER DATA FROM DATABASE
+// =====================================================
+
+export async function getSwitcherConfig(hubId: string): Promise<SwitcherConfig> {
+  // Default empty config
+  const defaultConfig: SwitcherConfig = {
+    type: null,
+    displayStyle: 'none',
+    options: [],
+    defaultOption: ''
+  };
+
+  try {
+    // Athlete Hub - fetch age options
+    if (hubId === 'athlete') {
+      const { data, error } = await supabase
+        .from('athlete_age_options')
+        .select('age_code, display_name, description')
+        .order('sort_order', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return defaultConfig;
+      }
+
+      return {
+        type: 'age',
+        displayStyle: 'radio',
+        options: data.map((item: any) => ({
+          id: item.age_code,
+          label: item.display_name,
+          description: item.description
+        })),
+        defaultOption: data[0]?.age_code || '5-8'
+      };
+    }
+
+    // Admin Hub - fetch role options
+    if (hubId === 'admin') {
+      const { data, error } = await supabase
+        .from('admin_role_switcher_options')
+        .select('role_name, display_name, description')
+        .order('sort_order', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return defaultConfig;
+      }
+
+      return {
+        type: 'role',
+        displayStyle: 'radio',
+        options: data.map((item: any) => ({
+          id: item.role_name,
+          label: item.display_name,
+          description: item.description
+        })),
+        defaultOption: data[0]?.role_name || 'org_admin'
+      };
+    }
+
+    // Official Hub - fetch official role options
+    if (hubId === 'official') {
+      const { data, error } = await supabase
+        .from('official_role_switcher_options')
+        .select('role_name, display_name, description')
+        .order('sort_order', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return defaultConfig;
+      }
+
+      return {
+        type: 'official_role',
+        displayStyle: 'radio',
+        options: data.map((item: any) => ({
+          id: item.role_name,
+          label: item.display_name,
+          description: item.description
+        })),
+        defaultOption: data[0]?.role_name || 'official'
+      };
+    }
+
+    // Scout Hub - no switcher
+    if (hubId === 'scout') {
+      return {
+        type: 'scout',
+        displayStyle: 'none',
+        options: [],
+        defaultOption: ''
+      };
+    }
+
+    return defaultConfig;
+  } catch (error) {
+    console.error('Error fetching switcher config:', error);
+    return defaultConfig;
+  }
+}
+
+// =====================================================
+// GET NAVIGATION FROM DATABASE
 // =====================================================
 
 export async function getNavigation(

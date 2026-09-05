@@ -4,101 +4,19 @@
 // IMPORTS
 // =============================================================================
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useHub } from '@/components/hubs/HubContext';
-import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
-
-// =============================================================================
-// SWITCHER CONFIGURATION
-// =============================================================================
-
-interface SwitcherOption {
-  id: string;
-  label: string;
-  description?: string;
-}
-
-interface SwitcherConfig {
-  type: 'age' | 'role' | 'official_role' | 'scout' | null;
-  displayStyle: 'radio' | 'dropdown' | 'none';
-  options: SwitcherOption[];
-  defaultOption: string;
-}
-
-// =============================================================================
-// SWITCHER DATA - ALL USE RADIO BUTTONS
-// =============================================================================
-
-const switcherConfigs: Record<string, SwitcherConfig> = {
-  athlete: {
-    type: 'age',
-    displayStyle: 'radio',
-    defaultOption: '5-8',
-    options: [
-      { id: '5-8', label: 'Foundation · Ages 5–8' },
-      { id: '9-11', label: 'Development · Ages 9–11' },
-      { id: '12-14', label: 'Growth · Ages 12–14' },
-      { id: '15-17', label: 'Performance · Ages 15–17' },
-      { id: '18+', label: 'Elite · 18+' }
-    ]
-  },
-  admin: {
-    type: 'role',
-    displayStyle: 'radio',
-    defaultOption: 'org_admin',
-    options: [
-      { id: 'org_admin', label: 'Organization Admin' },
-      { id: 'team_manager', label: 'Team Manager' },
-      { id: 'registrar', label: 'Registrar' },
-      { id: 'treasurer', label: 'Treasurer' },
-      { id: 'operations', label: 'Operations' },
-      { id: 'compliance', label: 'Compliance' },
-      { id: 'reporting', label: 'Reporting' }
-    ]
-  },
-  official: {
-    type: 'official_role',
-    displayStyle: 'radio',
-    defaultOption: 'official',
-    options: [
-      { id: 'official', label: 'Official' },
-      { id: 'meet_referee', label: 'Meet Referee' },
-      { id: 'starter', label: 'Starter' },
-      { id: 'stroke_turn', label: 'Stroke & Turn' },
-      { id: 'judge', label: 'Judge' },
-      { id: 'meet_director', label: 'Meet Director' }
-    ]
-  },
-  scout: {
-    type: 'scout',
-    displayStyle: 'none',
-    defaultOption: '',
-    options: []
-  }
-};
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-function currentView() {
-  if (typeof window === 'undefined') return '';
-  return new URLSearchParams(window.location.search).get('view') || '';
-}
-
-function currentSwitcherValue(hubId: string) {
-  if (typeof window === 'undefined') {
-    const config = switcherConfigs[hubId];
-    return config?.defaultOption || '';
-  }
-  const param = new URLSearchParams(window.location.search).get('switcher');
-  if (param) return param;
-  const config = switcherConfigs[hubId];
-  return config?.defaultOption || '';
-}
+import { 
+  getNavigation, 
+  getSwitcherConfig,
+  NavigationItem, 
+  NavigationSection,
+  SwitcherConfig,
+  SwitcherOption
+} from './navigationDefinitions';
 
 // =============================================================================
 // NAVIGATION ITEM VIEW
@@ -115,8 +33,8 @@ function NavigationItemView({
   onSelect: (id: string) => void;
   activeHubId: string;
 }) {
-  const router = useRouter();
-  const active = activeItem === item.id;
+  const pathname = usePathname();
+  const active = activeItem === item.id || pathname === item.href;
 
   const classes = `
     group flex min-h-9 w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors
@@ -136,8 +54,9 @@ function NavigationItemView({
       const next = new URLSearchParams(window.location.search);
       next.set('view', item.id);
       const basePath = activeHubId === 'superuser' ? '/superuser' : activeHubId === 'athlete' ? '/athlete' : '/parent';
+      const newUrl = `${basePath}?${next.toString()}`;
+      window.history.replaceState({}, '', newUrl);
       window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: item.id }));
-      router.push(`${basePath}?${next.toString()}`, { scroll: false });
     }
   };
 
@@ -157,23 +76,24 @@ function NavigationItemView({
 }
 
 // =============================================================================
-// SWITCHER RENDERER - RADIO BUTTONS
+// SWITCHER RENDERER - DATABASE DRIVEN
 // =============================================================================
 
 function SwitcherRenderer({
   hubId,
   switcherValue,
+  switcherConfig,
   onSwitch
 }: {
   hubId: string;
   switcherValue: string;
+  switcherConfig: SwitcherConfig;
   onSwitch: (value: string) => void;
 }) {
-  const config = switcherConfigs[hubId];
-  if (!config || config.displayStyle === 'none' || config.options.length === 0) return null;
+  if (!switcherConfig || switcherConfig.displayStyle === 'none' || switcherConfig.options.length === 0) return null;
 
   const getSwitcherLabel = () => {
-    switch (config.type) {
+    switch (switcherConfig.type) {
       case 'age': return 'Demonstrate athlete experience';
       case 'role': return 'Select your admin role';
       case 'official_role': return 'Select your official role';
@@ -182,7 +102,7 @@ function SwitcherRenderer({
   };
 
   const getSwitcherDescription = () => {
-    switch (config.type) {
+    switch (switcherConfig.type) {
       case 'age': return 'The selector changes the entire workspace experience, not the underlying Athlete Passport.';
       case 'role': return 'Your role determines what you can see and do in the Admin Hub.';
       case 'official_role': return 'Your role determines your responsibilities and view.';
@@ -196,7 +116,7 @@ function SwitcherRenderer({
         {getSwitcherLabel()}
       </div>
       <div className="space-y-1">
-        {config.options.map(option => (
+        {switcherConfig.options.map((option: SwitcherOption) => (
           <label
             key={option.id}
             className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
@@ -228,17 +148,41 @@ function SwitcherRenderer({
 // =============================================================================
 
 export function HubNavigation() {
-  const router = useRouter();
+  const pathname = usePathname();
   const { activeHubId, currentHub } = useHub();
   const [switcherValue, setSwitcherValue] = useState('');
+  const [switcherConfig, setSwitcherConfig] = useState<SwitcherConfig>({
+    type: null,
+    displayStyle: 'none',
+    options: [],
+    defaultOption: ''
+  });
   const [activeItem, setActiveItem] = useState('');
   const [sections, setSections] = useState<NavigationSection[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get switcher value
+  // Helper to get current switcher value from URL
+  const getCurrentSwitcherValue = () => {
+    if (typeof window === 'undefined') return switcherConfig.defaultOption || '';
+    const param = new URLSearchParams(window.location.search).get('switcher');
+    if (param) return param;
+    return switcherConfig.defaultOption || '';
+  };
+
+  // Load switcher config from database
   useEffect(() => {
-    const value = currentSwitcherValue(activeHubId);
-    setSwitcherValue(value);
+    const loadSwitcherConfig = async () => {
+      try {
+        const config = await getSwitcherConfig(activeHubId);
+        setSwitcherConfig(config);
+        // Set initial switcher value from URL or default
+        const initialValue = getCurrentSwitcherValue() || config.defaultOption || '';
+        setSwitcherValue(initialValue);
+      } catch (error) {
+        console.error('Error loading switcher config:', error);
+      }
+    };
+    loadSwitcherConfig();
   }, [activeHubId]);
 
   // Load navigation from database
@@ -256,13 +200,20 @@ export function HubNavigation() {
       }
     };
 
-    loadNavigation();
+    if (switcherValue !== '' || activeHubId === 'scout') {
+      loadNavigation();
+    }
   }, [activeHubId, switcherValue]);
 
   // Sync active item
   useEffect(() => {
     const sync = () => {
-      setActiveItem(currentView() || sections[0]?.items[0]?.id || '');
+      const view = new URLSearchParams(window.location.search).get('view');
+      if (view) {
+        setActiveItem(view);
+      } else if (sections.length > 0 && sections[0].items.length > 0) {
+        setActiveItem(sections[0].items[0].id);
+      }
     };
     sync();
     window.addEventListener('popstate', sync);
@@ -276,12 +227,14 @@ export function HubNavigation() {
     };
   }, [sections]);
 
-  // Handle switcher change
+  // Handle switcher change - NO PAGE REFRESH
   const handleSwitch = (value: string) => {
     setSwitcherValue(value);
     const next = new URLSearchParams(window.location.search);
     next.set('switcher', value);
-    router.push(`${window.location.pathname}?${next.toString()}`, { scroll: false });
+    const newUrl = `${window.location.pathname}?${next.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+    window.dispatchEvent(new CustomEvent('ls1sports:switcher-change', { detail: value }));
   };
 
   if (loading) {
@@ -308,10 +261,11 @@ export function HubNavigation() {
           {currentHub.description}
         </div>
 
-        {/* Render Switcher based on hub */}
+        {/* Render Switcher based on hub - DATABASE DRIVEN */}
         <SwitcherRenderer
           hubId={activeHubId}
           switcherValue={switcherValue}
+          switcherConfig={switcherConfig}
           onSwitch={handleSwitch}
         />
       </div>
