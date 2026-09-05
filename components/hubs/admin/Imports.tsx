@@ -1,12 +1,11 @@
 ﻿'use client';
 
 // =============================================================================
-// IMPORTS - File upload for meet results (TESTING)
+// IMPORTS - File upload for meet results
 // =============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { renderIconSync } from '@/lib/icons';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,13 +18,7 @@ export function Imports() {
   const [uploadStatus, setUploadStatus] = useState<{ type: string; message: string } | null>(null);
   const [importHistory, setImportHistory] = useState<any[]>([]);
 
-  const UploadIcon = renderIconSync('upload');
-  const FileTextIcon = renderIconSync('file-text');
-  const CheckCircle2Icon = renderIconSync('check-circle-2');
-  const AlertTriangleIcon = renderIconSync('alert-triangle');
-
-  // Load import history
-  useState(() => {
+  useEffect(() => {
     loadImportHistory();
   }, []);
 
@@ -92,28 +85,47 @@ export function Imports() {
         </div>
       </div>
 
-      {/* Upload Area */}
-      <div className={`rounded-2xl border-2 border-dashed ${file ? 'border-[#FA4616]' : 'border-neutral-800'} bg-[#090b0b] p-12 text-center`}>
+      <div className="rounded-2xl border-2 border-dashed border-neutral-800 bg-[#090b0b] p-12 text-center">
         {!file ? (
           <>
-            <div className="mx-auto h-12 w-12 text-neutral-600">{UploadIcon}</div>
+            <div className="mx-auto h-12 w-12 text-neutral-600">📄</div>
             <p className="mt-4 text-sm text-neutral-400">Drag and drop your file here, or click to browse</p>
             <p className="mt-1 text-xs text-neutral-500">Supported formats: .HY3, .SD3, .LIF, .EV3, .CSV</p>
-            <input type="file" accept=".hy3,.sd3,.lif,.ev3,.csv" onChange={handleFileChange} className="mt-4 block w-full cursor-pointer rounded-xl border border-neutral-800 bg-black p-3 text-sm text-white file:mr-4 file:rounded-xl file:border-0 file:bg-[#FA4616] file:px-4 file:py-2 file:text-sm file:font-bold file:text-black hover:file:bg-[#FA4616]/90" />
+            <input
+              type="file"
+              accept=".hy3,.sd3,.lif,.ev3,.csv"
+              onChange={handleFileChange}
+              className="mt-4 block w-full cursor-pointer rounded-xl border border-neutral-800 bg-black p-3 text-sm text-white file:mr-4 file:rounded-xl file:border-0 file:bg-[#FA4616] file:px-4 file:py-2 file:text-sm file:font-bold file:text-black hover:file:bg-[#FA4616]/90"
+            />
           </>
         ) : (
           <div>
-            <div className="mx-auto h-12 w-12 text-[#FA4616]">{FileTextIcon}</div>
+            <div className="mx-auto h-12 w-12 text-[#FA4616]">📄</div>
             <p className="mt-4 text-sm font-bold text-white">{file.name}</p>
             <p className="text-xs text-neutral-500">{(file.size / 1024).toFixed(2)} KB</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <button onClick={handleUpload} disabled={uploading} className="rounded-xl bg-[#FA4616] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#FA4616]/90 disabled:opacity-50 transition-colors">
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="rounded-xl bg-[#FA4616] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#FA4616]/90 disabled:opacity-50 transition-colors"
+              >
                 {uploading ? 'Processing...' : 'Process File'}
               </button>
-              <button onClick={() => setFile(null)} className="rounded-xl border border-neutral-800 px-6 py-2.5 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors">Remove</button>
+              <button
+                onClick={() => setFile(null)}
+                className="rounded-xl border border-neutral-800 px-6 py-2.5 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors"
+              >
+                Remove
+              </button>
             </div>
             {uploadStatus && (
-              <div className={`mt-4 rounded-xl p-3 text-sm ${uploadStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+              <div
+                className={`mt-4 rounded-xl p-3 text-sm ${
+                  uploadStatus.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}
+              >
                 {uploadStatus.message}
               </div>
             )}
@@ -121,7 +133,6 @@ export function Imports() {
         )}
       </div>
 
-      {/* Import History */}
       <div className="mt-6">
         <h2 className="text-sm font-bold text-white mb-3">📋 Recent Imports</h2>
         <div className="overflow-x-auto rounded-2xl border border-neutral-800 bg-[#090b0b]">
@@ -137,15 +148,35 @@ export function Imports() {
             </thead>
             <tbody>
               {importHistory.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-neutral-500">No imports yet. Upload a file to test.</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                    No imports yet. Upload a file to test.
+                  </td>
+                </tr>
               ) : (
                 importHistory.map((imp) => (
                   <tr key={imp.id} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
-                    <td className="px-4 py-3 font-medium text-white">{imp.file_name || '—'}</td>
-                    <td className="px-4 py-3 text-neutral-400">{imp.format || '—'}</td>
-                    <td className="px-4 py-3 text-neutral-400">{imp.total_lines || 0}</td>
-                    <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${imp.status === 'completed' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>{imp.status || 'PENDING'}</span></td>
-                    <td className="px-4 py-3 text-neutral-400">{imp.created_at ? new Date(imp.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-3 font-medium text-white truncate max-w-[200px]">
+                      {imp.file_name || imp.source_file || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-400">
+                      {imp.format || imp.file_type || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-400">
+                      {imp.total_lines || imp.records || imp.record_count || 0}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                        imp.status === 'completed' ? 'bg-emerald-400/10 text-emerald-400' :
+                        imp.status === 'failed' ? 'bg-red-400/10 text-red-400' :
+                        'bg-amber-400/10 text-amber-400'
+                      }`}>
+                        {imp.status || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-neutral-400">
+                      {imp.created_at ? new Date(imp.created_at).toLocaleDateString() : '—'}
+                    </td>
                   </tr>
                 ))
               )}
