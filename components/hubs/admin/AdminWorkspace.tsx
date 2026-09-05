@@ -64,7 +64,7 @@ interface Role {
 }
 
 // =============================================================================
-// FALLBACK COMPONENT
+// FALLBACK COMPONENT (Must be defined BEFORE componentMap)
 // =============================================================================
 
 const FallbackComponent = ({ title }: { title: string }) => (
@@ -77,10 +77,10 @@ const FallbackComponent = ({ title }: { title: string }) => (
 );
 
 // =============================================================================
-// COMPONENT MAP
+// COMPONENT MAP (Now uses direct imports)
 // =============================================================================
-// Maps database component names to actual React components
 
+// Import all the workspace components
 import { CommandCenter } from './CommandCenter';
 import { OrganizationArchitecture } from './OrganizationArchitecture';
 import { TeamManager } from './TeamManager';
@@ -198,7 +198,6 @@ export function AdminWorkspace() {
 
   const loadNavigationForRole = async (roleName: string) => {
     try {
-      // Step 1: Get role ID
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('role_id')
@@ -207,7 +206,6 @@ export function AdminWorkspace() {
 
       if (roleError) throw roleError;
 
-      // Step 2: Get navigation IDs for this role
       const { data: roleNavData, error: roleNavError } = await supabase
         .from('hub_role_navigation')
         .select('nav_id')
@@ -216,7 +214,6 @@ export function AdminWorkspace() {
 
       if (roleNavError) throw roleNavError;
 
-      // Extract nav IDs
       const navIds = roleNavData.map((item: any) => item.nav_id);
       if (navIds.length === 0) {
         setNavItems([]);
@@ -224,7 +221,6 @@ export function AdminWorkspace() {
         return;
       }
 
-      // Step 3: Get the actual navigation items
       const { data: navData, error: navError } = await supabase
         .from('hub_navigation')
         .select('*')
@@ -239,7 +235,6 @@ export function AdminWorkspace() {
         return;
       }
 
-      // Step 4: Build the navigation tree
       const rawItems: NavItem[] = navData.map((item: any) => ({
         nav_id: item.nav_id,
         hub_id: item.hub_id,
@@ -252,17 +247,14 @@ export function AdminWorkspace() {
         children: []
       }));
 
-      // Build hierarchy using a map
       const itemMap = new Map<string, NavItem>();
       const rootItems: NavItem[] = [];
 
-      // First pass: add all items to map
       for (let i = 0; i < rawItems.length; i++) {
         const item = rawItems[i];
         itemMap.set(item.nav_id, { ...item, children: [] });
       }
 
-      // Second pass: build tree
       for (let i = 0; i < rawItems.length; i++) {
         const item = rawItems[i];
         const current = itemMap.get(item.nav_id);
@@ -279,17 +271,14 @@ export function AdminWorkspace() {
         }
       }
 
-      // Sort root items
       rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
       setNavItems(rootItems);
 
-      // Set first item as active
       if (rootItems.length > 0) {
         setActiveView(rootItems[0].nav_id);
       }
 
-      // Auto-expand sections with children
       const sectionsWithChildren = rootItems
         .filter(item => item.children && item.children.length > 0)
         .map(item => item.nav_id);
@@ -332,9 +321,6 @@ export function AdminWorkspace() {
       const paddingLeft = level > 0 ? `${level * 12 + 12}px` : '12px';
       const icon = item.icon && iconMap[item.icon] ? iconMap[item.icon] : <FileText className="h-4 w-4" />;
 
-      // =========================================================================
-      // SECTION HEADER (has children - expandable)
-      // =========================================================================
       if (hasChildren) {
         return (
           <div key={item.nav_id}>
@@ -369,9 +355,6 @@ export function AdminWorkspace() {
         );
       }
 
-      // =========================================================================
-      // NAV ITEM (no children - clickable)
-      // =========================================================================
       return (
         <button
           key={item.nav_id}
@@ -438,45 +421,45 @@ export function AdminWorkspace() {
           </button>
         </div>
 
-        // --- Role Selector ---
-<div className="border-b border-neutral-800 p-3">
-  <div className="relative">
-    <button
-      onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-      className="flex w-full items-center justify-between rounded-xl border border-neutral-800 bg-black px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
-    >
-      <div className="flex items-center gap-2">
-        <Shield className="h-4 w-4 text-[#FA4616]" />
-        <span className="truncate">{currentRoleLabel}</span>
-      </div>
-      <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
-    </button>
+        {/* --- Role Selector --- */}
+        <div className="border-b border-neutral-800 p-3">
+          <div className="relative">
+            <button
+              onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+              className="flex w-full items-center justify-between rounded-xl border border-neutral-800 bg-black px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[#FA4616]" />
+                <span className="truncate">{currentRoleLabel}</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-    {isRoleDropdownOpen && (
-      <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
-        {roles.map((role) => (
-          <button
-            key={role.role_id}
-            onClick={() => {
-              setCurrentRole(role.role_name);
-              setIsRoleDropdownOpen(false);
-            }}
-            className={`
-              flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
-              ${currentRole === role.role_name ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
-            `}
-          >
-            <Shield className="h-4 w-4" />
-            <div>
-              <div className="font-medium">{role.description}</div>
-              <div className="text-[10px] text-neutral-500">{role.role_name}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    )}
-  </div>
-</div>
+            {isRoleDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
+                {roles.map((role) => (
+                  <button
+                    key={role.role_id}
+                    onClick={() => {
+                      setCurrentRole(role.role_name);
+                      setIsRoleDropdownOpen(false);
+                    }}
+                    className={`
+                      flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
+                      ${currentRole === role.role_name ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
+                    `}
+                  >
+                    <Shield className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">{role.description}</div>
+                      <div className="text-[10px] text-neutral-500">{role.role_name}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* --- Navigation --- */}
         <nav className="flex-1 overflow-y-auto p-3">
@@ -506,7 +489,6 @@ export function AdminWorkspace() {
         <div className="sticky top-0 z-10 border-b border-neutral-800 bg-[#090b0b]/80 backdrop-blur-sm">
           <div className="flex items-center justify-between px-6 py-3">
 
-            {/* Left side */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -531,7 +513,6 @@ export function AdminWorkspace() {
               </div>
             </div>
 
-            {/* Right side */}
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-lg border border-neutral-800 bg-black px-3 py-1.5 lg:flex">
                 <Search className="h-3.5 w-3.5 text-neutral-500" />
