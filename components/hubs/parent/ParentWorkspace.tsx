@@ -8,7 +8,7 @@ type Row=Record<string,any>;
 type Payload={family:Row|null;members:Row[];athletes:Row[];tasks:Row[];messages:Row[];invoices:Row[];documents:Row[];trips:Row[];custody:Row[];volunteer:Row[];metrics:Record<string,number>;source:string;error?:string};
 
 const NAV=[['household','Today'],['tasks','Task Center'],['athletes','My Athletes'],['schedule','Family Schedule'],['transport','Transport & Custody'],['documents','Document Vault'],['financial','Financial Center'],['volunteer','Participation'],['members','Family & Permissions'],['messages','Inbox']]as const;
-const money=(v:any)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Number(v||0));
+const money=(v:any)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Number(v ?? 0));
 
 function Card({children,onClick}:{children:React.ReactNode;onClick?:()=>void}){const C=onClick?'button':'section';return <C onClick={onClick as any} className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-5 text-left">{children}</C>}
 function Empty({title,text}:{title:string;text:string}){return <div className="rounded-xl border border-dashed border-neutral-800 p-7 text-center"><FileText className="mx-auto h-5 w-5 text-neutral-700"/><div className="mt-2 text-sm font-bold text-neutral-400">{title}</div><p className="mx-auto mt-1 max-w-xl text-xs leading-5 text-neutral-600">{text}</p></div>}
