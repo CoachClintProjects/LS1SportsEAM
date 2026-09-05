@@ -29,7 +29,7 @@ interface SwitcherConfig {
 }
 
 // =============================================================================
-// SWITCHER DATA - ALL USE RADIO BUTTONS (except none)
+// SWITCHER DATA - ALL USE RADIO BUTTONS
 // =============================================================================
 
 const switcherConfigs: Record<string, SwitcherConfig> = {
@@ -157,7 +157,7 @@ function NavigationItemView({
 }
 
 // =============================================================================
-// SWITCHER RENDERER - RADIO BUTTONS FOR EVERYTHING
+// SWITCHER RENDERER - RADIO BUTTONS
 // =============================================================================
 
 function SwitcherRenderer({
@@ -172,9 +172,6 @@ function SwitcherRenderer({
   const config = switcherConfigs[hubId];
   if (!config || config.displayStyle === 'none' || config.options.length === 0) return null;
 
-  // =========================================================================
-  // Get the label for the switcher section
-  // =========================================================================
   const getSwitcherLabel = () => {
     switch (config.type) {
       case 'age': return 'Demonstrate athlete experience';
@@ -235,25 +232,32 @@ export function HubNavigation() {
   const { activeHubId, currentHub } = useHub();
   const [switcherValue, setSwitcherValue] = useState('');
   const [activeItem, setActiveItem] = useState('');
-
-  // Get navigation sections - pass switcher value to filter
-  const sections = useMemo(() => {
-    let result: NavigationSection[] = getNavigation(activeHubId, switcherValue);
-
-    // Deduplicate items within each section
-    return result.map(section => ({
-      ...section,
-      items: section.items.filter((item, index, self) =>
-        index === self.findIndex(i => i.id === item.id)
-      )
-    })).filter(section => section.items.length > 0);
-  }, [activeHubId, switcherValue]);
+  const [sections, setSections] = useState<NavigationSection[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Get switcher value
   useEffect(() => {
     const value = currentSwitcherValue(activeHubId);
     setSwitcherValue(value);
   }, [activeHubId]);
+
+  // Load navigation from database
+  useEffect(() => {
+    const loadNavigation = async () => {
+      setLoading(true);
+      try {
+        const result = await getNavigation(activeHubId, switcherValue);
+        setSections(result);
+      } catch (error) {
+        console.error('Error loading navigation:', error);
+        setSections([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNavigation();
+  }, [activeHubId, switcherValue]);
 
   // Sync active item
   useEffect(() => {
@@ -277,12 +281,18 @@ export function HubNavigation() {
     setSwitcherValue(value);
     const next = new URLSearchParams(window.location.search);
     next.set('switcher', value);
-    // Trigger navigation refresh for role-based hubs
-    if (activeHubId === 'admin' || activeHubId === 'official') {
-      // Navigation will refresh via the useMemo dependency on switcherValue
-    }
     router.push(`${window.location.pathname}?${next.toString()}`, { scroll: false });
   };
+
+  if (loading) {
+    return (
+      <nav className="flex h-full w-full flex-col bg-[#080909]">
+        <div className="flex h-full items-center justify-center">
+          <div className="text-xs text-neutral-500">Loading...</div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="flex h-full w-full flex-col bg-[#080909]">
@@ -298,7 +308,7 @@ export function HubNavigation() {
           {currentHub.description}
         </div>
 
-        {/* Render Switcher based on hub - ALL RADIO BUTTONS */}
+        {/* Render Switcher based on hub */}
         <SwitcherRenderer
           hubId={activeHubId}
           switcherValue={switcherValue}
