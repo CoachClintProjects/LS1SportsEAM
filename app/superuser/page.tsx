@@ -20,7 +20,13 @@ function SuperUserLoading() {
 function RoutedWorkspace() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view') ?? 'command-center';
-  return projectControlViews.has(view) ? <ProjectCommand /> : <SuperUserModuleWorkspace view={view} />;
+  
+  // Ensure view is always a valid string
+  const validView = view || 'command-center';
+  
+  return projectControlViews.has(validView) 
+    ? <ProjectCommand /> 
+    : <SuperUserModuleWorkspace view={validView} />;
 }
 
 export default function SuperUserPage() {
