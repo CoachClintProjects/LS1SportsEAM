@@ -7,10 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  ChevronDown,
-  ChevronRight
-} from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
 
@@ -26,17 +23,19 @@ interface SwitcherOption {
 
 interface SwitcherConfig {
   type: 'age' | 'role' | 'official_role' | 'scout' | null;
+  displayStyle: 'radio' | 'dropdown' | 'none';
   options: SwitcherOption[];
   defaultOption: string;
 }
 
 // =============================================================================
-// SWITCHER DATA
+// SWITCHER DATA - ALL USE RADIO BUTTONS (except none)
 // =============================================================================
 
 const switcherConfigs: Record<string, SwitcherConfig> = {
   athlete: {
     type: 'age',
+    displayStyle: 'radio',
     defaultOption: '5-8',
     options: [
       { id: '5-8', label: 'Foundation · Ages 5–8' },
@@ -48,6 +47,7 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
   },
   admin: {
     type: 'role',
+    displayStyle: 'radio',
     defaultOption: 'org_admin',
     options: [
       { id: 'org_admin', label: 'Organization Admin' },
@@ -61,6 +61,7 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
   },
   official: {
     type: 'official_role',
+    displayStyle: 'radio',
     defaultOption: 'official',
     options: [
       { id: 'official', label: 'Official' },
@@ -73,6 +74,7 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
   },
   scout: {
     type: 'scout',
+    displayStyle: 'none',
     defaultOption: '',
     options: []
   }
@@ -155,7 +157,7 @@ function NavigationItemView({
 }
 
 // =============================================================================
-// SWITCHER RENDERER
+// SWITCHER RENDERER - RADIO BUTTONS FOR EVERYTHING
 // =============================================================================
 
 function SwitcherRenderer({
@@ -168,88 +170,60 @@ function SwitcherRenderer({
   onSwitch: (value: string) => void;
 }) {
   const config = switcherConfigs[hubId];
-  if (!config || config.type === 'scout' || config.options.length === 0) return null;
+  if (!config || config.displayStyle === 'none' || config.options.length === 0) return null;
 
-  const [isOpen, setIsOpen] = useState(false);
+  // =========================================================================
+  // Get the label for the switcher section
+  // =========================================================================
+  const getSwitcherLabel = () => {
+    switch (config.type) {
+      case 'age': return 'Demonstrate athlete experience';
+      case 'role': return 'Select your admin role';
+      case 'official_role': return 'Select your official role';
+      default: return 'Select option';
+    }
+  };
 
-  // Age switcher (Athlete Hub) - radio buttons style
-  if (config.type === 'age') {
-    return (
-      <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
-        <div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
-          Demonstrate athlete experience
-        </div>
-        <div className="space-y-1">
-          {config.options.map(option => (
-            <label
-              key={option.id}
-              className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
-                switcherValue === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              <input
-                type="radio"
-                name="switcher"
-                checked={switcherValue === option.id}
-                onChange={() => onSwitch(option.id)}
-                className="accent-[#FA4616]"
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="mt-2 text-[8px] leading-3 text-neutral-700">
-          The selector changes the entire workspace experience, not the underlying Athlete Passport.
-        </div>
+  const getSwitcherDescription = () => {
+    switch (config.type) {
+      case 'age': return 'The selector changes the entire workspace experience, not the underlying Athlete Passport.';
+      case 'role': return 'Your role determines what you can see and do in the Admin Hub.';
+      case 'official_role': return 'Your role determines your responsibilities and view.';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
+      <div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
+        {getSwitcherLabel()}
       </div>
-    );
-  }
-
-  // Role switcher (Admin Hub & Official Hub) - dropdown style
-  if (config.type === 'role' || config.type === 'official_role') {
-    const currentOption = config.options.find(o => o.id === switcherValue) || config.options[0];
-
-    return (
-      <div className="mt-5">
-        <div className="relative">
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex w-full items-center justify-between rounded-lg border border-neutral-800 bg-[#0d1010] px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
+      <div className="space-y-1">
+        {config.options.map(option => (
+          <label
+            key={option.id}
+            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
+              switcherValue === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'
+            }`}
           >
-            <span className="truncate">{currentOption?.label || 'Select Role'}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {isOpen && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-neutral-800 bg-[#0d1010] shadow-xl">
-              {config.options.map(option => {
-                const isActive = switcherValue === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => {
-                      onSwitch(option.id);
-                      setIsOpen(false);
-                    }}
-                    className={`
-                      flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
-                      ${isActive ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
-                    `}
-                  >
-                    <div>
-                      <div className="font-medium">{option.label}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+            <input
+              type="radio"
+              name={`switcher-${hubId}`}
+              checked={switcherValue === option.id}
+              onChange={() => onSwitch(option.id)}
+              className="accent-[#FA4616]"
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
       </div>
-    );
-  }
-
-  return null;
+      {getSwitcherDescription() && (
+        <div className="mt-2 text-[8px] leading-3 text-neutral-700">
+          {getSwitcherDescription()}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =============================================================================
@@ -262,9 +236,9 @@ export function HubNavigation() {
   const [switcherValue, setSwitcherValue] = useState('');
   const [activeItem, setActiveItem] = useState('');
 
-  // Get navigation sections
+  // Get navigation sections - pass switcher value to filter
   const sections = useMemo(() => {
-    let result: NavigationSection[] = getNavigation(activeHubId);
+    let result: NavigationSection[] = getNavigation(activeHubId, switcherValue);
 
     // Deduplicate items within each section
     return result.map(section => ({
@@ -273,7 +247,7 @@ export function HubNavigation() {
         index === self.findIndex(i => i.id === item.id)
       )
     })).filter(section => section.items.length > 0);
-  }, [activeHubId]);
+  }, [activeHubId, switcherValue]);
 
   // Get switcher value
   useEffect(() => {
@@ -303,8 +277,9 @@ export function HubNavigation() {
     setSwitcherValue(value);
     const next = new URLSearchParams(window.location.search);
     next.set('switcher', value);
-    if (activeHubId === 'admin') {
-      window.dispatchEvent(new CustomEvent('ls1sports:role-change', { detail: value }));
+    // Trigger navigation refresh for role-based hubs
+    if (activeHubId === 'admin' || activeHubId === 'official') {
+      // Navigation will refresh via the useMemo dependency on switcherValue
     }
     router.push(`${window.location.pathname}?${next.toString()}`, { scroll: false });
   };
@@ -323,7 +298,7 @@ export function HubNavigation() {
           {currentHub.description}
         </div>
 
-        {/* Render Switcher based on hub */}
+        {/* Render Switcher based on hub - ALL RADIO BUTTONS */}
         <SwitcherRenderer
           hubId={activeHubId}
           switcherValue={switcherValue}
