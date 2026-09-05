@@ -3,9 +3,11 @@
 // =====================================================
 // SECTION: ROUTE CONTRACT
 // - Valid Next.js App Router module.
-// - Workspace will be mounted through HubEngine.
+// - Renders the AdminWorkspace component.
 // =====================================================
 
+import { AdminWorkspace } from '@/components/hubs/admin/AdminWorkspace';
+
 export default function AdminPage() {
-  return null;
+  return <AdminWorkspace />;
 }
