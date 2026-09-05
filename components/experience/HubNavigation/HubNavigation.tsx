@@ -14,37 +14,98 @@ import {
   Lightbulb, List, Lock, Map, Medal, Package, Plug, Receipt, Repeat, Rocket,
   Route, Search, Send, Server, Settings, Sparkles, Target, Timer, TrendingUp,
   Upload, User, UserPlus, Users, Wallet, Wrench, Workflow, Shield, Gavel, Flag,
-  Trophy, UserCheck, Warehouse, DollarSign as DollarIcon, BarChart3 as ChartIcon,
-  ClipboardCheck, Users as UsersIcon, LayoutDashboard, Building2, FolderTree,
+  Trophy, UserCheck, Warehouse, LayoutDashboard, Building2, FolderTree,
   Calendar as CalendarIcon, FileText, CreditCard, Receipt as ReceiptIcon,
-  ChevronDown, ChevronRight, CheckCircle2, X, Menu, RefreshCw, Bell as BellIcon
+  ChevronDown, ChevronRight, CheckCircle2, X, Menu, RefreshCw, Bell as BellIcon,
+  ClipboardCheck, Users as UsersIcon, DollarSign as DollarIcon, BarChart3 as ChartIcon
 } from 'lucide-react';
 import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
 
 // =============================================================================
-// ICON MAP
+// ICON MAP (No duplicates)
 // =============================================================================
 
 const icons: Record<string, React.ElementType> = {
-  activity: Activity, archive: Archive, award: Award, badge: Badge,
-  chart: BarChart3, bell: Bell, book: Book, bot: Bot, boxes: Boxes,
-  briefcase: Briefcase, building: Building, calendar: Calendar, check: CheckCircle,
-  clipboard: Clipboard, command: Command, database: Database, dollar: DollarSign,
-  eye: Eye, file: File, branch: GitBranch, heart: HeartPulse, history: History,
-  home: Home, key: Key, layers: Layers, lightbulb: Lightbulb, list: List,
-  lock: Lock, map: Map, medal: Medal, package: Package, plug: Plug,
-  receipt: Receipt, repeat: Repeat, rocket: Rocket, route: Route, search: Search,
-  send: Send, server: Server, settings: Settings, shield: Shield, sparkles: Sparkles,
-  target: Target, timer: Timer, trending: TrendingUp, upload: Upload, user: User,
-  'user-plus': UserPlus, users: Users, wallet: Wallet, wrench: Wrench,
-  workflow: Workflow, milestone: Activity, down: TrendingUp, up: TrendingUp,
-  cash: DollarSign, box: Boxes, id: User, cart: Package, reports: BarChart3,
-  clock: Timer, alert: Bell, 'layout-dashboard': LayoutDashboard, 'building2': Building2,
-  'folder-tree': FolderTree, 'calendar-days': CalendarIcon, 'file-text': FileText,
-  'credit-card': CreditCard, 'receipt': ReceiptIcon, 'user-check': UserCheck,
-  'bar-chart-3': ChartIcon, 'clipboard-check': ClipboardCheck, 'dollar-sign': DollarIcon,
-  'users': UsersIcon, 'warehouse': Warehouse, 'gavel': Gavel, 'flag': Flag,
+  // General
+  activity: Activity,
+  archive: Archive,
+  award: Award,
+  badge: Badge,
+  bell: Bell,
+  book: Book,
+  bot: Bot,
+  boxes: Boxes,
+  briefcase: Briefcase,
+  building: Building,
+  calendar: Calendar,
+  check: CheckCircle,
+  clipboard: Clipboard,
+  command: Command,
+  database: Database,
+  dollar: DollarSign,
+  eye: Eye,
+  file: File,
+  branch: GitBranch,
+  heart: HeartPulse,
+  history: History,
+  home: Home,
+  key: Key,
+  layers: Layers,
+  lightbulb: Lightbulb,
+  list: List,
+  lock: Lock,
+  map: Map,
+  medal: Medal,
+  package: Package,
+  plug: Plug,
+  receipt: Receipt,
+  repeat: Repeat,
+  rocket: Rocket,
+  route: Route,
+  search: Search,
+  send: Send,
+  server: Server,
+  settings: Settings,
+  shield: Shield,
+  sparkles: Sparkles,
+  target: Target,
+  timer: Timer,
+  trending: TrendingUp,
+  upload: Upload,
+  user: User,
+  'user-plus': UserPlus,
+  users: Users,
+  wallet: Wallet,
+  wrench: Wrench,
+  workflow: Workflow,
+  milestone: Activity,
+  down: TrendingUp,
+  up: TrendingUp,
+  cash: DollarSign,
+  box: Boxes,
+  id: User,
+  cart: Package,
+  reports: BarChart3,
+  clock: Timer,
+  alert: Bell,
+  // Admin-specific
+  'layout-dashboard': LayoutDashboard,
+  'building2': Building2,
+  'folder-tree': FolderTree,
+  'calendar-days': CalendarIcon,
+  'file-text': FileText,
+  'credit-card': CreditCard,
+  'receipt': ReceiptIcon,
+  'user-check': UserCheck,
+  'bar-chart-3': ChartIcon,
+  'clipboard-check': ClipboardCheck,
+  'dollar-sign': DollarIcon,
+  'users': UsersIcon,
+  'warehouse': Warehouse,
+  // Official-specific
+  'gavel': Gavel,
+  'flag': Flag,
   'trophy': Trophy
 };
 
@@ -207,21 +268,6 @@ function SwitcherRenderer({
   const config = switcherConfigs[hubId];
   if (!config || config.type === 'scout' || config.options.length === 0) return null;
 
-  const IconComponent = (iconName: string) => {
-    const Icon = icons[iconName] || Shield;
-    return <Icon className="h-3.5 w-3.5" />;
-  };
-
-  const getLabel = () => {
-    const option = config.options.find(o => o.id === switcherValue);
-    return option ? option.label : config.options[0]?.label || '';
-  };
-
-  const getDescription = () => {
-    const option = config.options.find(o => o.id === switcherValue);
-    return option?.description || '';
-  };
-
   const [isOpen, setIsOpen] = useState(false);
 
   // Age switcher (Athlete Hub) - radio buttons style
@@ -257,7 +303,7 @@ function SwitcherRenderer({
     );
   }
 
-  // Role switcher (Admin Hub) - dropdown style
+  // Role switcher (Admin Hub & Official Hub) - dropdown style
   if (config.type === 'role' || config.type === 'official_role') {
     const currentOption = config.options.find(o => o.id === switcherValue) || config.options[0];
     const Icon = currentOption?.icon ? icons[currentOption.icon] || Shield : Shield;
@@ -333,7 +379,6 @@ export function HubNavigation() {
   const { activeHubId, currentHub } = useHub();
   const [switcherValue, setSwitcherValue] = useState('');
   const [activeItem, setActiveItem] = useState('');
-  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
   // Get navigation sections
   const sections = useMemo(() => {
@@ -376,16 +421,11 @@ export function HubNavigation() {
     setSwitcherValue(value);
     const next = new URLSearchParams(window.location.search);
     next.set('switcher', value);
-    // For admin, we might want to reload navigation based on role
     if (activeHubId === 'admin') {
-      // We'll handle role-based navigation reload
       window.dispatchEvent(new CustomEvent('ls1sports:role-change', { detail: value }));
     }
     router.push(`${window.location.pathname}?${next.toString()}`, { scroll: false });
   };
-
-  // Get switcher config for this hub
-  const switcherConfig = switcherConfigs[activeHubId];
 
   return (
     <nav className="flex h-full w-full flex-col bg-[#080909]">
