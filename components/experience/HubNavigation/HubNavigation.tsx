@@ -1,7 +1,7 @@
 'use client';
 
 // =============================================================================
-// HUB NAVIGATION - With Fallback
+// HUB NAVIGATION - With Switcher Fallback
 // =============================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -60,6 +60,71 @@ const FALLBACK_NAV: NavigationSection[] = [
 ];
 
 // =============================================================================
+// SWITCHER CONFIG (Hardcoded Fallback)
+// =============================================================================
+
+const getSwitcherFallback = (hubId: string) => {
+  // Athlete Hub - Age radio buttons
+  if (hubId === 'athlete') {
+    return {
+      type: 'age',
+      displayStyle: 'radio',
+      defaultOption: '5-8',
+      options: [
+        { id: '5-8', label: 'Foundation · Ages 5–8' },
+        { id: '9-11', label: 'Development · Ages 9–11' },
+        { id: '12-14', label: 'Growth · Ages 12–14' },
+        { id: '15-17', label: 'Performance · Ages 15–17' },
+        { id: '18+', label: 'Elite · 18+' }
+      ]
+    };
+  }
+
+  // Admin Hub - Role radio buttons
+  if (hubId === 'admin') {
+    return {
+      type: 'role',
+      displayStyle: 'radio',
+      defaultOption: 'org_admin',
+      options: [
+        { id: 'org_admin', label: 'Organization Admin' },
+        { id: 'team_manager', label: 'Team Manager' },
+        { id: 'registrar', label: 'Registrar' },
+        { id: 'treasurer', label: 'Treasurer' },
+        { id: 'operations', label: 'Operations' },
+        { id: 'compliance', label: 'Compliance' },
+        { id: 'reporting', label: 'Reporting' }
+      ]
+    };
+  }
+
+  // Official Hub - Official role radio buttons
+  if (hubId === 'official') {
+    return {
+      type: 'official_role',
+      displayStyle: 'radio',
+      defaultOption: 'official',
+      options: [
+        { id: 'official', label: 'Official' },
+        { id: 'meet_referee', label: 'Meet Referee' },
+        { id: 'starter', label: 'Starter' },
+        { id: 'stroke_turn', label: 'Stroke & Turn' },
+        { id: 'judge', label: 'Judge' },
+        { id: 'meet_director', label: 'Meet Director' }
+      ]
+    };
+  }
+
+  // No switcher for other hubs
+  return {
+    type: null,
+    displayStyle: 'none',
+    defaultOption: '',
+    options: []
+  };
+};
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -69,7 +134,10 @@ export function HubNavigation() {
   const [sections, setSections] = useState<NavigationSection[]>(FALLBACK_NAV);
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState('');
+  const [switcherValue, setSwitcherValue] = useState('');
+  const [switcherConfig, setSwitcherConfig] = useState(() => getSwitcherFallback(activeHubId));
 
+  // Load navigation from database
   useEffect(() => {
     const loadNavigation = async () => {
       setLoading(true);
@@ -91,6 +159,16 @@ export function HubNavigation() {
     loadNavigation();
   }, [activeHubId]);
 
+  // Set switcher config when hub changes
+  useEffect(() => {
+    setSwitcherConfig(getSwitcherFallback(activeHubId));
+    // Set default switcher value
+    const config = getSwitcherFallback(activeHubId);
+    if (config && config.options.length > 0) {
+      setSwitcherValue(config.defaultOption || config.options[0].id);
+    }
+  }, [activeHubId]);
+
   // Set active item based on current path
   useEffect(() => {
     if (pathname) {
@@ -104,6 +182,76 @@ export function HubNavigation() {
       }
     }
   }, [pathname, sections]);
+
+  // Handle switcher change
+  const handleSwitch = (value: string) => {
+    setSwitcherValue(value);
+    // Update URL if needed
+    const next = new URLSearchParams(window.location.search);
+    next.set('switcher', value);
+    const newUrl = `${window.location.pathname}?${next.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  };
+
+  // =========================================================================
+  // RENDER SWITCHER
+  // =========================================================================
+
+  const renderSwitcher = () => {
+    if (!switcherConfig || switcherConfig.displayStyle === 'none' || switcherConfig.options.length === 0) {
+      return null;
+    }
+
+    const getSwitcherLabel = () => {
+      switch (switcherConfig.type) {
+        case 'age': return 'Demonstrate athlete experience';
+        case 'role': return 'Select your admin role';
+        case 'official_role': return 'Select your official role';
+        default: return 'Select option';
+      }
+    };
+
+    const getSwitcherDescription = () => {
+      switch (switcherConfig.type) {
+        case 'age': return 'The selector changes the entire workspace experience, not the underlying Athlete Passport.';
+        case 'role': return 'Your role determines what you can see and do in the Admin Hub.';
+        case 'official_role': return 'Your role determines your responsibilities and view.';
+        default: return '';
+      }
+    };
+
+    return (
+      <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
+        <div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
+          {getSwitcherLabel()}
+        </div>
+        <div className="space-y-1">
+          {switcherConfig.options.map((option: any) => (
+            <label
+              key={option.id}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
+                switcherValue === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name={`switcher-${activeHubId}`}
+                checked={switcherValue === option.id}
+                onChange={() => handleSwitch(option.id)}
+                className="accent-[#FA4616]"
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+        {getSwitcherDescription() && (
+          <div className="mt-2 text-[8px] leading-3 text-neutral-700">
+            {getSwitcherDescription()}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -128,6 +276,9 @@ export function HubNavigation() {
         <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">
           {currentHub.description}
         </div>
+
+        {/* Render Switcher */}
+        {renderSwitcher()}
       </div>
 
       {/* Navigation */}
