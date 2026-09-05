@@ -1,17 +1,11 @@
-﻿// =====================================================
-// LS1Sports Navigation Definitions
-// =====================================================
+'use client';
 
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
-
-// =====================================================
-// TYPES
-// =====================================================
 
 export type NavigationItem = {
   id: string;
@@ -42,175 +36,190 @@ export interface SwitcherConfig {
   defaultOption: string;
 }
 
-// =====================================================
-// GET NAVIGATION FROM DATABASE
-// =====================================================
+type DbNavRow = {
+  nav_id: string;
+  label: string;
+  path: string | null;
+  icon: string | null;
+  description: string | null;
+  sort_order: number | null;
+  parent_id: string | null;
+  is_active?: boolean | null;
+};
+
+const ATHLETE_NAV_BY_AGE: Record<string, string[]> = {
+  '5-8': ['Overview'],
+  '9-11': ['Overview', 'Goals', 'Achievements'],
+  '12-14': ['Overview', 'Development', 'Goals', 'Achievements'],
+  '15-17': ['Overview', 'Performance', 'Development', 'Goals', 'Documents', 'Recruiting'],
+  '18+': ['Overview', 'Passport', 'Performance', 'Development', 'Documents', 'Recruiting'],
+};
+
+function buildSections(rows: DbNavRow[], hubId: string): NavigationSection[] {
+  const map = new Map<string, NavigationItem>();
+  const roots: NavigationItem[] = [];
+
+  for (const row of rows) {
+    map.set(row.nav_id, {
+      id: row.nav_id,
+      label: row.label,
+      href: row.path || undefined,
+      icon: row.icon || undefined,
+      description: row.description || undefined,
+      sort_order: row.sort_order || 0,
+      children: [],
+    });
+  }
+
+  for (const row of rows) {
+    const item = map.get(row.nav_id);
+    if (!item) continue;
+
+    if (row.parent_id && map.has(row.parent_id)) {
+      map.get(row.parent_id)?.children?.push(item);
+    } else {
+      roots.push(item);
+    }
+  }
+
+  roots.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  for (const item of roots) {
+    item.children?.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }
+
+  const sections: NavigationSection[] = [];
+  const parents = roots.filter((item) => item.children?.length);
+  const standalone = roots.filter((item) => !item.children?.length);
+
+  for (const parent of parents) {
+    sections.push({
+      id: parent.id,
+      label: parent.label.toUpperCase(),
+      items: parent.children || [],
+    });
+  }
+
+  if (standalone.length) {
+    sections.unshift({
+      id: `${hubId}-main`,
+      label: hubId.toUpperCase(),
+      items: standalone,
+    });
+  }
+
+  return sections.filter((section) => section.items.length > 0);
+}
 
 export async function getNavigation(
   hubId: string,
-  switcherValue: string = ''
+  switcherValue = '',
 ): Promise<NavigationSection[]> {
   if (!hubId) return [];
 
   try {
-    // Get navigation items for this hub
-    const { data: navItems, error: navError } = await supabase
+    const { data, error } = await supabase
       .from('hub_navigation')
-      .select('*')
+      .select('nav_id,label,path,icon,description,sort_order,parent_id,is_active')
       .eq('hub_id', hubId)
+      .eq('is_active', true)
       .order('sort_order', { ascending: true });
 
-    if (navError || !navItems || navItems.length === 0) {
-      return [];
-    }
+    if (error || !data?.length) return [];
 
-    // ================================================================
-    // FILTER BY SWITCHER VALUE (Role/Age)
-    // ================================================================
-    let filteredItems = navItems;
+    let rows = data as DbNavRow[];
 
-    // For Admin Hub - filter by role
     if (hubId === 'admin' && switcherValue) {
-      // Get the role ID for this switcher value
-      const { data: roleData } = await supabase
+      const { data: role } = await supabase
         .from('admin_roles')
         .select('role_id')
         .eq('role_name', switcherValue)
-        .single();
+        .maybeSingle();
 
-      if (roleData) {
-        // Get navigation items allowed for this role
-        const { data: roleNavData } = await supabase
+      if (role?.role_id) {
+        const { data: permissions } = await supabase
           .from('hub_role_navigation')
           .select('nav_id')
-          .eq('role_id', roleData.role_id)
+          .eq('role_id', role.role_id)
           .eq('can_view', true);
 
-        if (roleNavData && roleNavData.length > 0) {
-          const allowedNavIds = roleNavData.map((item: any) => item.nav_id);
-          // Filter: only keep items that are in the allowed list OR are parent items
-          filteredItems = navItems.filter(item => {
-            // Always include parent sections (items with children that have no parent_id)
-            const isParent = item.parent_id === null && navItems.some(child => child.parent_id === item.nav_id);
-            // Always include items that are explicitly allowed
-            const isAllowed = allowedNavIds.includes(item.nav_id);
-            // Always include the command-center (dashboard)
-            const isCommandCenter = item.label === 'Command Center' || item.path === '/admin';
-            return isAllowed || isParent || isCommandCenter;
-          });
-        }
+        const allowed = new Set((permissions || []).map((item: { nav_id: string }) => item.nav_id));
+        const childParents = new Set(
+          rows
+            .filter((row) => row.parent_id && allowed.has(row.nav_id))
+            .map((row) => row.parent_id as string),
+        );
+
+        rows = rows.filter(
+          (row) =>
+            allowed.has(row.nav_id) ||
+            childParents.has(row.nav_id) ||
+            row.label === 'Command Center',
+        );
       }
     }
 
-    // For Athlete Hub - navigation stays the same for all ages
-    // The age changes the AthleteWorkspace content, not the sidebar
     if (hubId === 'athlete') {
-      // Athlete navigation stays the same regardless of age
+      const allowedLabels = new Set(
+        ATHLETE_NAV_BY_AGE[switcherValue] || ATHLETE_NAV_BY_AGE['5-8'],
+      );
+      rows = rows.filter((row) => allowedLabels.has(row.label));
     }
 
-    // Build navigation tree with filtered items
-    const itemMap = new Map<string, NavigationItem>();
-    const rootItems: NavigationItem[] = [];
-
-    for (const item of filteredItems) {
-      const navItem: NavigationItem = {
-        id: item.nav_id,
-        label: item.label,
-        href: item.path || undefined,
-        icon: item.icon || undefined,
-        description: item.description || undefined,
-        sort_order: item.sort_order || 0,
-        children: []
-      };
-      itemMap.set(item.nav_id, navItem);
-    }
-
-    // Build hierarchy
-    for (const item of filteredItems) {
-      const current = itemMap.get(item.nav_id);
-      if (!current) continue;
-
-      if (item.parent_id && itemMap.has(item.parent_id)) {
-        const parent = itemMap.get(item.parent_id);
-        if (parent && parent.children) {
-          parent.children.push(current);
-        }
-      } else {
-        rootItems.push(current);
-      }
-    }
-
-    // Sort root items
-    rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    // Convert to sections
-    const sections: NavigationSection[] = [];
-
-    const sectionItems = rootItems.filter(item => 
-      item.children && item.children.length > 0
-    );
-
-    const standaloneItems = rootItems.filter(item => 
-      !item.children || item.children.length === 0
-    );
-
-    for (const section of sectionItems) {
-      sections.push({
-        id: section.id,
-        label: section.label.toUpperCase(),
-        items: section.children || []
-      });
-    }
-
-    if (standaloneItems.length > 0) {
-      sections.push({
-        id: 'default',
-        label: hubId.toUpperCase(),
-        items: standaloneItems
-      });
-    }
-
-    // Ensure sections have content
-    const filteredSections = sections.filter(section => section.items.length > 0);
-    
-    // If no sections after filtering, return fallback
-    if (filteredSections.length === 0) {
-      // Return at least a default section with Command Center
-      const commandCenterItem = navItems.find(item => item.label === 'Command Center' || item.path === '/admin');
-      if (commandCenterItem) {
-        return [{
-          id: 'default',
-          label: hubId.toUpperCase(),
-          items: [{
-            id: commandCenterItem.nav_id,
-            label: commandCenterItem.label,
-            href: commandCenterItem.path || '/admin',
-            icon: commandCenterItem.icon || undefined,
-            description: commandCenterItem.description || undefined,
-            sort_order: commandCenterItem.sort_order || 0
-          }]
-        }];
-      }
-    }
-
-    return filteredSections;
-
+    return buildSections(rows, hubId);
   } catch (error) {
-    console.error('Error in getNavigation:', error);
+    console.error('[navigationDefinitions] getNavigation failed', { hubId, error });
     return [];
   }
 }
 
-// =====================================================
-// GET SWITCHER CONFIG
-// =====================================================
-
 export async function getSwitcherConfig(hubId: string): Promise<SwitcherConfig> {
-  // Return default config for now
-  return {
-    type: null,
-    displayStyle: 'none',
-    options: [],
-    defaultOption: ''
-  };
+  if (hubId === 'athlete') {
+    return {
+      type: 'age',
+      displayStyle: 'radio',
+      defaultOption: '5-8',
+      options: [
+        { id: '5-8', label: 'Foundation · Ages 5–8' },
+        { id: '9-11', label: 'Development · Ages 9–11' },
+        { id: '12-14', label: 'Growth · Ages 12–14' },
+        { id: '15-17', label: 'Performance · Ages 15–17' },
+        { id: '18+', label: 'Advanced · 18+' },
+      ],
+    };
+  }
+
+  if (hubId === 'admin') {
+    return {
+      type: 'role',
+      displayStyle: 'radio',
+      defaultOption: 'org_admin',
+      options: [
+        { id: 'org_admin', label: 'Organization Admin' },
+        { id: 'team_manager', label: 'Team Manager' },
+        { id: 'registrar', label: 'Registrar' },
+        { id: 'treasurer', label: 'Treasurer' },
+        { id: 'operations', label: 'Operations' },
+        { id: 'compliance', label: 'Compliance' },
+        { id: 'reporting', label: 'Reporting' },
+      ],
+    };
+  }
+
+  if (hubId === 'official') {
+    return {
+      type: 'official_role',
+      displayStyle: 'radio',
+      defaultOption: 'official',
+      options: [
+        { id: 'official', label: 'Official' },
+        { id: 'meet_referee', label: 'Meet Referee' },
+        { id: 'starter', label: 'Starter' },
+        { id: 'stroke_turn', label: 'Stroke & Turn' },
+        { id: 'judge', label: 'Judge' },
+        { id: 'meet_director', label: 'Meet Director' },
+      ],
+    };
+  }
+
+  return { type: null, displayStyle: 'none', options: [], defaultOption: '' };
 }
