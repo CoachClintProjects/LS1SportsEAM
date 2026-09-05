@@ -17,19 +17,13 @@ function SuperUserLoading() {
   );
 }
 
-// =============================================================================
-// ROUTED WORKSPACE - With proper error handling
-// =============================================================================
-
 function RoutedWorkspace() {
   const searchParams = useSearchParams();
   const view = searchParams?.get('view') ?? 'command-center';
   const validView = view || 'command-center';
   
-  // Log for debugging
-  console.log('[SuperUser] View parameter:', validView);
+  console.log('[SuperUser] View:', validView);
   
-  // Simple guard - if view is empty, default to command-center
   if (!validView || validView === '') {
     return <ProjectCommand />;
   }
@@ -41,15 +35,10 @@ function RoutedWorkspace() {
       return <SuperUserModuleWorkspace view={validView} />;
     }
   } catch (error) {
-    console.error('[SuperUser] Error rendering workspace:', error);
-    // Fallback to ProjectCommand on error
+    console.error('[SuperUser] Error:', error);
     return <ProjectCommand />;
   }
 }
-
-// =============================================================================
-// MAIN PAGE
-// =============================================================================
 
 export default function SuperUserPage() {
   const [mounted, setMounted] = useState(false);
@@ -58,7 +47,6 @@ export default function SuperUserPage() {
     setMounted(true);
   }, []);
 
-  // Prevent hydration mismatch
   if (!mounted) {
     return <SuperUserLoading />;
   }
