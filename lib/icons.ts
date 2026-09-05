@@ -1,12 +1,25 @@
 // =============================================================================
 // ICON REGISTRY - Database-Driven
 // =============================================================================
-// This file provides the icon registry for the entire platform.
-// Icons are stored in the icon_registry table in Supabase.
-// =============================================================================
 
 import * as LucideIcons from 'lucide-react';
+import React from 'react';
 
+const iconMap: Record<string, React.ComponentType<any>> = {
+  // ... all icons
+};
+
+export function renderIconSync(iconName: string | null | undefined, className: string = 'h-4 w-4'): React.ReactNode {
+  if (!iconName) return null;
+  const Icon = iconMap[iconName];
+  if (!Icon) return null;
+  return React.createElement(Icon, { className });
+}
+
+export function getIconSync(iconName: string | null | undefined): React.ComponentType<any> | null {
+  if (!iconName) return null;
+  return iconMap[iconName] || null;
+}
 // =============================================================================
 // ICON REGISTRY - Fallback hardcoded map (for now)
 // =============================================================================
