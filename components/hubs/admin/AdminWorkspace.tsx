@@ -64,33 +64,138 @@ interface Role {
 }
 
 // =============================================================================
-// FALLBACK COMPONENT (Must be defined BEFORE componentMap)
+// VIEW COMPONENTS (Simplified placeholders for now)
 // =============================================================================
 
-const FallbackComponent = ({ title }: { title: string }) => (
-  <div className="flex h-full items-center justify-center">
-    <div className="text-center">
-      <div className="text-2xl font-black text-white">{title}</div>
-      <p className="mt-2 text-sm text-neutral-500">This workspace is being built.</p>
-    </div>
+const CommandCenter = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Command Center</h1>
+    <p className="mt-2 text-neutral-400">Dashboard overview will appear here.</p>
+  </div>
+);
+
+const OrganizationArchitecture = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Organization</h1>
+    <p className="mt-2 text-neutral-400">Organization structure will appear here.</p>
+  </div>
+);
+
+const TeamManager = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Team Manager</h1>
+    <p className="mt-2 text-neutral-400">Team management will appear here.</p>
+  </div>
+);
+
+const RegistrarValidation = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Registrar</h1>
+    <p className="mt-2 text-neutral-400">Registration validation will appear here.</p>
+  </div>
+);
+
+const FinanceAccounting = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Finance</h1>
+    <p className="mt-2 text-neutral-400">Financial overview will appear here.</p>
+  </div>
+);
+
+const Facilities = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Facilities</h1>
+    <p className="mt-2 text-neutral-400">Facility management will appear here.</p>
+  </div>
+);
+
+const Payroll = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Payroll</h1>
+    <p className="mt-2 text-neutral-400">Payroll management will appear here.</p>
+  </div>
+);
+
+const Imports = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Imports</h1>
+    <p className="mt-2 text-neutral-400">Data import tools will appear here.</p>
+  </div>
+);
+
+const Compliance = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Compliance</h1>
+    <p className="mt-2 text-neutral-400">Compliance tracking will appear here.</p>
+  </div>
+);
+
+const Reporting = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Reporting</h1>
+    <p className="mt-2 text-neutral-400">Reports and analytics will appear here.</p>
+  </div>
+);
+
+const RostersView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Rosters</h1>
+    <p className="mt-2 text-neutral-400">Roster management will appear here.</p>
+  </div>
+);
+
+const MembershipView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Membership</h1>
+    <p className="mt-2 text-neutral-400">Membership management will appear here.</p>
+  </div>
+);
+
+const ProgramsView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Programs</h1>
+    <p className="mt-2 text-neutral-400">Program management will appear here.</p>
+  </div>
+);
+
+const TeamsView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Teams</h1>
+    <p className="mt-2 text-neutral-400">Team management will appear here.</p>
+  </div>
+);
+
+const SeasonsView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Seasons</h1>
+    <p className="mt-2 text-neutral-400">Season management will appear here.</p>
+  </div>
+);
+
+const BillingView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Billing</h1>
+    <p className="mt-2 text-neutral-400">Billing management will appear here.</p>
+  </div>
+);
+
+const InvoicesView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Invoices</h1>
+    <p className="mt-2 text-neutral-400">Invoice management will appear here.</p>
+  </div>
+);
+
+const PaymentsView = () => (
+  <div className="text-white">
+    <h1 className="text-2xl font-black">Payments</h1>
+    <p className="mt-2 text-neutral-400">Payment management will appear here.</p>
   </div>
 );
 
 // =============================================================================
-// COMPONENT MAP (Now uses direct imports)
+// COMPONENT MAP
 // =============================================================================
-
-// Import all the workspace components
-import { CommandCenter } from './CommandCenter';
-import { OrganizationArchitecture } from './OrganizationArchitecture';
-import { TeamManager } from './TeamManager';
-import { RegistrarValidation } from './RegistrarValidation';
-import { FinanceAccounting } from './FinanceAccounting';
-import { Facilities } from './Facilities';
-import { Payroll } from './Payroll';
-import { Imports } from './Imports';
-import { Compliance } from './Compliance';
-import { Reporting } from './Reporting';
 
 const componentMap: Record<string, React.ComponentType<any>> = {
   CommandCenter,
@@ -103,15 +208,14 @@ const componentMap: Record<string, React.ComponentType<any>> = {
   Imports,
   Compliance,
   Reporting,
-  // Placeholder components for views that don't have real components yet
-  RostersView: () => <FallbackComponent title="Rosters" />,
-  MembershipView: () => <FallbackComponent title="Membership" />,
-  ProgramsView: () => <FallbackComponent title="Programs" />,
-  TeamsView: () => <FallbackComponent title="Teams" />,
-  SeasonsView: () => <FallbackComponent title="Seasons" />,
-  BillingView: () => <FallbackComponent title="Billing" />,
-  InvoicesView: () => <FallbackComponent title="Invoices" />,
-  PaymentsView: () => <FallbackComponent title="Payments" />,
+  RostersView,
+  MembershipView,
+  ProgramsView,
+  TeamsView,
+  SeasonsView,
+  BillingView,
+  InvoicesView,
+  PaymentsView,
 };
 
 // =============================================================================
@@ -391,7 +495,7 @@ export function AdminWorkspace() {
   // MAIN RENDER
   // ===========================================================================
 
-  const ActiveComponent = findActiveComponent(navItems) || (() => <FallbackComponent title="Dashboard" />);
+  const ActiveComponent = findActiveComponent(navItems) || CommandCenter;
   const currentRoleLabel = roles.find(r => r.role_name === currentRole)?.description || currentRole;
 
   return (
