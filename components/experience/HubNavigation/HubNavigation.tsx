@@ -304,5 +304,4 @@ export function HubNavigation() {
     </nav>
   );
 }
-
 export default HubNavigation;
