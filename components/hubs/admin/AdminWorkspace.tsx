@@ -45,7 +45,6 @@ const supabase = createClient(
 // TYPE DEFINITIONS
 // =============================================================================
 
-// Navigation item structure from database
 interface NavItem {
   nav_id: string;
   hub_id: string;
@@ -58,7 +57,6 @@ interface NavItem {
   children?: NavItem[];
 }
 
-// Role structure from database
 interface Role {
   role_id: string;
   role_name: string;
@@ -68,7 +66,6 @@ interface Role {
 // =============================================================================
 // FALLBACK COMPONENT
 // =============================================================================
-// Rendered when a real component isn't available yet
 
 const FallbackComponent = ({ title }: { title: string }) => (
   <div className="flex h-full items-center justify-center">
@@ -82,12 +79,9 @@ const FallbackComponent = ({ title }: { title: string }) => (
 // =============================================================================
 // COMPONENT MAP
 // =============================================================================
-// Maps database component names to actual React components
-// Add new components here when they're built
 
 const componentMap: Record<string, React.ComponentType<any>> = {};
 
-// Try to import each component from the admin folder
 const componentNames = [
   'CommandCenter',
   'OrganizationArchitecture',
@@ -101,7 +95,6 @@ const componentNames = [
   'Reporting'
 ];
 
-// Register each component with a fallback if it doesn't exist
 componentNames.forEach(name => {
   try {
     const module = require(`./${name}`);
@@ -111,7 +104,7 @@ componentNames.forEach(name => {
   }
 });
 
-// Placeholder components for views that don't have real components yet
+// Placeholder components
 componentMap['RostersView'] = () => <FallbackComponent title="Rosters" />;
 componentMap['MembershipView'] = () => <FallbackComponent title="Membership" />;
 componentMap['ProgramsView'] = () => <FallbackComponent title="Programs" />;
@@ -124,8 +117,6 @@ componentMap['PaymentsView'] = () => <FallbackComponent title="Payments" />;
 // =============================================================================
 // ICON MAP
 // =============================================================================
-// Maps database icon names to Lucide components
-// Add new icons here as needed
 
 const iconMap: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="h-4 w-4" />,
@@ -169,12 +160,10 @@ export function AdminWorkspace() {
   // EFFECTS
   // ===========================================================================
 
-  // Load navigation data on mount
   useEffect(() => {
     loadNavigation();
   }, []);
 
-  // Reload navigation when role changes
   useEffect(() => {
     if (currentRole) {
       loadNavigationForRole(currentRole);
@@ -185,11 +174,9 @@ export function AdminWorkspace() {
   // DATA LOADING FUNCTIONS
   // ===========================================================================
 
-  // Load roles and set default role
   const loadNavigation = async () => {
     setLoading(true);
     try {
-      // Get all roles from database
       const { data: rolesData, error: rolesError } = await supabase
         .from('admin_roles')
         .select('*');
@@ -197,7 +184,6 @@ export function AdminWorkspace() {
       if (rolesError) throw rolesError;
       setRoles(rolesData || []);
 
-      // Set first role as default
       if (rolesData && rolesData.length > 0) {
         setCurrentRole(rolesData[0].role_name);
         await loadNavigationForRole(rolesData[0].role_name);
@@ -210,10 +196,8 @@ export function AdminWorkspace() {
     }
   };
 
-  // Load navigation items for a specific role
   const loadNavigationForRole = async (roleName: string) => {
     try {
-      // 1. Get the role ID
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('role_id')
@@ -222,7 +206,6 @@ export function AdminWorkspace() {
 
       if (roleError) throw roleError;
 
-      // 2. Get navigation items for this role via the junction table
       const { data: navData, error: navError } = await supabase
         .from('hub_role_navigation')
         .select(`
@@ -243,12 +226,16 @@ export function AdminWorkspace() {
 
       if (navError) throw navError;
 
-      // 3. Extract and filter out null values
-      const items: NavItem[] = navData
-        .map((item: any) => {
-          const nav = item.hub_navigation;
-          if (!nav) return null;
-          return {
+      // =========================================================================
+      // FIX: Build items array without null values using a simple loop
+      // =========================================================================
+      const items: NavItem[] = [];
+
+      for (let i = 0; i < navData.length; i++) {
+        const entry = navData[i];
+        const nav = entry.hub_navigation;
+        if (nav) {
+          items.push({
             nav_id: nav.nav_id,
             hub_id: nav.hub_id,
             parent_id: nav.parent_id,
@@ -258,43 +245,48 @@ export function AdminWorkspace() {
             component: nav.component,
             sort_order: nav.sort_order || 0,
             children: []
-          };
-        })
-        .filter((item: NavItem | null): item is NavItem => item !== null);
+          });
+        }
+      }
 
-      // 4. Build parent-child hierarchy
+      // =========================================================================
+      // BUILD HIERARCHY
+      // =========================================================================
       const itemMap = new Map<string, NavItem>();
       const rootItems: NavItem[] = [];
 
-      // First pass: create map of all items
-      items.forEach(item => {
+      // First pass: create map
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         itemMap.set(item.nav_id, { ...item, children: [] });
-      });
+      }
 
-      // Second pass: build tree structure
-      items.forEach(item => {
-        const current = itemMap.get(item.nav_id)!;
+      // Second pass: build tree
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const current = itemMap.get(item.nav_id);
+        if (!current) continue;
+
         if (item.parent_id && itemMap.has(item.parent_id)) {
-          const parent = itemMap.get(item.parent_id)!;
-          if (!parent.children) parent.children = [];
-          parent.children.push(current);
+          const parent = itemMap.get(item.parent_id);
+          if (parent) {
+            if (!parent.children) parent.children = [];
+            parent.children.push(current);
+          }
         } else {
           rootItems.push(current);
         }
-      });
+      }
 
-      // 5. Sort by sort_order
+      // Sort by sort_order
       rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
-      // 6. Update state
       setNavItems(rootItems);
 
-      // Set first item as active view
       if (rootItems.length > 0) {
         setActiveView(rootItems[0].nav_id);
       }
 
-      // Auto-expand sections that have children
       const sectionsWithChildren = rootItems
         .filter(item => item.children && item.children.length > 0)
         .map(item => item.nav_id);
@@ -311,9 +303,9 @@ export function AdminWorkspace() {
   // HELPER FUNCTIONS
   // ===========================================================================
 
-  // Find the active component by searching the nav tree
   const findActiveComponent = (items: NavItem[]): React.ComponentType<any> | null => {
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       if (item.nav_id === activeView && item.component && componentMap[item.component]) {
         return componentMap[item.component];
       }
@@ -329,7 +321,6 @@ export function AdminWorkspace() {
   // RENDER FUNCTIONS
   // ===========================================================================
 
-  // Render navigation items recursively
   const renderNavItems = (items: NavItem[], level: number = 0) => {
     return items.map((item) => {
       const hasChildren = item.children && item.children.length > 0;
@@ -338,9 +329,6 @@ export function AdminWorkspace() {
       const paddingLeft = level > 0 ? `${level * 12 + 12}px` : '12px';
       const icon = item.icon && iconMap[item.icon] ? iconMap[item.icon] : <FileText className="h-4 w-4" />;
 
-      // =========================================================================
-      // SECTION HEADER (has children - expandable)
-      // =========================================================================
       if (hasChildren) {
         return (
           <div key={item.nav_id}>
@@ -375,9 +363,6 @@ export function AdminWorkspace() {
         );
       }
 
-      // =========================================================================
-      // NAV ITEM (no children - clickable)
-      // =========================================================================
       return (
         <button
           key={item.nav_id}
@@ -458,7 +443,6 @@ export function AdminWorkspace() {
               <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* --- Role Dropdown --- */}
             {isRoleDropdownOpen && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
                 {roles.map((role) => (
@@ -513,7 +497,6 @@ export function AdminWorkspace() {
         <div className="sticky top-0 z-10 border-b border-neutral-800 bg-[#090b0b]/80 backdrop-blur-sm">
           <div className="flex items-center justify-between px-6 py-3">
 
-            {/* Left side: Mobile toggle + breadcrumb */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -538,7 +521,6 @@ export function AdminWorkspace() {
               </div>
             </div>
 
-            {/* Right side: Search + actions */}
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-lg border border-neutral-800 bg-black px-3 py-1.5 lg:flex">
                 <Search className="h-3.5 w-3.5 text-neutral-500" />
@@ -553,7 +535,6 @@ export function AdminWorkspace() {
                 <RefreshCw className="h-4 w-4" />
               </button>
 
-              {/* User avatar */}
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FA4616]/20 text-xs font-bold text-[#FA4616]">
                 CK
               </div>
