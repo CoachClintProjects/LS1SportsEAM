@@ -23,10 +23,11 @@ import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
 
 // =============================================================================
-// ICON MAP - Simplified with NO DUPLICATES
+// ICON MAP - Clean, no duplicates
 // =============================================================================
 
 const icons: Record<string, React.ElementType> = {
+  // Standard icons
   activity: Activity,
   archive: Archive,
   award: Award,
@@ -78,11 +79,7 @@ const icons: Record<string, React.ElementType> = {
   wallet: Wallet,
   wrench: Wrench,
   workflow: Workflow,
-  cash: DollarSign,
-  cart: Package,
-  reports: BarChart3,
-  clock: Timer,
-  alert: Bell,
+  // Admin-specific
   'layout-dashboard': LayoutDashboard,
   'building2': Building2,
   'folder-tree': FolderTree,
@@ -95,6 +92,7 @@ const icons: Record<string, React.ElementType> = {
   'clipboard-check': ClipboardCheck,
   'dollar-sign': DollarIcon,
   'warehouse': Warehouse,
+  // Official-specific
   'gavel': Gavel,
   'flag': Flag,
   'trophy': Trophy
@@ -118,7 +116,7 @@ interface SwitcherConfig {
 }
 
 // =============================================================================
-// SWITCHER DATA - No duplicate IDs
+// SWITCHER DATA
 // =============================================================================
 
 const switcherConfigs: Record<string, SwitcherConfig> = {
@@ -166,6 +164,15 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
 };
 
 // =============================================================================
+// HELPER: Get icon component
+// =============================================================================
+
+function getIcon(name: string | undefined): React.ElementType {
+  if (!name) return File;
+  return icons[name] || File;
+}
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
@@ -201,7 +208,7 @@ function NavigationItemView({
   activeHubId: string;
 }) {
   const router = useRouter();
-  const Icon = item.icon ? icons[item.icon] ?? File : File;
+  const Icon = getIcon(item.icon);
   const active = activeItem === item.id;
 
   const classes = `
@@ -297,7 +304,7 @@ function SwitcherRenderer({
   // Role switcher (Admin Hub & Official Hub) - dropdown style
   if (config.type === 'role' || config.type === 'official_role') {
     const currentOption = config.options.find(o => o.id === switcherValue) || config.options[0];
-    const Icon = currentOption?.icon ? icons[currentOption.icon] || Shield : Shield;
+    const Icon = getIcon(currentOption?.icon);
 
     return (
       <div className="mt-5">
@@ -320,7 +327,7 @@ function SwitcherRenderer({
           {isOpen && (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-neutral-800 bg-[#0d1010] shadow-xl">
               {config.options.map(option => {
-                const OptionIcon = option.icon ? icons[option.icon] || Shield : Shield;
+                const OptionIcon = getIcon(option.icon);
                 const isActive = switcherValue === option.id;
                 return (
                   <button
