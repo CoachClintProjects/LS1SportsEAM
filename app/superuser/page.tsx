@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
+import SuperUserActions from '@/components/hubs/superuser/SuperUserActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -19,14 +20,18 @@ function LoadingWorkspace() {
 
 function SuperUserRouter() {
   const searchParams = useSearchParams();
-  const requestedView = searchParams.get('view');
-  const view = requestedView?.trim() || 'command-center';
+  const view = searchParams.get('view')?.trim() || 'command-center';
 
-  if (COMMAND_VIEWS.has(view)) {
-    return <ProjectCommand />;
-  }
-
-  return <SuperUserModuleWorkspace view={view} />;
+  return (
+    <div className="space-y-5">
+      <SuperUserActions />
+      {COMMAND_VIEWS.has(view) ? (
+        <ProjectCommand />
+      ) : (
+        <SuperUserModuleWorkspace view={view} />
+      )}
+    </div>
+  );
 }
 
 export default function SuperUserPage() {
