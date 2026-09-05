@@ -8,95 +8,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Activity, Archive, Award, Badge, BarChart3, Bell, Book, Bot, Boxes,
-  Briefcase, Building, Calendar, CheckCircle, Clipboard, Command, Database,
-  DollarSign, Eye, File, GitBranch, HeartPulse, History, Home, Key, Layers,
-  Lightbulb, List, Lock, Map, Medal, Package, Plug, Receipt, Repeat, Rocket,
-  Route, Search, Send, Server, Settings, Sparkles, Target, Timer, TrendingUp,
-  Upload, User, UserPlus, Users, Wallet, Wrench, Workflow, Shield, Gavel, Flag,
-  Trophy, UserCheck, Warehouse, LayoutDashboard, Building2, FolderTree,
-  Calendar as CalendarIcon, FileText, CreditCard, Receipt as ReceiptIcon,
-  ChevronDown, ChevronRight, CheckCircle2, X, Menu, RefreshCw, Bell as BellIcon,
-  ClipboardCheck, Users as UsersIcon, DollarSign as DollarIcon, BarChart3 as ChartIcon
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
-
-// =============================================================================
-// ICON MAP - Clean, no duplicates
-// =============================================================================
-
-const icons: Record<string, React.ElementType> = {
-  // Standard icons
-  activity: Activity,
-  archive: Archive,
-  award: Award,
-  badge: Badge,
-  bell: Bell,
-  book: Book,
-  bot: Bot,
-  boxes: Boxes,
-  briefcase: Briefcase,
-  building: Building,
-  calendar: Calendar,
-  check: CheckCircle,
-  clipboard: Clipboard,
-  command: Command,
-  database: Database,
-  dollar: DollarSign,
-  eye: Eye,
-  file: File,
-  branch: GitBranch,
-  heart: HeartPulse,
-  history: History,
-  home: Home,
-  key: Key,
-  layers: Layers,
-  lightbulb: Lightbulb,
-  list: List,
-  lock: Lock,
-  map: Map,
-  medal: Medal,
-  package: Package,
-  plug: Plug,
-  receipt: Receipt,
-  repeat: Repeat,
-  rocket: Rocket,
-  route: Route,
-  search: Search,
-  send: Send,
-  server: Server,
-  settings: Settings,
-  shield: Shield,
-  sparkles: Sparkles,
-  target: Target,
-  timer: Timer,
-  trending: TrendingUp,
-  upload: Upload,
-  user: User,
-  'user-plus': UserPlus,
-  users: Users,
-  wallet: Wallet,
-  wrench: Wrench,
-  workflow: Workflow,
-  // Admin-specific
-  'layout-dashboard': LayoutDashboard,
-  'building2': Building2,
-  'folder-tree': FolderTree,
-  'calendar-days': CalendarIcon,
-  'file-text': FileText,
-  'credit-card': CreditCard,
-  'receipt': ReceiptIcon,
-  'user-check': UserCheck,
-  'bar-chart-3': ChartIcon,
-  'clipboard-check': ClipboardCheck,
-  'dollar-sign': DollarIcon,
-  'warehouse': Warehouse,
-  // Official-specific
-  'gavel': Gavel,
-  'flag': Flag,
-  'trophy': Trophy
-};
 
 // =============================================================================
 // SWITCHER CONFIGURATION
@@ -106,7 +22,6 @@ interface SwitcherOption {
   id: string;
   label: string;
   description?: string;
-  icon?: string;
 }
 
 interface SwitcherConfig {
@@ -135,25 +50,25 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
     type: 'role',
     defaultOption: 'org_admin',
     options: [
-      { id: 'org_admin', label: 'Organization Admin', icon: 'shield' },
-      { id: 'team_manager', label: 'Team Manager', icon: 'users' },
-      { id: 'registrar', label: 'Registrar', icon: 'user-check' },
-      { id: 'treasurer', label: 'Treasurer', icon: 'dollar-sign' },
-      { id: 'operations', label: 'Operations', icon: 'warehouse' },
-      { id: 'compliance', label: 'Compliance', icon: 'clipboard-check' },
-      { id: 'reporting', label: 'Reporting', icon: 'bar-chart-3' }
+      { id: 'org_admin', label: 'Organization Admin' },
+      { id: 'team_manager', label: 'Team Manager' },
+      { id: 'registrar', label: 'Registrar' },
+      { id: 'treasurer', label: 'Treasurer' },
+      { id: 'operations', label: 'Operations' },
+      { id: 'compliance', label: 'Compliance' },
+      { id: 'reporting', label: 'Reporting' }
     ]
   },
   official: {
     type: 'official_role',
     defaultOption: 'official',
     options: [
-      { id: 'official', label: 'Official', icon: 'shield' },
-      { id: 'meet_referee', label: 'Meet Referee', icon: 'gavel' },
-      { id: 'starter', label: 'Starter', icon: 'flag' },
-      { id: 'stroke_turn', label: 'Stroke & Turn', icon: 'eye' },
-      { id: 'judge', label: 'Judge', icon: 'clipboard' },
-      { id: 'meet_director', label: 'Meet Director', icon: 'trophy' }
+      { id: 'official', label: 'Official' },
+      { id: 'meet_referee', label: 'Meet Referee' },
+      { id: 'starter', label: 'Starter' },
+      { id: 'stroke_turn', label: 'Stroke & Turn' },
+      { id: 'judge', label: 'Judge' },
+      { id: 'meet_director', label: 'Meet Director' }
     ]
   },
   scout: {
@@ -162,15 +77,6 @@ const switcherConfigs: Record<string, SwitcherConfig> = {
     options: []
   }
 };
-
-// =============================================================================
-// HELPER: Get icon component
-// =============================================================================
-
-function getIcon(name: string | undefined): React.ElementType {
-  if (!name) return File;
-  return icons[name] || File;
-}
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -208,7 +114,6 @@ function NavigationItemView({
   activeHubId: string;
 }) {
   const router = useRouter();
-  const Icon = getIcon(item.icon);
   const active = activeItem === item.id;
 
   const classes = `
@@ -218,7 +123,6 @@ function NavigationItemView({
 
   const content = (
     <>
-      <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#FA4616]' : 'text-neutral-600 group-hover:text-neutral-300'}`} strokeWidth={1.8} />
       <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
       {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}
     </>
@@ -304,7 +208,6 @@ function SwitcherRenderer({
   // Role switcher (Admin Hub & Official Hub) - dropdown style
   if (config.type === 'role' || config.type === 'official_role') {
     const currentOption = config.options.find(o => o.id === switcherValue) || config.options[0];
-    const Icon = getIcon(currentOption?.icon);
 
     return (
       <div className="mt-5">
@@ -313,21 +216,13 @@ function SwitcherRenderer({
             onClick={() => setIsOpen(!isOpen)}
             className="flex w-full items-center justify-between rounded-lg border border-neutral-800 bg-[#0d1010] px-3 py-2.5 text-sm text-white hover:border-neutral-600 transition-colors"
           >
-            <div className="flex items-center gap-2">
-              {currentOption?.icon && (
-                <span className="text-[#FA4616]">
-                  <Icon className="h-4 w-4" />
-                </span>
-              )}
-              <span className="truncate">{currentOption?.label || 'Select Role'}</span>
-            </div>
+            <span className="truncate">{currentOption?.label || 'Select Role'}</span>
             <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isOpen && (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-neutral-800 bg-[#0d1010] shadow-xl">
               {config.options.map(option => {
-                const OptionIcon = getIcon(option.icon);
                 const isActive = switcherValue === option.id;
                 return (
                   <button
@@ -341,9 +236,6 @@ function SwitcherRenderer({
                       ${isActive ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
                     `}
                   >
-                    <span className={isActive ? 'text-[#FA4616]' : 'text-neutral-500'}>
-                      <OptionIcon className="h-4 w-4" />
-                    </span>
                     <div>
                       <div className="font-medium">{option.label}</div>
                     </div>
