@@ -23,7 +23,7 @@ import { useHub } from '@/components/hubs/HubContext';
 import { getNavigation, NavigationItem, NavigationSection } from './navigationDefinitions';
 
 // =============================================================================
-// ICON MAP
+// ICON MAP - Simplified with NO DUPLICATES
 // =============================================================================
 
 const icons: Record<string, React.ElementType> = {
@@ -78,7 +78,6 @@ const icons: Record<string, React.ElementType> = {
   wallet: Wallet,
   wrench: Wrench,
   workflow: Workflow,
-  milestone: Activity,
   cash: DollarSign,
   cart: Package,
   reports: BarChart3,
@@ -119,7 +118,7 @@ interface SwitcherConfig {
 }
 
 // =============================================================================
-// SWITCHER DATA
+// SWITCHER DATA - No duplicate IDs
 // =============================================================================
 
 const switcherConfigs: Record<string, SwitcherConfig> = {
