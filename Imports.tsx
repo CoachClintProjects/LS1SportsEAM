@@ -4,7 +4,7 @@
 // IMPORTS - File upload for meet results
 // =============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -18,7 +18,7 @@ export function Imports() {
   const [uploadStatus, setUploadStatus] = useState<{ type: string; message: string } | null>(null);
   const [importHistory, setImportHistory] = useState<any[]>([]);
 
-  useState(() => {
+  useEffect(() => {
     loadImportHistory();
   }, []);
 
