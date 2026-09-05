@@ -79,40 +79,40 @@ const FallbackComponent = ({ title }: { title: string }) => (
 // =============================================================================
 // COMPONENT MAP
 // =============================================================================
+// Maps database component names to actual React components
 
-const componentMap: Record<string, React.ComponentType<any>> = {};
+import { CommandCenter } from './CommandCenter';
+import { OrganizationArchitecture } from './OrganizationArchitecture';
+import { TeamManager } from './TeamManager';
+import { RegistrarValidation } from './RegistrarValidation';
+import { FinanceAccounting } from './FinanceAccounting';
+import { Facilities } from './Facilities';
+import { Payroll } from './Payroll';
+import { Imports } from './Imports';
+import { Compliance } from './Compliance';
+import { Reporting } from './Reporting';
 
-const componentNames = [
-  'CommandCenter',
-  'OrganizationArchitecture',
-  'TeamManager',
-  'RegistrarValidation',
-  'FinanceAccounting',
-  'Facilities',
-  'Payroll',
-  'Imports',
-  'Compliance',
-  'Reporting'
-];
-
-componentNames.forEach(name => {
-  try {
-    const module = require(`./${name}`);
-    componentMap[name] = module.default || module;
-  } catch (e) {
-    componentMap[name] = () => <FallbackComponent title={name} />;
-  }
-});
-
-// Placeholder components
-componentMap['RostersView'] = () => <FallbackComponent title="Rosters" />;
-componentMap['MembershipView'] = () => <FallbackComponent title="Membership" />;
-componentMap['ProgramsView'] = () => <FallbackComponent title="Programs" />;
-componentMap['TeamsView'] = () => <FallbackComponent title="Teams" />;
-componentMap['SeasonsView'] = () => <FallbackComponent title="Seasons" />;
-componentMap['BillingView'] = () => <FallbackComponent title="Billing" />;
-componentMap['InvoicesView'] = () => <FallbackComponent title="Invoices" />;
-componentMap['PaymentsView'] = () => <FallbackComponent title="Payments" />;
+const componentMap: Record<string, React.ComponentType<any>> = {
+  CommandCenter,
+  OrganizationArchitecture,
+  TeamManager,
+  RegistrarValidation,
+  FinanceAccounting,
+  Facilities,
+  Payroll,
+  Imports,
+  Compliance,
+  Reporting,
+  // Placeholder components for views that don't have real components yet
+  RostersView: () => <FallbackComponent title="Rosters" />,
+  MembershipView: () => <FallbackComponent title="Membership" />,
+  ProgramsView: () => <FallbackComponent title="Programs" />,
+  TeamsView: () => <FallbackComponent title="Teams" />,
+  SeasonsView: () => <FallbackComponent title="Seasons" />,
+  BillingView: () => <FallbackComponent title="Billing" />,
+  InvoicesView: () => <FallbackComponent title="Invoices" />,
+  PaymentsView: () => <FallbackComponent title="Payments" />,
+};
 
 // =============================================================================
 // ICON MAP
