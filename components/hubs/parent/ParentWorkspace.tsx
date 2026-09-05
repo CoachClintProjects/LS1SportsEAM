@@ -1,13 +1,11 @@
 'use client';
 
-
 import React,{useCallback,useEffect,useMemo,useState}from'react';
 import{AlertTriangle,CalendarDays,Car,CheckCircle2,ChevronRight,FileText,RefreshCw,ShieldCheck,Users,Wallet,X}from'lucide-react';
 import{useRouter,useSearchParams}from'next/navigation';
 
 type Row=Record<string,any>;
 type Payload={family:Row|null;members:Row[];athletes:Row[];tasks:Row[];messages:Row[];invoices:Row[];documents:Row[];trips:Row[];custody:Row[];volunteer:Row[];metrics:Record<string,number>;source:string;error?:string};
-
 
 const NAV=[['household','Today'],['tasks','Task Center'],['athletes','My Athletes'],['schedule','Family Schedule'],['transport','Transport & Custody'],['documents','Document Vault'],['financial','Financial Center'],['volunteer','Participation'],['members','Family & Permissions'],['messages','Inbox']]as const;
 const money=(v:any)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Number(v||0));
