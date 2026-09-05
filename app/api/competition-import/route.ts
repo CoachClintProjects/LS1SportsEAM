@@ -21,7 +21,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate format
     const validFormats = ['CSV', 'JSON', 'TXT', 'XML']
     if (!validFormats.includes(format)) {
       return NextResponse.json(
@@ -30,10 +29,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ FIXED: Properly split on newlines
     const lines = format === 'JSON' ? [text] : text.split(/\r?\n/)
 
-    // Insert import file record
     const { data: row, error: insertError } = await supabase
       .from('competition_import_files')
       .insert({
@@ -54,12 +51,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // Process lines in batches
     const batchSize = 100
     let staged = 0
 
     for (let i = 0; i < lines.length; i += batchSize) {
-      const batch = lines.slice(i, i + batchSize).map((line, index) => ({
+      const batch = lines.slice(i, i + batchSize).map((line: string, index: number) => ({
         import_file_id: row.id,
         record_type: 'RAW',
         line_number: i + index + 1,
@@ -72,7 +68,6 @@ export async function POST(request: Request) {
 
       if (batchError) {
         console.error('Error inserting batch:', batchError)
-        // Update status to failed
         await supabase
           .from('competition_import_files')
           .update({ status: 'failed' })
@@ -86,7 +81,6 @@ export async function POST(request: Request) {
       staged += batch.length
     }
 
-    // Update status to completed
     await supabase
       .from('competition_import_files')
       .update({ 
