@@ -137,12 +137,13 @@ export function HubNavigation() {
   const [switcherValue, setSwitcherValue] = useState('');
   const [switcherConfig, setSwitcherConfig] = useState(() => getSwitcherFallback(activeHubId));
 
-  // Load navigation from database
+  // Load navigation from database - RELOADS WHEN SWITCHER VALUE CHANGES
   useEffect(() => {
     const loadNavigation = async () => {
       setLoading(true);
       try {
-        const result = await getNavigation(activeHubId, '');
+        // Pass switcherValue to getNavigation so it can filter by role/age
+        const result = await getNavigation(activeHubId, switcherValue);
         if (result && result.length > 0) {
           setSections(result);
         } else {
@@ -157,13 +158,12 @@ export function HubNavigation() {
     };
 
     loadNavigation();
-  }, [activeHubId]);
+  }, [activeHubId, switcherValue]); // <-- KEY FIX: switcherValue triggers reload
 
   // Set switcher config when hub changes
   useEffect(() => {
-    setSwitcherConfig(getSwitcherFallback(activeHubId));
-    // Set default switcher value
     const config = getSwitcherFallback(activeHubId);
+    setSwitcherConfig(config);
     if (config && config.options.length > 0) {
       setSwitcherValue(config.defaultOption || config.options[0].id);
     }
@@ -183,10 +183,10 @@ export function HubNavigation() {
     }
   }, [pathname, sections]);
 
-  // Handle switcher change
+  // Handle switcher change - updates URL and triggers navigation reload
   const handleSwitch = (value: string) => {
     setSwitcherValue(value);
-    // Update URL if needed
+    // Update URL
     const next = new URLSearchParams(window.location.search);
     next.set('switcher', value);
     const newUrl = `${window.location.pathname}?${next.toString()}`;

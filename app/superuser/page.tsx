@@ -5,8 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
 
-// Only these four views belong to the master project-control surface.
-// Every other SuperUser navigation item receives a domain-specific workspace.
 const projectControlViews = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
 function SuperUserLoading() {
@@ -20,9 +18,12 @@ function SuperUserLoading() {
 function RoutedWorkspace() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view') ?? 'command-center';
-  
-  // Ensure view is always a valid string
   const validView = view || 'command-center';
+  
+  // If view is empty or invalid, default to command-center
+  if (!validView || validView === '') {
+    return <ProjectCommand />;
+  }
   
   return projectControlViews.has(validView) 
     ? <ProjectCommand /> 
@@ -30,5 +31,9 @@ function RoutedWorkspace() {
 }
 
 export default function SuperUserPage() {
-  return <Suspense fallback={<SuperUserLoading />}><RoutedWorkspace /></Suspense>;
+  return (
+    <Suspense fallback={<SuperUserLoading />}>
+      <RoutedWorkspace />
+    </Suspense>
+  );
 }
