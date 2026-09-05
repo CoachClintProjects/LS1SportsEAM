@@ -198,6 +198,7 @@ export function AdminWorkspace() {
 
   const loadNavigationForRole = async (roleName: string) => {
     try {
+      // Step 1: Get role ID
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('role_id')
@@ -206,64 +207,64 @@ export function AdminWorkspace() {
 
       if (roleError) throw roleError;
 
-      const { data: navData, error: navError } = await supabase
+      // Step 2: Get navigation IDs for this role
+      const { data: roleNavData, error: roleNavError } = await supabase
         .from('hub_role_navigation')
-        .select(`
-          nav_id,
-          hub_navigation:nav_id (
-            nav_id,
-            hub_id,
-            parent_id,
-            label,
-            icon,
-            path,
-            component,
-            sort_order
-          )
-        `)
+        .select('nav_id')
         .eq('role_id', roleData.role_id)
         .eq('can_view', true);
 
-      if (navError) throw navError;
+      if (roleNavError) throw roleNavError;
 
-      // =========================================================================
-      // FIX: Build items array without null values using a simple loop
-      // =========================================================================
-      const items: NavItem[] = [];
-
-      for (let i = 0; i < navData.length; i++) {
-        const entry = navData[i];
-        const nav = entry.hub_navigation;
-        if (nav) {
-          items.push({
-            nav_id: nav.nav_id,
-            hub_id: nav.hub_id,
-            parent_id: nav.parent_id,
-            label: nav.label,
-            icon: nav.icon,
-            path: nav.path,
-            component: nav.component,
-            sort_order: nav.sort_order || 0,
-            children: []
-          });
-        }
+      // Extract nav IDs
+      const navIds = roleNavData.map((item: any) => item.nav_id);
+      if (navIds.length === 0) {
+        setNavItems([]);
+        setLoading(false);
+        return;
       }
 
-      // =========================================================================
-      // BUILD HIERARCHY
-      // =========================================================================
+      // Step 3: Get the actual navigation items
+      const { data: navData, error: navError } = await supabase
+        .from('hub_navigation')
+        .select('*')
+        .in('nav_id', navIds)
+        .order('sort_order', { ascending: true });
+
+      if (navError) throw navError;
+
+      if (!navData || navData.length === 0) {
+        setNavItems([]);
+        setLoading(false);
+        return;
+      }
+
+      // Step 4: Build the navigation tree
+      const rawItems: NavItem[] = navData.map((item: any) => ({
+        nav_id: item.nav_id,
+        hub_id: item.hub_id,
+        parent_id: item.parent_id,
+        label: item.label,
+        icon: item.icon,
+        path: item.path,
+        component: item.component,
+        sort_order: item.sort_order || 0,
+        children: []
+      }));
+
+      // Build hierarchy using a map
       const itemMap = new Map<string, NavItem>();
       const rootItems: NavItem[] = [];
 
-      // First pass: create map
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
+      // First pass: add all items to map
+      for (let i = 0; i < rawItems.length; i++) {
+        const item = rawItems[i];
         itemMap.set(item.nav_id, { ...item, children: [] });
       }
 
       // Second pass: build tree
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
+      for (let i = 0; i < rawItems.length; i++) {
+        const item = rawItems[i];
         const current = itemMap.get(item.nav_id);
         if (!current) continue;
 
@@ -278,15 +279,17 @@ export function AdminWorkspace() {
         }
       }
 
-      // Sort by sort_order
+      // Sort root items
       rootItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
       setNavItems(rootItems);
 
+      // Set first item as active
       if (rootItems.length > 0) {
         setActiveView(rootItems[0].nav_id);
       }
 
+      // Auto-expand sections with children
       const sectionsWithChildren = rootItems
         .filter(item => item.children && item.children.length > 0)
         .map(item => item.nav_id);
@@ -329,6 +332,9 @@ export function AdminWorkspace() {
       const paddingLeft = level > 0 ? `${level * 12 + 12}px` : '12px';
       const icon = item.icon && iconMap[item.icon] ? iconMap[item.icon] : <FileText className="h-4 w-4" />;
 
+      // =========================================================================
+      // SECTION HEADER (has children - expandable)
+      // =========================================================================
       if (hasChildren) {
         return (
           <div key={item.nav_id}>
@@ -363,6 +369,9 @@ export function AdminWorkspace() {
         );
       }
 
+      // =========================================================================
+      // NAV ITEM (no children - clickable)
+      // =========================================================================
       return (
         <button
           key={item.nav_id}
@@ -443,6 +452,7 @@ export function AdminWorkspace() {
               <ChevronDown className={`h-4 w-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
+            {/* --- Role Dropdown --- */}
             {isRoleDropdownOpen && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-neutral-800 bg-[#090b0b] shadow-xl">
                 {roles.map((role) => (
@@ -497,6 +507,7 @@ export function AdminWorkspace() {
         <div className="sticky top-0 z-10 border-b border-neutral-800 bg-[#090b0b]/80 backdrop-blur-sm">
           <div className="flex items-center justify-between px-6 py-3">
 
+            {/* Left side */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -521,6 +532,7 @@ export function AdminWorkspace() {
               </div>
             </div>
 
+            {/* Right side */}
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-lg border border-neutral-800 bg-black px-3 py-1.5 lg:flex">
                 <Search className="h-3.5 w-3.5 text-neutral-500" />
