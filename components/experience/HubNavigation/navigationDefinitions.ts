@@ -19,6 +19,7 @@ export type NavigationItem = {
   href?: string;
   icon?: string;
   description?: string;
+  sort_order?: number;  // ADD THIS
   children?: NavigationItem[];
 };
 
