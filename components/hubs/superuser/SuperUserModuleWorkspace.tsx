@@ -209,8 +209,8 @@ export default function SuperUserModuleWorkspace({view}:{view:string}){
    }
  };
 
- const handleDelete = async (id: string) => {
-   if (!confirm('Are you sure you want to delete this record?')) return;
+ const handleDelete = async (id: string | undefined) => {
+  if (!id) return;
    try {
      const { error } = await supabase
        .from(getTableName(view))
@@ -310,7 +310,7 @@ export default function SuperUserModuleWorkspace({view}:{view:string}){
           <ActionButtons
             onAdd={handleAdd}
             onEdit={() => handleEdit(moduleData?.metrics?.[0] || {})}
-            onDelete={() => handleDelete(moduleData?.metrics?.[0]?.id || '')}
+            onDelete={() => handleDelete(moduleData?.metrics?.[0]?.id)}
             isEditing={isEditing}
             onSave={handleSaveEdit}
             onCancel={handleCancel}

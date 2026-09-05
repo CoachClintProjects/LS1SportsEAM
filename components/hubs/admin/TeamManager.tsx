@@ -142,23 +142,39 @@ export function TeamManager() {
   }, []);
 
   const loadAthletes = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-  .from('athletes')
-  .select(`
-    id,
-    person_id,
-    athlete_number,
-    status,
-    people:person_id (
-      first_name,
-      last_name,
-      date_of_birth,
-      gender
-    )
-  `)
-  .order('athlete_number', { ascending: true });
+  setLoading(true);
+  try {
+    const { data, error } = await supabase
+      .from('athletes')
+      .select(`
+        id,
+        person_id,
+        athlete_number,
+        status,
+        people:person_id (
+          first_name,
+          last_name,
+          date_of_birth,
+          gender
+        )
+      `)
+      .order('athlete_number', { ascending: true });
+
+    if (error) throw error;
+
+    // FIX: people is returned as an array, take the first item
+    const mappedData = (data || []).map((athlete: any) => ({
+      ...athlete,
+      people: athlete.people && athlete.people.length > 0 ? athlete.people[0] : null
+    }));
+    
+    setAthletes(mappedData);
+  } catch (error) {
+    console.error('Error loading athletes:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
 // Fix: people is an array, take the first item
 const mappedData = data?.map((athlete: any) => ({
