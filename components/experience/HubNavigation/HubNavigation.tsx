@@ -4,7 +4,7 @@
 // IMPORTS
 // =============================================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -159,7 +159,8 @@ export function HubNavigation() {
   });
   const [activeItem, setActiveItem] = useState('');
   const [sections, setSections] = useState<NavigationSection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const isFirstRender = useRef(true);
 
   // Helper to get current switcher value from URL
   const getCurrentSwitcherValue = () => {
@@ -175,7 +176,6 @@ export function HubNavigation() {
       try {
         const config = await getSwitcherConfig(activeHubId);
         setSwitcherConfig(config);
-        // Set initial switcher value from URL or default
         const initialValue = getCurrentSwitcherValue() || config.defaultOption || '';
         setSwitcherValue(initialValue);
       } catch (error) {
@@ -185,10 +185,9 @@ export function HubNavigation() {
     loadSwitcherConfig();
   }, [activeHubId]);
 
-  // Load navigation from database
+  // Load navigation from database - only show loading on first load
   useEffect(() => {
     const loadNavigation = async () => {
-      setLoading(true);
       try {
         const result = await getNavigation(activeHubId, switcherValue);
         setSections(result);
@@ -196,7 +195,7 @@ export function HubNavigation() {
         console.error('Error loading navigation:', error);
         setSections([]);
       } finally {
-        setLoading(false);
+        setIsInitialLoad(false);
       }
     };
 
@@ -237,7 +236,8 @@ export function HubNavigation() {
     window.dispatchEvent(new CustomEvent('ls1sports:switcher-change', { detail: value }));
   };
 
-  if (loading) {
+  // Show loading only on first load
+  if (isInitialLoad) {
     return (
       <nav className="flex h-full w-full flex-col bg-[#080909]">
         <div className="flex h-full items-center justify-center">
