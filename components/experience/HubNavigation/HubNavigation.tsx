@@ -1,243 +1,111 @@
 'use client';
 
 // =============================================================================
-// IMPORTS
+// HUB NAVIGATION - With Fallback
 // =============================================================================
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useHub } from '@/components/hubs/HubContext';
-import { 
-  getNavigation, 
-  getSwitcherConfig,
-  NavigationItem, 
-  NavigationSection,
-  SwitcherConfig,
-  SwitcherOption
-} from './navigationDefinitions';
+import { getNavigation, NavigationSection } from './navigationDefinitions';
 
 // =============================================================================
-// NAVIGATION ITEM VIEW
+// FALLBACK NAVIGATION (used when database fails)
 // =============================================================================
 
-function NavigationItemView({
-  item,
-  activeItem,
-  onSelect,
-  activeHubId
-}: {
-  item: NavigationItem;
-  activeItem: string;
-  onSelect: (id: string) => void;
-  activeHubId: string;
-}) {
-  const pathname = usePathname();
-  const active = activeItem === item.id || pathname === item.href;
-
-  const classes = `
-    group flex min-h-9 w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors
-    ${active ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}
-  `;
-
-  const content = (
-    <>
-      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}
-    </>
-  );
-
-  const select = () => {
-    onSelect(item.id);
-    if (['superuser', 'athlete', 'parent'].includes(activeHubId)) {
-      const next = new URLSearchParams(window.location.search);
-      next.set('view', item.id);
-      const basePath = activeHubId === 'superuser' ? '/superuser' : activeHubId === 'athlete' ? '/athlete' : '/parent';
-      const newUrl = `${basePath}?${next.toString()}`;
-      window.history.replaceState({}, '', newUrl);
-      window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: item.id }));
-    }
-  };
-
-  if (['superuser', 'athlete', 'parent'].includes(activeHubId)) {
-    return (
-      <button type="button" onClick={select} aria-current={active ? 'page' : undefined} className={classes}>
-        {content}
-      </button>
-    );
+const FALLBACK_NAV: NavigationSection[] = [
+  {
+    id: 'admin',
+    label: 'ADMIN',
+    items: [
+      { id: 'command-center', label: 'Command Center', href: '/admin' },
+      { id: 'organization', label: 'Organization', href: '/admin/organization' },
+      { id: 'hierarchy', label: 'Hierarchy', href: '/admin/hierarchy' },
+    ]
+  },
+  {
+    id: 'team-manager',
+    label: 'TEAM MANAGER',
+    items: [
+      { id: 'registrar', label: 'Registrar', href: '/admin/registrar' },
+      { id: 'rosters', label: 'Rosters', href: '/admin/rosters' },
+      { id: 'membership', label: 'Membership', href: '/admin/membership' },
+      { id: 'programs', label: 'Programs', href: '/admin/programs' },
+      { id: 'teams', label: 'Teams', href: '/admin/teams' },
+      { id: 'seasons', label: 'Seasons', href: '/admin/seasons' },
+    ]
+  },
+  {
+    id: 'finance',
+    label: 'FINANCE',
+    items: [
+      { id: 'financial-overview', label: 'Financial Overview', href: '/admin/finance' },
+      { id: 'billing', label: 'Billing', href: '/admin/billing' },
+      { id: 'invoices', label: 'Invoices', href: '/admin/invoices' },
+      { id: 'payments', label: 'Payments', href: '/admin/payments' },
+    ]
+  },
+  {
+    id: 'operations',
+    label: 'OPERATIONS',
+    items: [
+      { id: 'facilities', label: 'Facilities', href: '/admin/facilities' },
+      { id: 'payroll', label: 'Payroll', href: '/admin/payroll' },
+      { id: 'imports', label: 'Imports', href: '/admin/imports' },
+      { id: 'reporting', label: 'Reporting', href: '/admin/reporting' },
+      { id: 'compliance', label: 'Compliance', href: '/admin/compliance' },
+    ]
   }
-
-  return (
-    <Link href={item.href ?? '#'} onClick={() => onSelect(item.id)} aria-current={active ? 'page' : undefined} className={classes}>
-      {content}
-    </Link>
-  );
-}
+];
 
 // =============================================================================
-// SWITCHER RENDERER - DATABASE DRIVEN
-// =============================================================================
-
-function SwitcherRenderer({
-  hubId,
-  switcherValue,
-  switcherConfig,
-  onSwitch
-}: {
-  hubId: string;
-  switcherValue: string;
-  switcherConfig: SwitcherConfig;
-  onSwitch: (value: string) => void;
-}) {
-  if (!switcherConfig || switcherConfig.displayStyle === 'none' || switcherConfig.options.length === 0) return null;
-
-  const getSwitcherLabel = () => {
-    switch (switcherConfig.type) {
-      case 'age': return 'Demonstrate athlete experience';
-      case 'role': return 'Select your admin role';
-      case 'official_role': return 'Select your official role';
-      default: return 'Select option';
-    }
-  };
-
-  const getSwitcherDescription = () => {
-    switch (switcherConfig.type) {
-      case 'age': return 'The selector changes the entire workspace experience, not the underlying Athlete Passport.';
-      case 'role': return 'Your role determines what you can see and do in the Admin Hub.';
-      case 'official_role': return 'Your role determines your responsibilities and view.';
-      default: return '';
-    }
-  };
-
-  return (
-    <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
-      <div className="mb-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
-        {getSwitcherLabel()}
-      </div>
-      <div className="space-y-1">
-        {switcherConfig.options.map((option: SwitcherOption) => (
-          <label
-            key={option.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
-              switcherValue === option.id ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-500 hover:text-neutral-300'
-            }`}
-          >
-            <input
-              type="radio"
-              name={`switcher-${hubId}`}
-              checked={switcherValue === option.id}
-              onChange={() => onSwitch(option.id)}
-              className="accent-[#FA4616]"
-            />
-            <span>{option.label}</span>
-          </label>
-        ))}
-      </div>
-      {getSwitcherDescription() && (
-        <div className="mt-2 text-[8px] leading-3 text-neutral-700">
-          {getSwitcherDescription()}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// =============================================================================
-// MAIN COMPONENT: HubNavigation
+// MAIN COMPONENT
 // =============================================================================
 
 export function HubNavigation() {
   const pathname = usePathname();
   const { activeHubId, currentHub } = useHub();
-  const [switcherValue, setSwitcherValue] = useState('');
-  const [switcherConfig, setSwitcherConfig] = useState<SwitcherConfig>({
-    type: null,
-    displayStyle: 'none',
-    options: [],
-    defaultOption: ''
-  });
+  const [sections, setSections] = useState<NavigationSection[]>(FALLBACK_NAV);
+  const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState('');
-  const [sections, setSections] = useState<NavigationSection[]>([]);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const isFirstRender = useRef(true);
 
-  // Helper to get current switcher value from URL
-  const getCurrentSwitcherValue = () => {
-    if (typeof window === 'undefined') return switcherConfig.defaultOption || '';
-    const param = new URLSearchParams(window.location.search).get('switcher');
-    if (param) return param;
-    return switcherConfig.defaultOption || '';
-  };
-
-  // Load switcher config from database
-  useEffect(() => {
-    const loadSwitcherConfig = async () => {
-      try {
-        const config = await getSwitcherConfig(activeHubId);
-        setSwitcherConfig(config);
-        const initialValue = getCurrentSwitcherValue() || config.defaultOption || '';
-        setSwitcherValue(initialValue);
-      } catch (error) {
-        console.error('Error loading switcher config:', error);
-      }
-    };
-    loadSwitcherConfig();
-  }, [activeHubId]);
-
-  // Load navigation from database - only show loading on first load
   useEffect(() => {
     const loadNavigation = async () => {
+      setLoading(true);
       try {
-        const result = await getNavigation(activeHubId, switcherValue);
-        setSections(result);
+        const result = await getNavigation(activeHubId, '');
+        if (result && result.length > 0) {
+          setSections(result);
+        } else {
+          setSections(FALLBACK_NAV);
+        }
       } catch (error) {
         console.error('Error loading navigation:', error);
-        setSections([]);
+        setSections(FALLBACK_NAV);
       } finally {
-        setIsInitialLoad(false);
+        setLoading(false);
       }
     };
 
-    if (switcherValue !== '' || activeHubId === 'scout') {
-      loadNavigation();
-    }
-  }, [activeHubId, switcherValue]);
+    loadNavigation();
+  }, [activeHubId]);
 
-  // Sync active item
+  // Set active item based on current path
   useEffect(() => {
-    const sync = () => {
-      const view = new URLSearchParams(window.location.search).get('view');
-      if (view) {
-        setActiveItem(view);
-      } else if (sections.length > 0 && sections[0].items.length > 0) {
-        setActiveItem(sections[0].items[0].id);
+    if (pathname) {
+      for (const section of sections) {
+        for (const item of section.items) {
+          if (item.href && pathname.startsWith(item.href)) {
+            setActiveItem(item.id);
+            return;
+          }
+        }
       }
-    };
-    sync();
-    window.addEventListener('popstate', sync);
-    window.addEventListener('ls1sports:navigation', (event: Event) => {
-      const next = (event as CustomEvent<string>).detail;
-      if (next) setActiveItem(next);
-    });
-    return () => {
-      window.removeEventListener('popstate', sync);
-      window.removeEventListener('ls1sports:navigation', () => {});
-    };
-  }, [sections]);
+    }
+  }, [pathname, sections]);
 
-  // Handle switcher change - NO PAGE REFRESH
-  const handleSwitch = (value: string) => {
-    setSwitcherValue(value);
-    const next = new URLSearchParams(window.location.search);
-    next.set('switcher', value);
-    const newUrl = `${window.location.pathname}?${next.toString()}`;
-    window.history.replaceState({}, '', newUrl);
-    window.dispatchEvent(new CustomEvent('ls1sports:switcher-change', { detail: value }));
-  };
-
-  // Show loading only on first load
-  if (isInitialLoad) {
+  if (loading) {
     return (
       <nav className="flex h-full w-full flex-col bg-[#080909]">
         <div className="flex h-full items-center justify-center">
@@ -260,14 +128,6 @@ export function HubNavigation() {
         <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">
           {currentHub.description}
         </div>
-
-        {/* Render Switcher based on hub - DATABASE DRIVEN */}
-        <SwitcherRenderer
-          hubId={activeHubId}
-          switcherValue={switcherValue}
-          switcherConfig={switcherConfig}
-          onSwitch={handleSwitch}
-        />
       </div>
 
       {/* Navigation */}
@@ -279,13 +139,17 @@ export function HubNavigation() {
             </div>
             <div className="space-y-0.5">
               {section.items.map(item => (
-                <NavigationItemView
+                <Link
                   key={item.id}
-                  item={item}
-                  onSelect={setActiveItem}
-                  activeItem={activeItem}
-                  activeHubId={activeHubId}
-                />
+                  href={item.href || '#'}
+                  className={`
+                    flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors
+                    ${activeItem === item.id ? 'bg-[#FA4616]/10 text-[#FA4616]' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}
+                  `}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                  {activeItem === item.id && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}
+                </Link>
               ))}
             </div>
           </div>
@@ -304,4 +168,5 @@ export function HubNavigation() {
     </nav>
   );
 }
+
 export default HubNavigation;
