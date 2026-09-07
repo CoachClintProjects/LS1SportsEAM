@@ -9,6 +9,7 @@ export async function GET() {
       primaryCta: site.primaryCta,
       loginCta: site.loginCta,
       navigation: site.navigation,
+      signInCopy: site.signInCopy,
       authPolicy: site.authPolicy,
     });
   } catch (error: unknown) {
