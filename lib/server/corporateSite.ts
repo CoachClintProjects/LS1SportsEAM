@@ -46,11 +46,27 @@ export type CorporateAuthPolicy = {
   required_aal: 'aal1' | 'aal2';
   session_max_age_seconds: number;
 };
+export type CorporateSignInCopy = {
+  back_label: string;
+  eyebrow: string;
+  title: string;
+  summary: string;
+  mfa_title: string;
+  mfa_body: string;
+  operator_title: string;
+  operator_body: string;
+  workspace_label: string;
+  sso_label: string;
+  separator_label: string;
+  email_label: string;
+  magic_link_label: string;
+};
 export type CorporateSite = {
   brand: CorporateBrand;
   primaryCta: CorporateAction;
   loginCta: CorporateAction;
   footerStatement: string;
+  signInCopy: CorporateSignInCopy;
   navigation: CorporateNavItem[];
   page: CorporatePage;
   pricingPlans: CorporatePricingPlan[];
@@ -103,12 +119,14 @@ export async function getCorporateSite(slug: string): Promise<CorporateSite> {
   const primaryCta = requiredConfig<CorporateAction>(configRows, 'primary_cta');
   const loginCta = requiredConfig<CorporateAction>(configRows, 'login_cta');
   const footer = requiredConfig<{ statement: string }>(configRows, 'footer');
+  const signInCopy = requiredConfig<CorporateSignInCopy>(configRows, 'sign_in');
 
   return {
     brand,
     primaryCta,
     loginCta,
     footerStatement: footer.statement,
+    signInCopy,
     navigation,
     page: { ...page, sections },
     pricingPlans,
