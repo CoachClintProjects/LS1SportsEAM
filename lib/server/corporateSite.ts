@@ -61,12 +61,26 @@ export type CorporateSignInCopy = {
   email_label: string;
   magic_link_label: string;
 };
+export type CorporateMfaCopy = {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  enroll_title: string;
+  enroll_body: string;
+  challenge_title: string;
+  challenge_body: string;
+  code_label: string;
+  verify_label: string;
+  secret_label: string;
+  loading_label: string;
+};
 export type CorporateSite = {
   brand: CorporateBrand;
   primaryCta: CorporateAction;
   loginCta: CorporateAction;
   footerStatement: string;
   signInCopy: CorporateSignInCopy;
+  mfaCopy: CorporateMfaCopy;
   navigation: CorporateNavItem[];
   page: CorporatePage;
   pricingPlans: CorporatePricingPlan[];
@@ -120,6 +134,7 @@ export async function getCorporateSite(slug: string): Promise<CorporateSite> {
   const loginCta = requiredConfig<CorporateAction>(configRows, 'login_cta');
   const footer = requiredConfig<{ statement: string }>(configRows, 'footer');
   const signInCopy = requiredConfig<CorporateSignInCopy>(configRows, 'sign_in');
+  const mfaCopy = requiredConfig<CorporateMfaCopy>(configRows, 'mfa');
 
   return {
     brand,
@@ -127,6 +142,7 @@ export async function getCorporateSite(slug: string): Promise<CorporateSite> {
     loginCta,
     footerStatement: footer.statement,
     signInCopy,
+    mfaCopy,
     navigation,
     page: { ...page, sections },
     pricingPlans,
