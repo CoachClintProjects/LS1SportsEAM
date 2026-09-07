@@ -8,6 +8,7 @@ export async function GET() {
       brand: site.brand,
       primaryCta: site.primaryCta,
       loginCta: site.loginCta,
+      superuserEntry: site.superuserEntry,
       navigation: site.navigation,
       signInCopy: site.signInCopy,
       mfaCopy: site.mfaCopy,
