@@ -4,6 +4,8 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
+import SuperUserOrganizationsWorkspace from '@/components/hubs/superuser/SuperUserOrganizationsWorkspace';
+import SuperUserTeamManagerWorkspace from '@/components/hubs/superuser/SuperUserTeamManagerWorkspace';
 import SuperUserActions from '@/components/hubs/superuser/SuperUserActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
@@ -27,6 +29,10 @@ function SuperUserRouter() {
       <SuperUserActions />
       {COMMAND_VIEWS.has(view) ? (
         <ProjectCommand />
+      ) : view === 'organizations' ? (
+        <SuperUserOrganizationsWorkspace />
+      ) : view === 'team-manager' ? (
+        <SuperUserTeamManagerWorkspace />
       ) : (
         <SuperUserModuleWorkspace view={view} />
       )}
