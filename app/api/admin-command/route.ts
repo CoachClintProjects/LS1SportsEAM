@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeRequest, authorizationFailure } from '@/lib/server/authorization';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,12 +36,14 @@ async function audit(args: {
   before?: unknown;
   after?: unknown;
   reason?: string | null;
+  actorPersonId?: string | null;
 }) {
   try {
     await rest('audit_events', {
       method: 'POST',
       body: JSON.stringify({
         tenant_id: args.tenantId || null,
+        actor_person_id: args.actorPersonId || null,
         action: args.action,
         entity_type: 'work_items',
         entity_id: args.entityId || null,
@@ -60,11 +63,20 @@ async function getTask(id: string) {
   return rows?.[0] || null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const auth = await authorizeRequest(request, { permission: 'admin_tasks.read' });
+    let canReadFinance = false;
+    try {
+      await authorizeRequest(request, { permission: 'finance.read' });
+      canReadFinance = true;
+    } catch {
+      canReadFinance = false;
+    }
+
     const [invoices, bills, tasks, athletes, teams] = await Promise.all([
-      rest('invoices?select=id,invoice_number,invoice_date,due_date,total,balance_due,status&order=invoice_date.desc&limit=50'),
-      rest('vendor_bills?select=id,bill_number,bill_date,due_date,total,balance_due,status&order=bill_date.desc&limit=50'),
+      canReadFinance ? rest('invoices?select=id,invoice_number,invoice_date,due_date,total,balance_due,status&order=invoice_date.desc&limit=50') : Promise.resolve([]),
+      canReadFinance ? rest('vendor_bills?select=id,bill_number,bill_date,due_date,total,balance_due,status&order=bill_date.desc&limit=50') : Promise.resolve([]),
       rest('work_items?select=id,tenant_id,work_type,status,priority,payload&work_type=eq.ADMIN_TASK&order=id.desc&limit=100'),
       rest('athletes?select=id&status=eq.ACTIVE'),
       rest('teams?select=id&status=eq.active'),
@@ -89,10 +101,13 @@ export async function GET() {
         activeAthletes: (athletes || []).length,
         activeTeams: (teams || []).length,
       },
+      capabilities: { financeRead: canReadFinance, actor: auth.personId, roles: auth.roleCodes },
       generatedAt: new Date().toISOString(),
       source: 'LS1SportsEAM Supabase',
     });
   } catch (error) {
+    const auth = authorizationFailure(error);
+    if (auth) return NextResponse.json(auth.body, { status: auth.status });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Admin command data unavailable.' },
       { status: 500 },
@@ -106,6 +121,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action || '');
 
     if (action === 'create-task') {
+      const auth = await authorizeRequest(request, { permission: 'admin_tasks.create', requestedFields: ['title', 'description', 'priority'] });
       const title = String(body.title || '').trim();
       if (!title) throw new Error('Task title is required.');
       const tenant = (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
@@ -124,7 +140,7 @@ export async function POST(request: NextRequest) {
         }),
       });
       const created = row?.[0] || null;
-      await audit({ tenantId: tenant, action: 'ADMIN_TASK_CREATE', entityId: created?.id, after: created });
+      await audit({ tenantId: tenant, action: 'ADMIN_TASK_CREATE', entityId: created?.id, after: created, actorPersonId: auth.personId });
       return NextResponse.json({ ok: true, row: created });
     }
 
@@ -135,6 +151,7 @@ export async function POST(request: NextRequest) {
       if (!title) throw new Error('Task title is required.');
       const before = await getTask(id);
       if (!before || before.work_type !== 'ADMIN_TASK') throw new Error('Admin task not found.');
+      const auth = await authorizeRequest(request, { permission: 'admin_tasks.update', requestedFields: ['title', 'description', 'priority'] });
       const row = await rest(`work_items?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -147,7 +164,7 @@ export async function POST(request: NextRequest) {
         }),
       });
       const updated = row?.[0] || null;
-      await audit({ tenantId: before.tenant_id, action: 'ADMIN_TASK_UPDATE', entityId: id, before, after: updated });
+      await audit({ tenantId: before.tenant_id, action: 'ADMIN_TASK_UPDATE', entityId: id, before, after: updated, actorPersonId: auth.personId });
       return NextResponse.json({ ok: true, row: updated });
     }
 
@@ -156,6 +173,7 @@ export async function POST(request: NextRequest) {
       if (!id) throw new Error('Task ID is required.');
       const before = await getTask(id);
       if (!before || before.work_type !== 'ADMIN_TASK') throw new Error('Admin task not found.');
+      const auth = await authorizeRequest(request, { permission: 'admin_tasks.update', requestedFields: ['status'] });
       const nextStatus = action === 'complete-task' ? 'completed' : 'open';
       const row = await rest(`work_items?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -168,6 +186,7 @@ export async function POST(request: NextRequest) {
         entityId: id,
         before,
         after: updated,
+        actorPersonId: auth.personId,
       });
       return NextResponse.json({ ok: true, row: updated });
     }
@@ -177,13 +196,16 @@ export async function POST(request: NextRequest) {
       if (!id) throw new Error('Task ID is required.');
       const before = await getTask(id);
       if (!before || before.work_type !== 'ADMIN_TASK') throw new Error('Admin task not found.');
+      const auth = await authorizeRequest(request, { permission: 'admin_tasks.delete' });
       await rest(`work_items?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
-      await audit({ tenantId: before.tenant_id, action: 'ADMIN_TASK_DELETE', entityId: id, before, after: null });
+      await audit({ tenantId: before.tenant_id, action: 'ADMIN_TASK_DELETE', entityId: id, before, after: null, actorPersonId: auth.personId });
       return NextResponse.json({ ok: true, id });
     }
 
     throw new Error('Unsupported Admin action.');
   } catch (error) {
+    const auth = authorizationFailure(error);
+    if (auth) return NextResponse.json(auth.body, { status: auth.status });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Admin action failed.' },
       { status: 400 },
