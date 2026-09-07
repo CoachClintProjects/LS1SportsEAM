@@ -122,6 +122,7 @@ export function Onboarding() {
     }
   }
 
+  const selectedCase = selected?.case;
   const completeCount = useMemo(
     () => selected?.steps.filter((step) => step.status === 'completed').length || 0,
     [selected],
@@ -186,7 +187,7 @@ export function Onboarding() {
                   type="button"
                   onClick={() => void openCase(item.id)}
                   className={`w-full rounded-xl border p-4 text-left transition ${
-                    selected?.case?.id === item.id
+                    selectedCase?.id === item.id
                       ? 'border-[#FA4616]/50 bg-[#FA4616]/5'
                       : 'border-neutral-800 bg-[#0d1010] hover:border-neutral-600'
                   }`}
@@ -211,14 +212,14 @@ export function Onboarding() {
         </Panel>
 
         <Panel>
-          {selected?.case ? (
+          {selectedCase ? (
             <div>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-400">Live case</div>
-                  <h2 className="mt-1 text-2xl font-black text-white">{selected.case.client_name}</h2>
+                  <h2 className="mt-1 text-2xl font-black text-white">{selectedCase.client_name}</h2>
                   <div className="mt-1 text-xs text-neutral-500">
-                    {selected.case.primary_admin_email || 'Primary admin not assigned'} · {(selected.case.sports || []).join(', ') || 'No sport selected'}
+                    {selectedCase.primary_admin_email || 'Primary admin not assigned'} · {(selectedCase.sports || []).join(', ') || 'No sport selected'}
                   </div>
                 </div>
                 <div className="text-right">
@@ -251,7 +252,7 @@ export function Onboarding() {
                         onClick={() =>
                           void post({
                             action: 'update-step',
-                            case_id: selected.case.id,
+                            case_id: selectedCase.id,
                             step_id: step.id,
                             status: complete ? 'in_progress' : 'completed',
                             evidence: { updated_from: 'superuser_onboarding_workspace' },
@@ -277,9 +278,9 @@ export function Onboarding() {
                   onClick={() =>
                     void post({
                       action: 'update-case',
-                      id: selected.case.id,
+                      id: selectedCase.id,
                       status: 'IN_PROGRESS',
-                      current_step: selected.case.current_step,
+                      current_step: selectedCase.current_step,
                     })
                   }
                   className="inline-flex items-center gap-2 rounded-xl border border-neutral-700 px-4 py-3 text-xs font-black text-white"
@@ -289,7 +290,7 @@ export function Onboarding() {
                 <button
                   type="button"
                   disabled={saving || progress < 90}
-                  onClick={() => void post({ action: 'activate', id: selected.case.id })}
+                  onClick={() => void post({ action: 'activate', id: selectedCase.id })}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-3 text-xs font-black text-black disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Rocket className="h-4 w-4" /> Activate client
