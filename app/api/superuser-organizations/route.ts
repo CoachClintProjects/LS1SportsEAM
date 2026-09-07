@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeRequest, authorizationFailure } from '@/lib/server/authorization';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,12 +36,14 @@ async function audit(args: {
   before?: unknown;
   after?: unknown;
   reason?: string | null;
+  actorPersonId?: string | null;
 }) {
   try {
     await rest('audit_events', {
       method: 'POST',
       body: JSON.stringify({
         tenant_id: args.tenantId || null,
+        actor_person_id: args.actorPersonId || null,
         action: args.action,
         entity_type: 'organizations',
         entity_id: args.entityId || null,
@@ -60,8 +63,9 @@ async function getOrganization(id: string) {
   return rows?.[0] || null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await authorizeRequest(request, { permission: 'organizations.read' });
     const [organizations, tenants] = await Promise.all([
       rest('organizations?select=id,tenant_id,parent_organization_id,code,name,legal_name,organization_type,status,created_at,updated_at&order=name.asc&limit=250'),
       rest('tenants?select=id,name,status&order=name.asc&limit=100'),
@@ -74,6 +78,8 @@ export async function GET() {
       source: 'LS1SportsEAM Supabase',
     });
   } catch (error) {
+    const auth = authorizationFailure(error);
+    if (auth) return NextResponse.json(auth.body, { status: auth.status });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Organization data unavailable.' },
       { status: 500 },
@@ -87,6 +93,10 @@ export async function POST(request: NextRequest) {
     const action = String(body.action || '');
 
     if (action === 'create-organization') {
+      const auth = await authorizeRequest(request, {
+        permission: 'organizations.create',
+        requestedFields: ['tenant_id', 'code', 'name', 'legal_name', 'organization_type', 'status'],
+      });
       const tenantId = String(body.tenantId || '').trim();
       const code = String(body.code || '').trim().toUpperCase();
       const name = String(body.name || '').trim();
@@ -106,7 +116,7 @@ export async function POST(request: NextRequest) {
         }),
       });
       const created = row?.[0] || null;
-      await audit({ tenantId, action: 'ORGANIZATION_CREATE', entityId: created?.id, after: created });
+      await audit({ tenantId, action: 'ORGANIZATION_CREATE', entityId: created?.id, after: created, actorPersonId: auth.personId });
       return NextResponse.json({ ok: true, row: created });
     }
 
@@ -119,6 +129,11 @@ export async function POST(request: NextRequest) {
       if (!name) throw new Error('Organization name is required.');
       const before = await getOrganization(id);
       if (!before) throw new Error('Organization not found.');
+      const auth = await authorizeRequest(request, {
+        permission: 'organizations.update',
+        organizationId: before.id,
+        requestedFields: ['code', 'name', 'legal_name', 'organization_type', 'status'],
+      });
 
       const row = await rest(`organizations?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -132,7 +147,7 @@ export async function POST(request: NextRequest) {
         }),
       });
       const updated = row?.[0] || null;
-      await audit({ tenantId: before.tenant_id, action: 'ORGANIZATION_UPDATE', entityId: id, before, after: updated });
+      await audit({ tenantId: before.tenant_id, action: 'ORGANIZATION_UPDATE', entityId: id, before, after: updated, actorPersonId: auth.personId });
       return NextResponse.json({ ok: true, row: updated });
     }
 
@@ -141,6 +156,7 @@ export async function POST(request: NextRequest) {
       if (!id) throw new Error('Organization ID is required.');
       const before = await getOrganization(id);
       if (!before) throw new Error('Organization not found.');
+      const auth = await authorizeRequest(request, { permission: 'organizations.archive', organizationId: before.id });
       const nextStatus = action === 'archive-organization' ? 'archived' : 'active';
       const row = await rest(`organizations?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -153,12 +169,15 @@ export async function POST(request: NextRequest) {
         entityId: id,
         before,
         after: updated,
+        actorPersonId: auth.personId,
       });
       return NextResponse.json({ ok: true, row: updated });
     }
 
     throw new Error('Unsupported SuperUser organization action.');
   } catch (error) {
+    const auth = authorizationFailure(error);
+    if (auth) return NextResponse.json(auth.body, { status: auth.status });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'SuperUser organization action failed.' },
       { status: 400 },
