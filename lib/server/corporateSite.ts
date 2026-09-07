@@ -78,6 +78,7 @@ export type CorporateSite = {
   brand: CorporateBrand;
   primaryCta: CorporateAction;
   loginCta: CorporateAction;
+  superuserEntry: { href: string };
   footerStatement: string;
   signInCopy: CorporateSignInCopy;
   mfaCopy: CorporateMfaCopy;
@@ -132,6 +133,7 @@ export async function getCorporateSite(slug: string): Promise<CorporateSite> {
   const brand = requiredConfig<CorporateBrand>(configRows, 'brand');
   const primaryCta = requiredConfig<CorporateAction>(configRows, 'primary_cta');
   const loginCta = requiredConfig<CorporateAction>(configRows, 'login_cta');
+  const superuserEntry = requiredConfig<{ href: string }>(configRows, 'superuser_entry');
   const footer = requiredConfig<{ statement: string }>(configRows, 'footer');
   const signInCopy = requiredConfig<CorporateSignInCopy>(configRows, 'sign_in');
   const mfaCopy = requiredConfig<CorporateMfaCopy>(configRows, 'mfa');
@@ -140,6 +142,7 @@ export async function getCorporateSite(slug: string): Promise<CorporateSite> {
     brand,
     primaryCta,
     loginCta,
+    superuserEntry,
     footerStatement: footer.statement,
     signInCopy,
     mfaCopy,
