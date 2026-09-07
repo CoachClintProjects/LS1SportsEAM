@@ -10,6 +10,7 @@ export async function GET() {
       loginCta: site.loginCta,
       navigation: site.navigation,
       signInCopy: site.signInCopy,
+      mfaCopy: site.mfaCopy,
       authPolicy: site.authPolicy,
     });
   } catch (error: unknown) {
