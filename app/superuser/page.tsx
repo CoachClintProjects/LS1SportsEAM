@@ -14,6 +14,7 @@ import SuperUserCompetitionActions from '@/components/hubs/superuser/SuperUserCo
 import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
 import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOperationsActions';
+import SuperUserReferenceFinder from '@/components/hubs/superuser/SuperUserReferenceFinder';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -35,6 +36,7 @@ function SuperUserRouter() {
     <SuperUserApiBoundary>
       <div className="space-y-5">
         <SuperUserActions />
+        <SuperUserReferenceFinder />
         {COMMAND_VIEWS.has(view) ? (
           <>
             <ProjectCommand />
