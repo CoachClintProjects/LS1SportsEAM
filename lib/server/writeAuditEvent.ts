@@ -1,7 +1,7 @@
 import type { SuperUserIdentity } from '@/lib/server/requireSuperUser';
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xedfstgwotzxnztpembv.supabase.co';
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
 export type AuditWrite = {
   action: string;
@@ -16,23 +16,20 @@ export type AuditWrite = {
 
 function normalizeAuditPayload(value: unknown): Record<string, unknown> | null {
   if (value === null || value === undefined) return null;
-  if (typeof value === 'object' && !Array.isArray(value)) {
-    return { ...(value as Record<string, unknown>) };
-  }
+  if (typeof value === 'object' && !Array.isArray(value)) return { ...(value as Record<string, unknown>) };
   return { value };
 }
 
 export async function writeAuditEvent(actor: SuperUserIdentity, event: AuditWrite) {
-  if (!URL || !KEY) throw new Error('Audit service credentials are not configured.');
+  if (!URL || !PUBLIC_KEY) throw new Error('Audit authentication is not configured.');
 
   const beforeData = normalizeAuditPayload(event.beforeData);
   const afterData = normalizeAuditPayload(event.afterData);
-
   const response = await fetch(`${URL}/rest/v1/audit_events`, {
     method: 'POST',
     headers: {
-      apikey: KEY,
-      Authorization: `Bearer ${KEY}`,
+      apikey: PUBLIC_KEY,
+      Authorization: `Bearer ${actor.accessToken}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
@@ -56,10 +53,7 @@ export async function writeAuditEvent(actor: SuperUserIdentity, event: AuditWrit
   });
 
   const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`Audit write failed (${response.status}): ${text.slice(0, 400)}`);
-  }
-
+  if (!response.ok) throw new Error(`Audit write failed (${response.status}): ${text.slice(0, 400)}`);
   const rows = text ? JSON.parse(text) : [];
   return rows?.[0] || null;
 }
