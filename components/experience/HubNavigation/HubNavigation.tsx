@@ -100,6 +100,13 @@ export function HubNavigation() {
   const [switcherValue, setSwitcherValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
+  // A hub change is the only navigation event allowed to reset the tree to a
+  // fallback. Query-string/view changes within the same hub must retain the
+  // last successfully loaded DB-driven navigation model.
+  useEffect(() => {
+    setSections(fallback);
+  }, [activeHubId, fallback]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -117,14 +124,13 @@ export function HubNavigation() {
           : config.defaultOption || config.options[0]?.id || '';
 
       setSwitcherValue(nextValue);
-      setSections(fallback);
     }
 
     void initializeHub();
     return () => {
       cancelled = true;
     };
-  }, [activeHubId, fallback, searchParams]);
+  }, [activeHubId, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -268,7 +274,8 @@ export function HubNavigation() {
                     onClick={() =>
                       window.dispatchEvent(
                         new CustomEvent('ls1sports:navigation', {
-                          detail: { hubId: activeHubId, itemId: item.id, href },
+                          // The workspace contract is the canonical view id.
+                          detail: item.id,
                         }),
                       )
                     }
@@ -295,7 +302,7 @@ export function HubNavigation() {
           <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-neutral-700">
             LS1SPORTS OS
           </span>
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
         </div>
       </div>
     </nav>
