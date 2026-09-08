@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "verify:locks": "node scripts/verify-regression-locks.mjs",
+    "prebuild": "npm run verify:locks",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
