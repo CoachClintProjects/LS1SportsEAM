@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { requireSuperUser, SuperUserAuthError, type SuperUserIdentity } from '@/lib/server/requireSuperUser';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xedfstgwotzxnztpembv.supabase.co';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,7 +13,7 @@ const domains: Record<string, Domain> = {
   platform: { label: 'Platform Core', tables: [{table:'tenants',label:'Tenants'},{table:'sports',label:'Sports'},{table:'system_configurations',label:'Configurations'},{table:'dashboard_definitions',label:'Dashboards'},{table:'rules',label:'Rules'}] },
   organizations: { label: 'Organizations', tables: [{table:'organizations',label:'Organizations'},{table:'sites',label:'Sites'},{table:'governing_bodies',label:'Governing Bodies'},{table:'legal_entities',label:'Legal Entities'}] },
   people: { label: 'People / Person Master', tables: [{table:'people',label:'People'},{table:'users',label:'Users'},{table:'families',label:'Families'},{table:'family_members',label:'Family Members'},{table:'external_ids',label:'External IDs'},{table:'duplicate_candidates',label:'Duplicate Candidates'}] },
-  'team-manager': { label: 'Team Manager', tables: [{table:'organizations',label:'Organizations'},{table:'people',label:'People'},{table:'teams',label:'Teams'},{table:'team_memberships',label:'Roster Assignments'},{table:'memberships',label:'Memberships'},{table:'programs',label:'Programs'},{table:'seasons',label:'Seasons'},{table:'staff_assignments',label:'Staff Assignments'},{table:'groups',label:'Groups'},{table:'communication_threads',label:'Communication Threads'}] },
+  'team-engine': { label: 'Team Engine', tables: [{table:'organizations',label:'Organizations'},{table:'people',label:'People'},{table:'teams',label:'Teams'},{table:'team_memberships',label:'Roster Assignments'},{table:'memberships',label:'Memberships'},{table:'programs',label:'Programs'},{table:'seasons',label:'Seasons'},{table:'staff_assignments',label:'Staff Assignments'},{table:'groups',label:'Groups'},{table:'communication_threads',label:'Communication Threads'}] },
   registrar: { label: 'Registrar & Validation', tables: [{table:'memberships',label:'Memberships'},{table:'team_memberships',label:'Roster Assignments'},{table:'waiver_assignments',label:'Waiver Assignments'},{table:'data_quality_issues',label:'Validation Issues'},{table:'duplicate_candidates',label:'Duplicate Candidates'}] },
   rosters: { label: 'Rosters', tables: [{table:'team_memberships',label:'Roster Assignments'},{table:'teams',label:'Teams'},{table:'athletes',label:'Athletes'},{table:'people',label:'People'}] },
   memberships: { label: 'Memberships', tables: [{table:'memberships',label:'Organization Memberships'},{table:'team_memberships',label:'Team Memberships'},{table:'waiver_assignments',label:'Waiver Assignments'}] },
@@ -88,10 +88,11 @@ const domains: Record<string, Domain> = {
   'role-customization': { label: 'Role-Specific Customization', tables: [{table:'platform_preferences',label:'Role Preferences'},{table:'roles',label:'Roles'},{table:'permissions',label:'Permissions'},{table:'role_permissions',label:'Role Permissions'}] },
 };
 
-async function count(table: string) {
+async function count(actor: SuperUserIdentity, table: string) {
+  if (!PUBLIC_KEY) throw new Error('Supabase authenticated access is not configured.');
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
     method: 'HEAD',
-    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY}`, Prefer: 'count=exact', Range: '0-0' },
+    headers: { apikey: PUBLIC_KEY, Authorization: `Bearer ${actor.accessToken}`, Prefer: 'count=exact', Range: '0-0' },
     cache: 'no-store',
   });
   if (!response.ok) return null;
@@ -102,12 +103,11 @@ async function count(table: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireSuperUser(request);
-    if (!SERVICE_KEY) return NextResponse.json({ error: 'Supabase server credentials are not configured.' }, { status: 500 });
+    const actor = await requireSuperUser(request);
     const view = request.nextUrl.searchParams.get('view') ?? '';
     const domain = domains[view];
     if (!domain) return NextResponse.json({ error: 'Unknown SuperUser workspace.' }, { status: 404 });
-    const metrics = await Promise.all(domain.tables.map(async item => ({ ...item, count: await count(item.table) })));
+    const metrics = await Promise.all(domain.tables.map(async item => ({ ...item, count: await count(actor, item.table) })));
     return NextResponse.json({ view, label: domain.label, metrics, generatedAt: new Date().toISOString(), source: 'LS1SportsEAM Supabase' }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
   } catch (error) {
     if (error instanceof SuperUserAuthError) return NextResponse.json({ error: error.message }, { status: error.status });
