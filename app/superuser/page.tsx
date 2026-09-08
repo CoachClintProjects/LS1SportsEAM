@@ -17,7 +17,6 @@ import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOpe
 import SuperUserReferenceFinder from '@/components/hubs/superuser/SuperUserReferenceFinder';
 import SuperUserReleaseCertification from '@/components/hubs/superuser/SuperUserReleaseCertification';
 
-const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 const COMPETITION_PLACEHOLDER_VIEWS = new Set(['competition','competition-events','competition-entries','competition-results','competition-officials','competition-seeding','competition-timing','competition-rules','competition-reconciliation','competition-publication','competition-records','competition-imports']);
 
 function LoadingWorkspace() {
@@ -34,17 +33,41 @@ function CompetitionPlaceholder() {
   return <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6"><div className="text-[9px] font-black uppercase tracking-[.2em] text-neutral-500">FUTURE DOMAIN · PLACEHOLDER ONLY</div><h1 className="mt-2 text-2xl font-black text-white">Competition Engine</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-500">Competition is intentionally isolated from the Team Engine release. No competition workflow, timing, scoring, results or lifecycle action is mounted here, so future Competition work cannot disrupt Team Engine completion.</p></section>;
 }
 
+function CommandCenter() {
+  return (
+    <div className="space-y-5">
+      <ProjectCommand />
+      <SuperUserActions />
+      <SuperUserReferenceFinder />
+      <SuperUserProjectControlActions />
+    </div>
+  );
+}
+
 function SuperUserRouter() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view')?.trim() || 'command-center';
+
   return (
     <SuperUserApiBoundary>
-      <div className="space-y-5">
-        <SuperUserActions />
-        <SuperUserReferenceFinder />
-        {(view === 'command-center' || view === 'deployments') && <SuperUserReleaseCertification full={view === 'deployments'} />}
-        {COMMAND_VIEWS.has(view) ? <><ProjectCommand /><SuperUserProjectControlActions /></> : COMPETITION_PLACEHOLDER_VIEWS.has(view) ? <CompetitionPlaceholder /> : <><SuperUserModuleWorkspace view={view} /><SuperUserTeamEngineActions view={view} /><SuperUserDomainActions view={view} /><SuperUserSecurityActions view={view} /><SuperUserFinanceActions view={view} /><SuperUserEnterpriseActions view={view} /><SuperUserSupportActions view={view} /><SuperUserOperationsActions view={view} /></>}
-      </div>
+      {view === 'command-center' ? (
+        <CommandCenter />
+      ) : view === 'deployments' ? (
+        <SuperUserReleaseCertification full />
+      ) : COMPETITION_PLACEHOLDER_VIEWS.has(view) ? (
+        <CompetitionPlaceholder />
+      ) : (
+        <div className="space-y-5">
+          <SuperUserModuleWorkspace view={view} />
+          <SuperUserTeamEngineActions view={view} />
+          <SuperUserDomainActions view={view} />
+          <SuperUserSecurityActions view={view} />
+          <SuperUserFinanceActions view={view} />
+          <SuperUserEnterpriseActions view={view} />
+          <SuperUserSupportActions view={view} />
+          <SuperUserOperationsActions view={view} />
+        </div>
+      )}
     </SuperUserApiBoundary>
   );
 }
