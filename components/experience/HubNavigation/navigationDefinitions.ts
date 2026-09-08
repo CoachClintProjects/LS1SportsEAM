@@ -1,11 +1,24 @@
 'use client';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (supabase) return supabase;
+  if (typeof window === 'undefined') {
+    throw new Error('Hub navigation Supabase access is only available in the browser.');
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Supabase browser configuration is missing.');
+  }
+
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 export type NavigationItem = {
   id: string;
@@ -117,7 +130,8 @@ export async function getNavigation(
   if (!hubId) return [];
 
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    const { data, error } = await client
       .from('hub_navigation')
       .select('nav_id,label,path,icon,description,sort_order,parent_id,is_active')
       .eq('hub_id', hubId)
@@ -129,14 +143,14 @@ export async function getNavigation(
     let rows = data as DbNavRow[];
 
     if (hubId === 'admin' && switcherValue) {
-      const { data: role } = await supabase
+      const { data: role } = await client
         .from('admin_roles')
         .select('role_id')
         .eq('role_name', switcherValue)
         .maybeSingle();
 
       if (role?.role_id) {
-        const { data: permissions } = await supabase
+        const { data: permissions } = await client
           .from('hub_role_navigation')
           .select('nav_id')
           .eq('role_id', role.role_id)
