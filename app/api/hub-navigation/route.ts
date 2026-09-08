@@ -37,6 +37,25 @@ async function rest<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function withoutSubtree(rows: NavRow[], rootLabel: string) {
+  const rootIds = new Set(rows.filter(row => row.label === rootLabel).map(row => row.nav_id));
+  if (!rootIds.size) return rows;
+
+  const excluded = new Set(rootIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const row of rows) {
+      if (row.parent_id && excluded.has(row.parent_id) && !excluded.has(row.nav_id)) {
+        excluded.add(row.nav_id);
+        changed = true;
+      }
+    }
+  }
+
+  return rows.filter(row => !excluded.has(row.nav_id));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const hubId = (request.nextUrl.searchParams.get('hub') || '').trim().toLowerCase();
@@ -54,6 +73,14 @@ export async function GET(request: NextRequest) {
     );
 
     let filtered = rows;
+
+    // Current application scope is Team Manager. Competition Engine is a
+    // separate future domain/subdomain and must not be blended into the
+    // Team Manager Super User operating navigation. The canonical DB rows are
+    // intentionally preserved for later use by that domain.
+    if (hubId === 'superuser') {
+      filtered = withoutSubtree(filtered, 'Competition Engine');
+    }
 
     if (hubId === 'admin' && switcherValue) {
       const roles = await rest<RoleRow[]>(
