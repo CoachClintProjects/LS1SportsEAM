@@ -7,6 +7,13 @@ const noStoreHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xedfstgwotzxnztpembv.supabase.co',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      'sb_publishable_Zas0f_4UBJNgjfYnHpjOxg_Ey0yOILb',
+  },
   async headers() {
     return [
       { source: '/login', headers: noStoreHeaders },
