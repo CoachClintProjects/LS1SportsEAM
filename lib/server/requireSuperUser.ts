@@ -1,6 +1,5 @@
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xedfstgwotzxnztpembv.supabase.co';
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
 export type SuperUserIdentity = {
   userId: string;
@@ -10,6 +9,7 @@ export type SuperUserIdentity = {
   displayName: string;
   canOnboardClients: boolean;
   canManagePlatformSettings: boolean;
+  accessToken: string;
 };
 
 export class SuperUserAuthError extends Error {
@@ -23,7 +23,7 @@ export class SuperUserAuthError extends Error {
 }
 
 export async function requireSuperUser(request: Request): Promise<SuperUserIdentity> {
-  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
+  if (!SUPABASE_URL || !PUBLIC_KEY) {
     throw new SuperUserAuthError('SuperUser authentication is not configured.', 500);
   }
 
@@ -33,7 +33,7 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
 
   const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
-      apikey: ANON_KEY,
+      apikey: PUBLIC_KEY,
       Authorization: `Bearer ${token}`,
     },
     cache: 'no-store',
@@ -45,12 +45,15 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
   const email = String(user.email || '').trim().toLowerCase();
   if (!user.id || !email) throw new SuperUserAuthError('Authenticated user has no usable identity.', 403);
 
+  // Authorization is evaluated by Supabase RLS using the caller's JWT. This avoids
+  // making runtime availability depend on a service-role secret while preserving
+  // the immutable auth_user_id binding and app.is_superuser() policy.
   const operatorResponse = await fetch(
     `${SUPABASE_URL}/rest/v1/platform_superuser_operators?select=id,email,display_name,person_id,active,can_onboard_clients,can_manage_platform_settings,auth_user_id&auth_user_id=eq.${encodeURIComponent(user.id)}&active=eq.true&limit=1`,
     {
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        apikey: PUBLIC_KEY,
+        Authorization: `Bearer ${token}`,
       },
       cache: 'no-store',
     },
@@ -78,5 +81,6 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
     displayName: operator.display_name || email,
     canOnboardClients: Boolean(operator.can_onboard_clients),
     canManagePlatformSettings: Boolean(operator.can_manage_platform_settings),
+    accessToken: token,
   };
 }
