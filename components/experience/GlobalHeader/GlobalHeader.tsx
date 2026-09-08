@@ -11,15 +11,24 @@ import {
   Upload,
   UserCircle,
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
 import { HubType, hubs, useHub } from '@/components/hubs/HubContext';
 import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let browserSupabase: SupabaseClient | null = null;
+
+function getBrowserSupabase() {
+  if (browserSupabase) return browserSupabase;
+  if (typeof window === 'undefined') return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+
+  browserSupabase = createClient(url, key);
+  return browserSupabase;
+}
 
 type SearchResult = { id: string; type: string; title: string; subtitle: string; href: string };
 type HubAccess = Record<string, { allowed: boolean; units: number; reason: string }>;
@@ -142,7 +151,8 @@ export function GlobalHeader() {
     setExiting(true);
     try {
       await fetch('/api/superuser-auth/session', { method: 'DELETE' }).catch(() => null);
-      await supabase.auth.signOut({ scope: 'local' });
+      const supabase = getBrowserSupabase();
+      if (supabase) await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
       console.error('[GlobalHeader] sign out failed', error);
     } finally {
