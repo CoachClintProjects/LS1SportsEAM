@@ -6,6 +6,7 @@ import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
 import SuperUserActions from '@/components/hubs/superuser/SuperUserActions';
 import SuperUserApiBoundary from '@/components/hubs/superuser/SuperUserApiBoundary';
+import SuperUserDomainActions from '@/components/hubs/superuser/SuperUserDomainActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -30,7 +31,10 @@ function SuperUserRouter() {
         {COMMAND_VIEWS.has(view) ? (
           <ProjectCommand />
         ) : (
-          <SuperUserModuleWorkspace view={view} />
+          <>
+            <SuperUserModuleWorkspace view={view} />
+            <SuperUserDomainActions view={view} />
+          </>
         )}
       </div>
     </SuperUserApiBoundary>
