@@ -5,12 +5,24 @@
 // =============================================================================
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let browserSupabase: SupabaseClient | null = null;
+
+function getBrowserSupabase(): SupabaseClient | null {
+  if (browserSupabase) return browserSupabase;
+  if (typeof window === 'undefined') return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) return null;
+
+  browserSupabase = createClient(url, key);
+  return browserSupabase;
+}
 
 export function Imports() {
   const [file, setFile] = useState<File | null>(null);
@@ -24,6 +36,12 @@ export function Imports() {
 
   const loadImportHistory = async () => {
     try {
+      const supabase = getBrowserSupabase();
+      if (!supabase) {
+        setImportHistory([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('competition_import_files')
         .select('*')
