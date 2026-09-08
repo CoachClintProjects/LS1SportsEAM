@@ -46,7 +46,7 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
   if (!user.id || !email) throw new SuperUserAuthError('Authenticated user has no usable identity.', 403);
 
   const operatorResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/platform_superuser_operators?select=id,email,display_name,person_id,active,can_onboard_clients,can_manage_platform_settings&email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`,
+    `${SUPABASE_URL}/rest/v1/platform_superuser_operators?select=id,email,display_name,person_id,active,can_onboard_clients,can_manage_platform_settings,auth_user_id&auth_user_id=eq.${encodeURIComponent(user.id)}&active=eq.true&limit=1`,
     {
       headers: {
         apikey: SERVICE_KEY,
@@ -60,13 +60,15 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
 
   const operators = (await operatorResponse.json()) as Array<{
     id: string;
+    email: string;
+    auth_user_id: string;
     person_id: string | null;
     display_name: string | null;
     can_onboard_clients: boolean | null;
     can_manage_platform_settings: boolean | null;
   }>;
   const operator = operators[0];
-  if (!operator) throw new SuperUserAuthError('SuperUser access required.', 403);
+  if (!operator || operator.auth_user_id !== user.id) throw new SuperUserAuthError('SuperUser access required.', 403);
 
   return {
     userId: user.id,
