@@ -11,6 +11,7 @@ import SuperUserSecurityActions from '@/components/hubs/superuser/SuperUserSecur
 import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanceActions';
 import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
 import SuperUserCompetitionActions from '@/components/hubs/superuser/SuperUserCompetitionActions';
+import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -42,6 +43,7 @@ function SuperUserRouter() {
             <SuperUserFinanceActions view={view} />
             <SuperUserEnterpriseActions view={view} />
             <SuperUserCompetitionActions view={view} />
+            <SuperUserSupportActions view={view} />
           </>
         )}
       </div>
