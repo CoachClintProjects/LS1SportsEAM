@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
-      "superuser-release-candidate": true
+      "superuser-release-candidate": false
     }
   }
 }
