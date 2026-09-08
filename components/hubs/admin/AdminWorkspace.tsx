@@ -6,16 +6,32 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // =============================================================================
 // SUPABASE CLIENT
 // =============================================================================
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (supabase) return supabase;
+  if (typeof window === 'undefined') {
+    throw new Error('Supabase browser client is unavailable during server prerender.');
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase browser configuration is missing.');
+  }
+
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 // =============================================================================
 // COMPONENT REGISTRY - Maps component names from DB to actual components
@@ -94,7 +110,7 @@ const componentRegistry: Record<string, React.ComponentType> = {
   // ADMIN section
   'CommandCenter': CommandCenter,
   'OrganizationArchitecture': OrganizationArchitecture,
-  
+
   // TEAM MANAGER section
   'TeamManager': TeamManager,
   'RegistrarValidation': RegistrarValidation,
@@ -103,13 +119,13 @@ const componentRegistry: Record<string, React.ComponentType> = {
   'ProgramsView': ProgramsView,
   'TeamsView': TeamsView,
   'SeasonsView': SeasonsView,
-  
+
   // FINANCE section
   'FinanceAccounting': FinanceAccounting,
   'BillingView': BillingView,
   'InvoicesView': InvoicesView,
   'PaymentsView': PaymentsView,
-  
+
   // OPERATIONS section
   'Facilities': Facilities,
   'Payroll': Payroll,
@@ -153,7 +169,8 @@ export function AdminWorkspace() {
       // Default view if none specified - look up Command Center nav_id
       const loadDefaultView = async () => {
         try {
-          const { data } = await supabase
+          const client = getSupabaseClient();
+          const { data } = await client
             .from('hub_navigation')
             .select('nav_id')
             .eq('hub_id', 'admin')
@@ -168,7 +185,7 @@ export function AdminWorkspace() {
           setActiveView('command-center');
         }
       };
-      loadDefaultView();
+      void loadDefaultView();
     }
   }, [searchParams]);
 
@@ -179,8 +196,9 @@ export function AdminWorkspace() {
     const loadComponent = async () => {
       setLoading(true);
       try {
+        const client = getSupabaseClient();
         // Query the database for the navigation item that matches this view
-        const { data, error } = await supabase
+        const { data, error } = await client
           .from('hub_navigation')
           .select('component, label')
           .eq('hub_id', 'admin')
@@ -191,13 +209,13 @@ export function AdminWorkspace() {
           console.error('Error loading component from database:', error);
           // Try to find by path
           const path = `/admin?view=${activeView}`;
-          const { data: pathData } = await supabase
+          const { data: pathData } = await client
             .from('hub_navigation')
             .select('component, label')
             .eq('hub_id', 'admin')
             .eq('path', path)
             .single();
-          
+
           if (pathData && pathData.component) {
             const Component = componentRegistry[pathData.component];
             if (Component) {
@@ -240,7 +258,7 @@ export function AdminWorkspace() {
       }
     };
 
-    loadComponent();
+    void loadComponent();
   }, [activeView]);
 
   // Show loading state
