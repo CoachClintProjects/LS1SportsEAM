@@ -11,6 +11,7 @@ import SuperUserSecurityActions from '@/components/hubs/superuser/SuperUserSecur
 import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanceActions';
 import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
 import SuperUserCompetitionActions from '@/components/hubs/superuser/SuperUserCompetitionActions';
+import SuperUserCompetitionOperations from '@/components/hubs/superuser/SuperUserCompetitionOperations';
 import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
 import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOperationsActions';
@@ -50,6 +51,7 @@ function SuperUserRouter() {
             <SuperUserFinanceActions view={view} />
             <SuperUserEnterpriseActions view={view} />
             <SuperUserCompetitionActions view={view} />
+            <SuperUserCompetitionOperations view={view} />
             <SuperUserSupportActions view={view} />
             <SuperUserOperationsActions view={view} />
           </>
