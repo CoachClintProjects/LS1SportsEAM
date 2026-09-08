@@ -8,14 +8,25 @@ export type AuditWrite = {
   entityType?: string | null;
   entityId?: string | null;
   tenantId?: string | null;
-  beforeData?: Record<string, unknown> | null;
-  afterData?: Record<string, unknown> | null;
+  beforeData?: unknown;
+  afterData?: unknown;
   reason?: string | null;
   privileged?: boolean;
 };
 
+function normalizeAuditPayload(value: unknown): Record<string, unknown> | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  return { value };
+}
+
 export async function writeAuditEvent(actor: SuperUserIdentity, event: AuditWrite) {
   if (!URL || !KEY) throw new Error('Audit service credentials are not configured.');
+
+  const beforeData = normalizeAuditPayload(event.beforeData);
+  const afterData = normalizeAuditPayload(event.afterData);
 
   const response = await fetch(`${URL}/rest/v1/audit_events`, {
     method: 'POST',
@@ -28,13 +39,13 @@ export async function writeAuditEvent(actor: SuperUserIdentity, event: AuditWrit
     body: JSON.stringify({
       tenant_id: event.tenantId || null,
       actor_user_id: actor.userId,
-      actor_person_id: null,
+      actor_person_id: actor.personId || null,
       action: event.action,
       entity_type: event.entityType || null,
       entity_id: event.entityId || null,
-      before_data: event.beforeData || null,
+      before_data: beforeData,
       after_data: {
-        ...(event.afterData || {}),
+        ...(afterData || {}),
         superuser_operator_id: actor.operatorId,
         superuser_email: actor.email,
       },
