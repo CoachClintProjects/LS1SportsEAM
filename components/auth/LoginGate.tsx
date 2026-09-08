@@ -1,14 +1,27 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, CalendarDays, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (supabase) return supabase;
+  if (typeof window === 'undefined') {
+    throw new Error('Supabase browser authentication is unavailable during server prerender.');
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Supabase browser authentication is not configured.');
+  }
+
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 function safeNext(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/admin';
@@ -34,7 +47,16 @@ export function LoginGate() {
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    let client: SupabaseClient;
+    try {
+      client = getSupabaseClient();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Authentication is unavailable.');
+      setBusy(false);
+      return;
+    }
+
+    const { data, error: signInError } = await client.auth.signInWithPassword({ email, password });
     if (signInError || !data.session?.access_token) {
       setError('Unable to sign in with those credentials.');
       setBusy(false);
@@ -52,7 +74,7 @@ export function LoginGate() {
       if (!requestedNext) destination = '/superuser';
     } else if (next.startsWith('/superuser')) {
       const result = await superUserResponse.json().catch(() => ({}));
-      await supabase.auth.signOut({ scope: 'local' });
+      await client.auth.signOut({ scope: 'local' });
       setError(result.error || 'This account is not authorized for Super User access.');
       setBusy(false);
       return;
