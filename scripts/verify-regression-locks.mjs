@@ -89,6 +89,9 @@ if (exists(navApiPath)) {
   if (!api.includes('hub_navigation?select=')) {
     fail(`${navApiPath}: canonical DB-driven hub_navigation source is missing.`);
   }
+  if (!api.includes("withoutSubtree(filtered, 'Competition Engine')")) {
+    fail(`${navApiPath}: Competition Engine must remain outside the current Team Manager Super User navigation.`);
+  }
 }
 
 if (exists(superPagePath)) {
@@ -100,6 +103,9 @@ if (exists(superPagePath)) {
   if (!page.includes('<ProjectCommand />')) fail(`${superPagePath}: Project Command control surface is missing.`);
   if (!page.includes('<SuperUserApiBoundary>')) fail(`${superPagePath}: Super User API boundary is missing.`);
   if (!page.includes('<SuperUserReleaseCertification')) fail(`${superPagePath}: exact-SHA release certification control is missing.`);
+  if (page.includes('SuperUserCompetitionActions') || page.includes('SuperUserCompetitionOperations')) {
+    fail(`${superPagePath}: Competition Engine actions must not be mounted in the current Team Manager runtime.`);
+  }
 }
 
 if (exists(releaseApiPath)) {
