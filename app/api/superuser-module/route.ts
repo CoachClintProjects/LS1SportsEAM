@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xedfstgwotzxnztpembv.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -77,10 +78,16 @@ async function count(table: string) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!SERVICE_KEY) return NextResponse.json({ error: 'Supabase server credentials are not configured.' }, { status: 500 });
-  const view = request.nextUrl.searchParams.get('view') ?? '';
-  const domain = domains[view];
-  if (!domain) return NextResponse.json({ error: 'Unknown SuperUser workspace.' }, { status: 404 });
-  const metrics = await Promise.all(domain.tables.map(async item => ({ ...item, count: await count(item.table) })));
-  return NextResponse.json({ view, label: domain.label, metrics, generatedAt: new Date().toISOString(), source: 'LS1SportsEAM Supabase' }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
+  try {
+    await requireSuperUser(request);
+    if (!SERVICE_KEY) return NextResponse.json({ error: 'Supabase server credentials are not configured.' }, { status: 500 });
+    const view = request.nextUrl.searchParams.get('view') ?? '';
+    const domain = domains[view];
+    if (!domain) return NextResponse.json({ error: 'Unknown SuperUser workspace.' }, { status: 404 });
+    const metrics = await Promise.all(domain.tables.map(async item => ({ ...item, count: await count(item.table) })));
+    return NextResponse.json({ view, label: domain.label, metrics, generatedAt: new Date().toISOString(), source: 'LS1SportsEAM Supabase' }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
+  } catch (error) {
+    if (error instanceof SuperUserAuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Workspace unavailable.' }, { status: 500 });
+  }
 }
