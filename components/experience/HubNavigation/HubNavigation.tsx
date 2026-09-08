@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useHub } from '@/components/hubs/HubContext';
@@ -83,6 +83,17 @@ function isItemActive(href: string | undefined, pathname: string, search: string
   return !current.get('view');
 }
 
+function navigationEventDetail(hubId: string, itemId: string, href: string) {
+  const origin = typeof window === 'undefined' ? 'https://ls1sports.local' : window.location.origin;
+  const target = new URL(href, origin);
+  return {
+    hubId,
+    itemId,
+    href,
+    view: target.searchParams.get('view') || null,
+  };
+}
+
 export function HubNavigation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -99,11 +110,12 @@ export function HubNavigation() {
   const [switcherConfig, setSwitcherConfig] = useState<SwitcherConfig>(EMPTY_SWITCHER);
   const [switcherValue, setSwitcherValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const loadedHubRef = useRef<string | null>(null);
 
-  // A hub change is the only navigation event allowed to reset the tree to a
-  // fallback. Query-string/view changes within the same hub must retain the
-  // last successfully loaded DB-driven navigation model.
+  // Only an actual hub change may reset the tree. Same-hub query/view changes
+  // must preserve the last successfully loaded canonical navigation model.
   useEffect(() => {
+    loadedHubRef.current = null;
     setSections(fallback);
   }, [activeHubId, fallback]);
 
@@ -119,7 +131,7 @@ export function HubNavigation() {
       const queryKey = getQueryKey(activeHubId);
       const urlValue = searchParams.get(queryKey);
       const nextValue =
-        urlValue && config.options.some((option) => option.id === urlValue)
+        urlValue && config.options.some(option => option.id === urlValue)
           ? urlValue
           : config.defaultOption || config.options[0]?.id || '';
 
@@ -139,11 +151,17 @@ export function HubNavigation() {
       setRefreshing(true);
       try {
         const result = await getNavigation(activeHubId, switcherValue);
-        if (!cancelled && result.length) setSections(result);
-        if (!cancelled && !result.length) setSections(fallback);
+        if (!cancelled && result.length) {
+          setSections(result);
+          loadedHubRef.current = activeHubId;
+        } else if (!cancelled && loadedHubRef.current !== activeHubId) {
+          // Initial load can remain on the hub fallback. Never collapse an
+          // already-loaded tree because of an empty/transient response.
+          setSections(fallback);
+        }
       } catch (error) {
         console.error('[HubNavigation] navigation load failed', { activeHubId, error });
-        if (!cancelled) setSections(fallback);
+        if (!cancelled && loadedHubRef.current !== activeHubId) setSections(fallback);
       } finally {
         if (!cancelled) setRefreshing(false);
       }
@@ -197,6 +215,9 @@ export function HubNavigation() {
     if (activeHubId === 'admin' && switcherValue) {
       target.searchParams.set('role', switcherValue);
     }
+    if (activeHubId === 'official' && switcherValue) {
+      target.searchParams.set('official_role', switcherValue);
+    }
 
     return `${target.pathname}${target.search}`;
   }
@@ -233,7 +254,7 @@ export function HubNavigation() {
               {refreshing && <span className="text-neutral-700">updating</span>}
             </div>
             <div className="space-y-1">
-              {switcherConfig.options.map((option) => (
+              {switcherConfig.options.map(option => (
                 <label
                   key={option.id}
                   className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
@@ -258,13 +279,13 @@ export function HubNavigation() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        {sections.map((section) => (
+        {sections.map(section => (
           <div key={section.id} className="mb-5">
             <div className="mb-1.5 px-3 text-[8px] font-bold tracking-[0.2em] text-neutral-700">
               {section.label}
             </div>
             <div className="space-y-0.5">
-              {section.items.map((item) => {
+              {section.items.map(item => {
                 const href = hrefFor(item.href);
                 return (
                   <Link
@@ -274,8 +295,7 @@ export function HubNavigation() {
                     onClick={() =>
                       window.dispatchEvent(
                         new CustomEvent('ls1sports:navigation', {
-                          // The workspace contract is the canonical view id.
-                          detail: item.id,
+                          detail: navigationEventDetail(activeHubId, item.id, href),
                         }),
                       )
                     }
