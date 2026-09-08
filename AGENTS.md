@@ -28,6 +28,8 @@ Do not simplify by removing enterprise controls. Simplify how the user interacts
 
 Material visible product content, navigation, configuration, workflow definitions, and platform state should be database-driven where practical. Avoid hard-coded business content or configuration when it can be represented canonically in the data model.
 
+Super User is the most sophisticated control plane in the product and must still be easy enough for a non-specialist to understand. Prefer interactive visual summaries, guided cards, drawers, timelines, charts, evidence explanations, exception-first workflows, and clear next actions over raw tables and IDs. Every material card/chart/timeline element should resolve to the underlying evidence and outstanding work.
+
 ## Hub completion standard
 
 Hub delivery sequence is strict unless explicitly changed by the product owner:
@@ -35,12 +37,17 @@ Hub delivery sequence is strict unless explicitly changed by the product owner:
 1. Super User
 2. Admin
 3. Athlete
-4. Parent / Official / Scout and other role hubs as prioritized
-5. Coach is last unless explicitly reprioritized
+4. Parent
+5. Scout
+6. Coach
+
+Official is deferred from the current delivery sequence unless explicitly reprioritized.
 
 A hub is not complete because screens render. 100% means every intended route, link, workflow, read, write, hook, permission, authority check, audit path, validation state, lifecycle transition, empty/error/loading state, integration boundary, and deployment behavior works end to end.
 
 Anything below that standard remains in the Super User action plan. Implemented but not operational is unfinished. Operational but not validated is unfinished.
+
+Every successful capability must be regression-locked. A later change must not silently degrade previously verified behavior. Shared-shell, navigation, auth, API and database contracts must be treated as shared-platform contracts and validated across dependent hubs before they are considered stable.
 
 ## Deployment discipline
 
@@ -52,19 +59,19 @@ Do not mark deployment validation at 100% until the release candidate has been p
 
 ## Current product scope and domain boundary
 
-The active product completion target is the LS1Sports Team Manager operating domain. Super User work must first make Team Manager fully operational front-to-back and must not blur Team Manager functionality with Competition Engine functionality.
+The active product completion target is the LS1Sports **Team Engine**. Super User work must first make Team Engine fully operational front-to-back and must not blur Team Engine functionality with Competition Engine functionality.
 
-Team Manager includes the enterprise operating capabilities needed to run organizations, people/person master, teams, rosters, memberships, programs, seasons, administration, finance/accounting, facilities/assets, payroll/workforce operations, procurement, imports/data quality, reporting, compliance/governance, security/authority, workflow, audit, integrations, platform configuration, and operational health.
+Team Engine includes the enterprise operating capabilities needed to run organizations, people/person master, teams, rosters, memberships, programs, seasons, administration, finance/accounting, facilities/assets, payroll/workforce operations, procurement, imports/data quality, reporting, compliance/governance, security/authority, workflow, audit, integrations, platform configuration, AI/automation, and operational health.
 
-Competition Engine is a separate domain and may later be deployed on its own domain or subdomain. Competition navigation, timing, seeding, scoring, results, advancement, judicial operations, reconciliation, publication, records, awards, and competition-specific actions must not be mounted into the current Team Manager runtime or counted toward current Team Manager completion. Preserve Competition Engine source/data for future work; do not delete it merely to enforce separation.
+Competition Engine is a separate future domain and may later be deployed on its own domain or subdomain. During Team Engine completion, Competition is placeholder-only. Competition navigation, timing, seeding, scoring, results, advancement, judicial operations, reconciliation, publication, records, awards, and competition-specific mutations must not participate in or block Team Engine completion. Preserve Competition Engine source/data for future work rather than deleting it.
 
-Super User may eventually govern multiple LS1Sports domains, but the current Team Manager Super User control plane must remain internally coherent and independently certifiable.
+Super User may eventually govern multiple LS1Sports domains, but the current Team Engine Super User control plane must remain internally coherent and independently certifiable.
 
 ## Competition Engine truth standard
 
 Competition Engine correctness is existential to LS1Sports when that domain becomes active. If LS1Sports cannot prove competition truth, the EAM fails.
 
-During validation, LS1Sports runs in parallel with Hy-Tek Meet Manager. Hy-Tek source/results files are verification evidence against LS1Sports calculations and outcomes; they are not the long-term authoritative architecture or a permanent runtime dependency.
+During future validation, LS1Sports runs in parallel with Hy-Tek Meet Manager. Hy-Tek source/results files are verification evidence against LS1Sports calculations and outcomes; they are not the long-term authoritative architecture or a permanent runtime dependency.
 
 The parallel-validation program must compare the complete competition lifecycle where applicable: entries and eligibility, event/session structure, seeding, scratches/check-ins, officials and judicial decisions, timing/result ingestion, result versions, scoring, advancement, reconciliation, records, awards, publication, reports, and financial/operational consequences.
 
