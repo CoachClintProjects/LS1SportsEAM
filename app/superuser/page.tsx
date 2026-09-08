@@ -16,6 +16,7 @@ import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSuppor
 import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOperationsActions';
 import SuperUserReferenceFinder from '@/components/hubs/superuser/SuperUserReferenceFinder';
+import SuperUserReleaseCertification from '@/components/hubs/superuser/SuperUserReleaseCertification';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -38,6 +39,9 @@ function SuperUserRouter() {
       <div className="space-y-5">
         <SuperUserActions />
         <SuperUserReferenceFinder />
+        {(view === 'command-center' || view === 'deployments') && (
+          <SuperUserReleaseCertification full={view === 'deployments'} />
+        )}
         {COMMAND_VIEWS.has(view) ? (
           <>
             <ProjectCommand />
