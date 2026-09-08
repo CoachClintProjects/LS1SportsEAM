@@ -12,6 +12,7 @@ import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanc
 import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
 import SuperUserCompetitionActions from '@/components/hubs/superuser/SuperUserCompetitionActions';
 import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
+import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -34,7 +35,10 @@ function SuperUserRouter() {
       <div className="space-y-5">
         <SuperUserActions />
         {COMMAND_VIEWS.has(view) ? (
-          <ProjectCommand />
+          <>
+            <ProjectCommand />
+            <SuperUserProjectControlActions />
+          </>
         ) : (
           <>
             <SuperUserModuleWorkspace view={view} />
