@@ -1,0 +1,31 @@
+alter table public.admin_roles enable row level security;
+alter table public.platform_milestone_gate_status enable row level security;
+alter table public.athlete_age_options enable row level security;
+alter table public.organization_master enable row level security;
+alter table public.user_security_scopes enable row level security;
+alter table public.hub_navigation enable row level security;
+alter table public.platform_implementation_gates enable row level security;
+alter table public.admin_role_switcher_options enable row level security;
+alter table public.waiver_assignments enable row level security;
+alter table public.official_role_switcher_options enable row level security;
+alter table public.icon_registry enable row level security;
+alter table public.hub_role_navigation enable row level security;
+alter table public.role_permission_definitions enable row level security;
+
+revoke all on public.admin_roles from anon, authenticated;
+revoke all on public.platform_milestone_gate_status from anon, authenticated;
+revoke all on public.athlete_age_options from anon, authenticated;
+revoke all on public.organization_master from anon, authenticated;
+revoke all on public.user_security_scopes from anon, authenticated;
+revoke all on public.hub_navigation from anon, authenticated;
+revoke all on public.platform_implementation_gates from anon, authenticated;
+revoke all on public.admin_role_switcher_options from anon, authenticated;
+revoke all on public.waiver_assignments from anon, authenticated;
+revoke all on public.official_role_switcher_options from anon, authenticated;
+revoke all on public.icon_registry from anon, authenticated;
+revoke all on public.hub_role_navigation from anon, authenticated;
+revoke all on public.role_permission_definitions from anon, authenticated;
+
+comment on table public.hub_navigation is 'Canonical hub navigation configuration. Access is mediated through LS1Sports server APIs; browser roles have no direct table privileges.';
+comment on table public.user_security_scopes is 'Privileged user security scope control data; server-mediated only.';
+comment on table public.role_permission_definitions is 'Privileged authorization control data; server-mediated only.';
