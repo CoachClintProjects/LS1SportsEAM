@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSuperUser, SuperUserAuthError, SuperUserIdentity } from '@/lib/server/requireSuperUser';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,7 +46,7 @@ async function rest(path: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function audit(action: string, entityId: string | null, details: Record<string, unknown>) {
+async function audit(action: string, entityId: string | null, details: Record<string, unknown>, actor: SuperUserIdentity) {
   try {
     await rest('audit_events', {
       method: 'POST',
@@ -53,11 +54,15 @@ async function audit(action: string, entityId: string | null, details: Record<st
         action,
         entity_type: 'client_onboarding_cases',
         entity_id: entityId,
-        details,
+        details: {
+          ...details,
+          operator_id: actor.operatorId,
+          operator_email: actor.email,
+        },
       }),
     });
   } catch {
-    // Audit failure must not destroy the primary onboarding transaction.
+    // Primary onboarding writes are already persisted; do not retry them because of audit-table drift.
   }
 }
 
@@ -69,16 +74,24 @@ async function loadCase(id: string) {
   return { case: cases?.[0] || null, steps: steps || [] };
 }
 
+function authError(error: unknown) {
+  if (error instanceof SuperUserAuthError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    await requireSuperUser(request);
     const id = request.nextUrl.searchParams.get('case');
     if (id) return NextResponse.json(await loadCase(id));
 
-    const cases = await rest(
-      'client_onboarding_cases?select=*&order=started_at.desc&limit=100',
-    );
+    const cases = await rest('client_onboarding_cases?select=*&order=started_at.desc&limit=100');
     return NextResponse.json({ cases: cases || [] });
   } catch (error) {
+    const response = authError(error);
+    if (response) return response;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to load onboarding data.' },
       { status: 500 },
@@ -88,6 +101,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const actor = await requireSuperUser(request);
+    if (!actor.canOnboardClients) {
+      throw new SuperUserAuthError('Client-onboarding permission required.', 403);
+    }
+
     const body = await request.json();
     const action = String(body.action || '');
 
@@ -103,7 +121,10 @@ export async function POST(request: NextRequest) {
           primary_admin_email: body.primary_admin_email || null,
           sports: Array.isArray(body.sports) && body.sports.length ? body.sports : ['SWIMMING'],
           current_step: 1,
-          notes: body.notes || {},
+          notes: {
+            ...(body.notes || {}),
+            created_by_operator_id: actor.operatorId,
+          },
         }),
       });
       const onboardingCase = created?.[0];
@@ -121,7 +142,7 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         body: JSON.stringify(stepRows),
       });
-      await audit('CLIENT_ONBOARDING_CREATED', onboardingCase.id, { client_name: clientName });
+      await audit('CLIENT_ONBOARDING_CREATED', onboardingCase.id, { client_name: clientName }, actor);
       return NextResponse.json(await loadCase(onboardingCase.id));
     }
 
@@ -137,7 +158,7 @@ export async function POST(request: NextRequest) {
         method: 'PATCH',
         body: JSON.stringify(patch),
       });
-      await audit('CLIENT_ONBOARDING_UPDATED', id, patch);
+      await audit('CLIENT_ONBOARDING_UPDATED', id, patch, actor);
       return NextResponse.json(await loadCase(id));
     }
 
@@ -166,27 +187,39 @@ export async function POST(request: NextRequest) {
         method: 'PATCH',
         body: JSON.stringify({ current_step: currentStep, updated_at: new Date().toISOString() }),
       });
-      await audit('CLIENT_ONBOARDING_STEP_UPDATED', caseId, { step_id: stepId, status });
+      await audit('CLIENT_ONBOARDING_STEP_UPDATED', caseId, { step_id: stepId, status }, actor);
       return NextResponse.json(await loadCase(caseId));
     }
 
     if (action === 'activate') {
       const id = String(body.id || '');
       if (!id) throw new Error('Onboarding case ID is required.');
+      const current = await loadCase(id);
+      const incomplete = (current.steps || []).filter((step: Record<string, unknown>) => step.status !== 'completed');
+      if (incomplete.length) {
+        return NextResponse.json(
+          { error: `Activation requires all 12 onboarding steps. ${incomplete.length} step(s) remain incomplete.` },
+          { status: 409 },
+        );
+      }
+
       await rest(`client_onboarding_cases?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: 'ACTIVE',
+          current_step: STEP_DEFINITIONS.length,
           activated_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }),
       });
-      await audit('CLIENT_ONBOARDING_ACTIVATED', id, {});
+      await audit('CLIENT_ONBOARDING_ACTIVATED', id, {}, actor);
       return NextResponse.json(await loadCase(id));
     }
 
-    throw new Error('Unsupported onboarding action.');
+    return NextResponse.json({ error: 'Unsupported onboarding action.' }, { status: 400 });
   } catch (error) {
+    const response = authError(error);
+    if (response) return response;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to save onboarding data.' },
       { status: 400 },
