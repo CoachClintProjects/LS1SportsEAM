@@ -1,33 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { superUserRest } from '@/lib/server/superUserRest';
 import { writeAuditEvent } from '@/lib/server/writeAuditEvent';
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type JsonRow = Record<string, unknown>;
 
-function headers() {
-  if (!KEY) throw new Error('Supabase service credentials are not configured.');
-  return { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
-}
-async function rest(path: string, init: RequestInit = {}) {
-  if (!URL || !KEY) throw new Error('Supabase service credentials are not configured.');
-  const response = await fetch(`${URL}/rest/v1/${path}`, { ...init, headers: { ...headers(), ...(init.headers || {}) }, cache: 'no-store' });
-  const body = await response.text();
-  if (!response.ok) throw new Error(`Supabase ${path} returned ${response.status}: ${body.slice(0, 500)}`);
-  return body ? JSON.parse(body) : null;
-}
 function req(value: unknown, label: string, max = 160) { const s = String(value || '').trim(); if (!s) throw new Error(`${label} is required.`); if (s.length > max) throw new Error(`${label} is too long.`); return s; }
 function opt(value: unknown, max = 500) { const s = String(value || '').trim(); if (!s) return null; if (s.length > max) throw new Error('Value is too long.'); return s; }
 function money(value: unknown, label: string) { const n = Number(value); if (!Number.isFinite(n)) throw new Error(`${label} must be numeric.`); return Math.round(n * 100) / 100; }
 function positive(value: unknown, label: string) { const n = money(value, label); if (n <= 0) throw new Error(`${label} must be greater than zero.`); return n; }
 function currency(value: unknown) { const c = String(value || 'CAD').trim().toUpperCase(); if (!/^[A-Z]{3}$/.test(c)) throw new Error('Currency must be a 3-letter code.'); return c; }
 function jsonArray(value: unknown, label: string): JsonRow[] { if (Array.isArray(value)) return value as JsonRow[]; try { const parsed = JSON.parse(String(value || '[]')); if (!Array.isArray(parsed)) throw new Error(); return parsed; } catch { throw new Error(`${label} must be a JSON array.`); } }
-async function one(table: string, id: string) { return (await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0] || null; }
-async function tenantId() { return (await rest('tenants?select=id&limit=1'))?.[0]?.id || null; }
 
 function invoiceLines(raw: JsonRow[]) {
   if (!raw.length) throw new Error('At least one invoice line is required.');
@@ -52,6 +38,9 @@ export async function POST(request: NextRequest) {
   try {
     const actor = await requireSuperUser(request);
     if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
+    const rest = (path: string, init: RequestInit = {}) => superUserRest<any>(actor, path, init);
+    const one = async (table: string, id: string) => (await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0] || null;
+    const tenantId = async () => (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
     const body = await request.json();
     const action = String(body.action || '');
     const tenant = await tenantId();
