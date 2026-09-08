@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { writeAuditEvent } from '@/lib/server/writeAuditEvent';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,24 +36,16 @@ async function sha256(bytes: ArrayBuffer) {
 export async function POST(request: Request) {
   try {
     const actor = await requireSuperUser(request);
-    if (!actor.canManagePlatformSettings) {
-      throw new SuperUserAuthError('Platform-management permission required.', 403);
-    }
+    if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
 
     const form = await request.formData();
     const file = form.get('file');
     const sourceSystem = String(form.get('source_system') || 'UNKNOWN').trim();
     const format = String(form.get('format') || '').trim().toUpperCase();
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Select a source file.' }, { status: 400 });
-    }
-    if (!format) {
-      return NextResponse.json({ error: 'Import format is required.' }, { status: 400 });
-    }
-    if (file.size <= 0 || file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: 'Source file must be between 1 byte and 10 MB.' }, { status: 400 });
-    }
+    if (!(file instanceof File)) return NextResponse.json({ error: 'Select a source file.' }, { status: 400 });
+    if (!format) return NextResponse.json({ error: 'Import format is required.' }, { status: 400 });
+    if (file.size <= 0 || file.size > MAX_FILE_BYTES) return NextResponse.json({ error: 'Source file must be between 1 byte and 10 MB.' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
     const checksum = await sha256(bytes);
@@ -119,10 +112,7 @@ export async function POST(request: Request) {
           validation_errors: [],
         }));
         if (batch.length) {
-          await rest('competition_import_records', {
-            method: 'POST',
-            body: JSON.stringify(batch),
-          });
+          await rest('competition_import_records', { method: 'POST', body: JSON.stringify(batch) });
           stagedRecords += batch.length;
         }
       }
@@ -149,26 +139,19 @@ export async function POST(request: Request) {
       }
     }
 
-    try {
-      await rest('audit_events', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'COMPETITION_IMPORT_UPLOADED',
-          entity_type: 'competition_import_files',
-          entity_id: fileRow.id,
-          details: {
-            filename: file.name,
-            format,
-            source_system: sourceSystem,
-            staged_records: stagedRecords,
-            operator_id: actor.operatorId,
-            operator_email: actor.email,
-          },
-        }),
-      });
-    } catch {
-      // Import is already persisted; avoid duplicate writes if the audit schema differs.
-    }
+    const finalFile = (await rest(`competition_import_files?id=eq.${encodeURIComponent(fileRow.id)}&select=*&limit=1`))?.[0] || fileRow;
+    await writeAuditEvent(actor, {
+      action: 'COMPETITION_IMPORT_UPLOADED',
+      entityType: 'competition_import_files',
+      entityId: fileRow.id,
+      tenantId: tenant,
+      afterData: {
+        ...finalFile,
+        staged_records: stagedRecords,
+        import_job_id: job?.[0]?.id || null,
+      },
+      reason: 'Super User uploaded competition source package',
+    });
 
     return NextResponse.json({
       success: true,
@@ -181,9 +164,7 @@ export async function POST(request: Request) {
       checksum_sha256: checksum,
     });
   } catch (error) {
-    if (error instanceof SuperUserAuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
+    if (error instanceof SuperUserAuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[competition-import] failed', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Competition import failed.' }, { status: 500 });
   }
