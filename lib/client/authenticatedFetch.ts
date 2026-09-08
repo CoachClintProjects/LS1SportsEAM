@@ -1,14 +1,29 @@
 'use client';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (supabase) return supabase;
+
+  if (typeof window === 'undefined') {
+    throw new Error('Authenticated Supabase access is only available in the browser.');
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Supabase browser configuration is missing.');
+  }
+
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  const { data, error } = await supabase.auth.getSession();
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.getSession();
   if (error || !data.session?.access_token) {
     throw new Error('Your LS1Sports session is missing or expired. Sign in again.');
   }
