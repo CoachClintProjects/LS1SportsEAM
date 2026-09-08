@@ -14,11 +14,112 @@ import {
 const FALLBACKS: Record<string, NavigationSection[]> = {
   superuser: [
     {
-      id: 'superuser-main',
-      label: 'SUPERUSER',
+      id: 'superuser-command',
+      label: 'COMMAND',
       items: [
         { id: 'command-center', label: 'Command Center', href: '/superuser' },
+        { id: 'project-map', label: 'Project Map', href: '/superuser?view=project-map' },
+        { id: 'milestones', label: 'Milestones', href: '/superuser?view=milestones' },
+        { id: 'metrics', label: 'Live Core Metrics', href: '/superuser?view=metrics' },
+        { id: 'deployments', label: 'Release Certification', href: '/superuser?view=deployments' },
+      ],
+    },
+    {
+      id: 'superuser-team-engine',
+      label: 'TEAM ENGINE',
+      items: [
+        { id: 'team-engine', label: 'Team Engine', href: '/superuser?view=team-engine' },
+        { id: 'organizations', label: 'Organizations', href: '/superuser?view=organizations' },
+        { id: 'people', label: 'People', href: '/superuser?view=people' },
+        { id: 'programs', label: 'Programs', href: '/superuser?view=programs' },
+        { id: 'seasons', label: 'Seasons', href: '/superuser?view=seasons' },
+        { id: 'teams', label: 'Teams', href: '/superuser?view=teams' },
+        { id: 'memberships', label: 'Memberships', href: '/superuser?view=memberships' },
+        { id: 'rosters', label: 'Rosters', href: '/superuser?view=rosters' },
+        { id: 'registrar', label: 'Registrar', href: '/superuser?view=registrar' },
+      ],
+    },
+    {
+      id: 'superuser-security',
+      label: 'IDENTITY & SECURITY',
+      items: [
+        { id: 'identity', label: 'Identity', href: '/superuser?view=identity' },
+        { id: 'roles', label: 'Roles', href: '/superuser?view=roles' },
+        { id: 'permissions', label: 'Permissions', href: '/superuser?view=permissions' },
+        { id: 'raci', label: 'RACI', href: '/superuser?view=raci' },
+        { id: 'delegation', label: 'Delegation', href: '/superuser?view=delegation' },
+        { id: 'sod', label: 'Segregation of Duties', href: '/superuser?view=sod' },
+        { id: 'privileged-access', label: 'Privileged Access', href: '/superuser?view=privileged-access' },
+      ],
+    },
+    {
+      id: 'superuser-governance',
+      label: 'GOVERNANCE',
+      items: [
+        { id: 'compliance', label: 'Compliance', href: '/superuser?view=compliance' },
+        { id: 'data-governance', label: 'Data Governance', href: '/superuser?view=data-governance' },
+        { id: 'privacy', label: 'Privacy', href: '/superuser?view=privacy' },
+        { id: 'retention', label: 'Retention', href: '/superuser?view=retention' },
+        { id: 'audit', label: 'Audit', href: '/superuser?view=audit' },
+      ],
+    },
+    {
+      id: 'superuser-finance',
+      label: 'FINANCE & ACCOUNTING',
+      items: [
+        { id: 'financial-overview', label: 'Financial Overview', href: '/superuser?view=financial-overview' },
+        { id: 'general-ledger', label: 'General Ledger', href: '/superuser?view=general-ledger' },
+        { id: 'receivables', label: 'Receivables', href: '/superuser?view=receivables' },
+        { id: 'payables', label: 'Payables', href: '/superuser?view=payables' },
+        { id: 'budgets', label: 'Budgets', href: '/superuser?view=budgets' },
+        { id: 'cash-flow', label: 'Cash Flow', href: '/superuser?view=cash-flow' },
+      ],
+    },
+    {
+      id: 'superuser-operations',
+      label: 'OPERATIONS',
+      items: [
+        { id: 'procurement', label: 'Procurement', href: '/superuser?view=procurement' },
+        { id: 'workflow', label: 'Workflow', href: '/superuser?view=workflow' },
+        { id: 'rules', label: 'Rules', href: '/superuser?view=rules' },
+        { id: 'integrations', label: 'Integrations', href: '/superuser?view=integrations' },
+        { id: 'imports', label: 'Imports', href: '/superuser?view=imports' },
+        { id: 'reporting', label: 'Reporting', href: '/superuser?view=reporting' },
+        { id: 'facilities', label: 'Facilities', href: '/superuser?view=facilities' },
+        { id: 'assets', label: 'Assets', href: '/superuser?view=assets' },
+        { id: 'maintenance', label: 'Maintenance', href: '/superuser?view=maintenance' },
+      ],
+    },
+    {
+      id: 'superuser-intelligence',
+      label: 'INTELLIGENCE',
+      items: [
+        { id: 'agents', label: 'AI Agents', href: '/superuser?view=agents' },
+        { id: 'automation', label: 'Automation', href: '/superuser?view=automation' },
+        { id: 'alerts', label: 'Alerts', href: '/superuser?view=alerts' },
+        { id: 'insights', label: 'Insights', href: '/superuser?view=insights' },
+        { id: 'athletes', label: 'Athlete Intelligence', href: '/superuser?view=athletes' },
+      ],
+    },
+    {
+      id: 'superuser-platform',
+      label: 'PLATFORM',
+      items: [
+        { id: 'system-health', label: 'System Health', href: '/superuser?view=system-health' },
+        { id: 'platform', label: 'Platform', href: '/superuser?view=platform' },
+        { id: 'settings', label: 'Settings', href: '/superuser?view=settings' },
+        { id: 'knowledge', label: 'Knowledge', href: '/superuser?view=knowledge' },
+      ],
+    },
+    {
+      id: 'superuser-clients',
+      label: 'CLIENT OPERATIONS',
+      items: [
+        { id: 'all-clients', label: 'All Clients', href: '/superuser?view=all-clients' },
+        { id: 'new-client', label: 'New Client', href: '/superuser?view=new-client' },
         { id: 'onboarding', label: 'Client Onboarding', href: '/superuser/onboarding' },
+        { id: 'onboarding-queue', label: 'Onboarding Queue', href: '/superuser?view=onboarding-queue' },
+        { id: 'client-exceptions', label: 'Client Exceptions', href: '/superuser?view=client-exceptions' },
       ],
     },
   ],
@@ -112,8 +213,6 @@ export function HubNavigation() {
   const [refreshing, setRefreshing] = useState(false);
   const loadedHubRef = useRef<string | null>(null);
 
-  // Only an actual hub change may reset the tree. Same-hub query/view changes
-  // must preserve the last successfully loaded canonical navigation model.
   useEffect(() => {
     loadedHubRef.current = null;
     setSections(fallback);
@@ -125,7 +224,6 @@ export function HubNavigation() {
     async function initializeHub() {
       const config = await getSwitcherConfig(activeHubId);
       if (cancelled) return;
-
       setSwitcherConfig(config);
 
       const queryKey = getQueryKey(activeHubId);
@@ -134,7 +232,6 @@ export function HubNavigation() {
         urlValue && config.options.some(option => option.id === urlValue)
           ? urlValue
           : config.defaultOption || config.options[0]?.id || '';
-
       setSwitcherValue(nextValue);
     }
 
@@ -155,8 +252,6 @@ export function HubNavigation() {
           setSections(result);
           loadedHubRef.current = activeHubId;
         } else if (!cancelled && loadedHubRef.current !== activeHubId) {
-          // Initial load can remain on the hub fallback. Never collapse an
-          // already-loaded tree because of an empty/transient response.
           setSections(fallback);
         }
       } catch (error) {
@@ -209,43 +304,28 @@ export function HubNavigation() {
     const origin = typeof window === 'undefined' ? 'https://ls1sports.local' : window.location.origin;
     const target = new URL(itemHref, origin);
 
-    if (activeHubId === 'athlete' && switcherValue) {
-      target.searchParams.set('age', switcherValue);
-    }
-    if (activeHubId === 'admin' && switcherValue) {
-      target.searchParams.set('role', switcherValue);
-    }
-    if (activeHubId === 'official' && switcherValue) {
-      target.searchParams.set('official_role', switcherValue);
-    }
+    if (activeHubId === 'athlete' && switcherValue) target.searchParams.set('age', switcherValue);
+    if (activeHubId === 'admin' && switcherValue) target.searchParams.set('role', switcherValue);
+    if (activeHubId === 'official' && switcherValue) target.searchParams.set('official_role', switcherValue);
 
     return `${target.pathname}${target.search}`;
   }
 
-  const showSwitcher =
-    switcherConfig.displayStyle !== 'none' && switcherConfig.options.length > 0;
-
-  const switcherLabel =
-    switcherConfig.type === 'age'
-      ? 'Demonstrate athlete experience'
-      : switcherConfig.type === 'role'
-        ? 'Select admin role'
-        : switcherConfig.type === 'official_role'
-          ? 'Select official role'
-          : 'Select option';
+  const showSwitcher = switcherConfig.displayStyle !== 'none' && switcherConfig.options.length > 0;
+  const switcherLabel = switcherConfig.type === 'age'
+    ? 'Demonstrate athlete experience'
+    : switcherConfig.type === 'role'
+      ? 'Select admin role'
+      : switcherConfig.type === 'official_role'
+        ? 'Select official role'
+        : 'Select option';
 
   return (
     <nav className="flex h-full w-full flex-col bg-[#080909]">
       <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
-        <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">
-          {currentHub.codeLane}
-        </div>
-        <div className="mt-1.5 truncate text-[15px] font-black text-white">
-          {currentHub.name}
-        </div>
-        <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">
-          {currentHub.description}
-        </div>
+        <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">{currentHub.codeLane}</div>
+        <div className="mt-1.5 truncate text-[15px] font-black text-white">{currentHub.name}</div>
+        <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">{currentHub.description}</div>
 
         {showSwitcher && (
           <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
@@ -255,21 +335,8 @@ export function HubNavigation() {
             </div>
             <div className="space-y-1">
               {switcherConfig.options.map(option => (
-                <label
-                  key={option.id}
-                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
-                    switcherValue === option.id
-                      ? 'bg-[#FA4616]/10 text-white'
-                      : 'text-neutral-500 hover:text-neutral-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`switcher-${activeHubId}`}
-                    checked={switcherValue === option.id}
-                    onChange={() => handleSwitch(option.id)}
-                    className="accent-[#FA4616]"
-                  />
+                <label key={option.id} className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${switcherValue === option.id ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                  <input type="radio" name={`${activeHubId}-switcher`} value={option.id} checked={switcherValue === option.id} onChange={() => handleSwitch(option.id)} className="h-3 w-3 accent-[#FA4616]" />
                   <span>{option.label}</span>
                 </label>
               ))}
@@ -280,35 +347,24 @@ export function HubNavigation() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {sections.map(section => (
-          <div key={section.id} className="mb-5">
-            <div className="mb-1.5 px-3 text-[8px] font-bold tracking-[0.2em] text-neutral-700">
-              {section.label}
-            </div>
-            <div className="space-y-0.5">
+          <div key={section.id} className="mb-5 last:mb-0">
+            <div className="mb-2 px-2 text-[7px] font-black uppercase tracking-[.24em] text-neutral-700">{section.label}</div>
+            <div className="space-y-1">
               {section.items.map(item => {
                 const href = hrefFor(item.href);
+                const active = item.id === activeItem;
                 return (
                   <Link
                     key={item.id}
                     href={href}
                     scroll={false}
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent('ls1sports:navigation', {
-                          detail: navigationEventDetail(activeHubId, item.id, href),
-                        }),
-                      )
-                    }
-                    className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors ${
-                      activeItem === item.id
-                        ? 'bg-[#FA4616]/10 text-[#FA4616]'
-                        : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
-                    }`}
+                    onClick={() => {
+                      if (typeof window === 'undefined' || !item.href) return;
+                      window.dispatchEvent(new CustomEvent('ls1sports:navigation', { detail: navigationEventDetail(activeHubId, item.id, href) }));
+                    }}
+                    className={`block rounded-lg px-3 py-2 text-[11px] transition ${active ? 'bg-[#25100a] font-black text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}
                   >
-                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                    {activeItem === item.id && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />
-                    )}
+                    <span className="flex items-center justify-between gap-2"><span>{item.label}</span>{active && <span className="h-1.5 w-1.5 rounded-full bg-[#FA4616]" />}</span>
                   </Link>
                 );
               })}
@@ -316,17 +372,6 @@ export function HubNavigation() {
           </div>
         ))}
       </div>
-
-      <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-neutral-700">
-            LS1SPORTS OS
-          </span>
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-        </div>
-      </div>
     </nav>
   );
 }
-
-export default HubNavigation;
