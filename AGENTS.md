@@ -50,9 +50,19 @@ Build the active hub to a coherent release-candidate state first. Use source ins
 
 Do not mark deployment validation at 100% until the release candidate has been proven on the deployed application.
 
+## Current product scope and domain boundary
+
+The active product completion target is the LS1Sports Team Manager operating domain. Super User work must first make Team Manager fully operational front-to-back and must not blur Team Manager functionality with Competition Engine functionality.
+
+Team Manager includes the enterprise operating capabilities needed to run organizations, people/person master, teams, rosters, memberships, programs, seasons, administration, finance/accounting, facilities/assets, payroll/workforce operations, procurement, imports/data quality, reporting, compliance/governance, security/authority, workflow, audit, integrations, platform configuration, and operational health.
+
+Competition Engine is a separate domain and may later be deployed on its own domain or subdomain. Competition navigation, timing, seeding, scoring, results, advancement, judicial operations, reconciliation, publication, records, awards, and competition-specific actions must not be mounted into the current Team Manager runtime or counted toward current Team Manager completion. Preserve Competition Engine source/data for future work; do not delete it merely to enforce separation.
+
+Super User may eventually govern multiple LS1Sports domains, but the current Team Manager Super User control plane must remain internally coherent and independently certifiable.
+
 ## Competition Engine truth standard
 
-Competition Engine correctness is existential to LS1Sports. If LS1Sports cannot prove competition truth, the EAM fails.
+Competition Engine correctness is existential to LS1Sports when that domain becomes active. If LS1Sports cannot prove competition truth, the EAM fails.
 
 During validation, LS1Sports runs in parallel with Hy-Tek Meet Manager. Hy-Tek source/results files are verification evidence against LS1Sports calculations and outcomes; they are not the long-term authoritative architecture or a permanent runtime dependency.
 
