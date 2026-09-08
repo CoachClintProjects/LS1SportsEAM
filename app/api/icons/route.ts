@@ -1,26 +1,37 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from('icon_registry')
-      .select('*')
-      .order('icon_name', { ascending: true });
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      return NextResponse.json({ error: 'Icon service is not configured.' }, { status: 500 });
+    }
 
-    if (error) throw error;
+    const response = await fetch(
+      `${url}/rest/v1/icon_registry?select=*&order=icon_name.asc`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      },
+    );
 
-    return NextResponse.json({ icons: data });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Icon registry request failed (${response.status}): ${detail.slice(0, 300)}`);
+    }
+
+    const icons = await response.json();
+    return NextResponse.json({ icons }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     console.error('Error fetching icons:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch icons' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch icons' }, { status: 500 });
   }
 }
