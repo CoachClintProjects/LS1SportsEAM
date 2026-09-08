@@ -1,12 +1,23 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (supabase) return supabase;
+  if (typeof window === 'undefined') {
+    throw new Error('Super User browser auth is only available in the browser.');
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Supabase browser configuration is missing.');
+
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 function isProtectedApi(input: RequestInfo | URL) {
   const raw = input instanceof Request ? input.url : String(input);
@@ -16,7 +27,8 @@ function isProtectedApi(input: RequestInfo | URL) {
     (
       url.pathname.startsWith('/api/superuser-') ||
       url.pathname.startsWith('/api/superuser/') ||
-      url.pathname === '/api/competition-import'
+      url.pathname === '/api/competition-import' ||
+      url.pathname === '/api/hub-navigation'
     )
   );
 }
@@ -29,48 +41,55 @@ export default function SuperUserApiBoundary({ children }: { children: ReactNode
     let active = true;
     let accessToken = '';
     const originalFetch = window.fetch.bind(window);
+    let unsubscribe: (() => void) | null = null;
 
     async function initialize() {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (!active) return;
+      try {
+        const client = getSupabaseClient();
+        const { data, error: sessionError } = await client.auth.getSession();
+        if (!active) return;
 
-      if (sessionError || !data.session?.access_token) {
-        setError('Your LS1Sports session is missing or expired. Sign in again.');
-        return;
-      }
-
-      accessToken = data.session.access_token;
-
-      window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
-        if (!isProtectedApi(input)) return originalFetch(input, init);
-
-        const headers = new Headers(input instanceof Request ? input.headers : undefined);
-        new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
-        headers.set('Authorization', `Bearer ${accessToken}`);
-
-        if (input instanceof Request) {
-          return originalFetch(new Request(input, { ...init, headers }));
+        if (sessionError || !data.session?.access_token) {
+          setError('Your LS1Sports session is missing or expired. Sign in again.');
+          return;
         }
 
-        return originalFetch(input, { ...init, headers });
-      };
+        accessToken = data.session.access_token;
 
-      setReady(true);
+        window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+          if (!isProtectedApi(input)) return originalFetch(input, init);
+
+          const headers = new Headers(input instanceof Request ? input.headers : undefined);
+          new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
+          headers.set('Authorization', `Bearer ${accessToken}`);
+
+          if (input instanceof Request) {
+            return originalFetch(new Request(input, { ...init, headers }));
+          }
+
+          return originalFetch(input, { ...init, headers });
+        };
+
+        const { data: authSubscription } = client.auth.onAuthStateChange((_event, session) => {
+          accessToken = session?.access_token || '';
+          if (!accessToken && active) {
+            setReady(false);
+            setError('Your LS1Sports session ended. Sign in again.');
+          }
+        });
+        unsubscribe = () => authSubscription.subscription.unsubscribe();
+
+        setReady(true);
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Unable to initialize Super User session.');
+      }
     }
 
     void initialize();
 
-    const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      accessToken = session?.access_token || '';
-      if (!accessToken && active) {
-        setReady(false);
-        setError('Your LS1Sports session ended. Sign in again.');
-      }
-    });
-
     return () => {
       active = false;
-      authSubscription.subscription.unsubscribe();
+      unsubscribe?.();
       window.fetch = originalFetch;
     };
   }, []);
