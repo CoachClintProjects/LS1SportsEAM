@@ -21,6 +21,16 @@ const runtimeAuthFiles=[
   'app/api/superuser-team-engine-action/route.ts',
   'app/api/superuser-module/route.ts',
   'app/api/superuser-records/route.ts',
+  'app/api/superuser-reference/route.ts',
+  'app/api/superuser-search/route.ts',
+  'app/api/superuser-hub-access/route.ts',
+  'app/api/superuser/onboarding/route.ts',
+  'app/api/superuser-domain-action/route.ts',
+  'app/api/superuser-security-action/route.ts',
+  'app/api/superuser-finance-action/route.ts',
+  'app/api/superuser-enterprise-action/route.ts',
+  'app/api/superuser-support-action/route.ts',
+  'app/api/superuser-operations-action/route.ts',
   'lib/server/writeAuditEvent.ts',
 ];
 for(const file of runtimeAuthFiles){
@@ -36,6 +46,13 @@ const requireSource=read('lib/server/requireSuperUser.ts');
 if(!requireSource.includes('auth_user_id=eq.')||!requireSource.includes('Bearer ${token}'))failures.push('Super User authorization must remain bound to auth_user_id and the caller JWT.');
 const sessionSource=read('app/api/superuser-auth/session/route.ts');
 if(!sessionSource.includes('auth_user_id=eq.')||sessionSource.includes('email=ilike.'))failures.push('Super User session gate must authorize immutable auth_user_id, not email lookup.');
+
+const authorityMigration='supabase/migrations/20260909070000_fix_superuser_operator_authority.sql';
+const authoritySource=read(authorityMigration);
+for(const marker of['platform_superuser_operators','pso.auth_user_id = auth.uid()','pso.active = true','security definer'])if(!authoritySource.toLowerCase().includes(marker.toLowerCase()))failures.push(`${authorityMigration}: immutable operator authority contract missing ${marker}.`);
+const grantsMigration='supabase/migrations/20260909070500_grant_authenticated_superuser_runtime_tables.sql';
+const grantsSource=read(grantsMigration);
+for(const marker of['platform_superuser_operators to authenticated','hub_navigation to authenticated','client_onboarding_cases to authenticated','platform_release_candidates to authenticated','platform_preferences to authenticated'])if(!grantsSource.includes(marker))failures.push(`${grantsMigration}: authenticated Super User runtime grant missing ${marker}.`);
 
 if(failures.length){console.error('\nLS1Sports authentication locks FAILED:\n');failures.forEach((f,i)=>console.error(`${i+1}. ${f}`));process.exit(1)}
 console.log('LS1Sports authentication locks passed.');
