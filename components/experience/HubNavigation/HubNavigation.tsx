@@ -18,9 +18,6 @@ const FALLBACKS: Record<string, NavigationSection[]> = {
       label: 'COMMAND',
       items: [
         { id: 'command-center', label: 'Command Center', href: '/superuser' },
-        { id: 'project-map', label: 'Project Map', href: '/superuser?view=project-map' },
-        { id: 'milestones', label: 'Milestones', href: '/superuser?view=milestones' },
-        { id: 'metrics', label: 'Live Core Metrics', href: '/superuser?view=metrics' },
         { id: 'deployments', label: 'Release Certification', href: '/superuser?view=deployments' },
       ],
     },
