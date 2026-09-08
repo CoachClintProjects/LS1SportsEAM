@@ -19,6 +19,8 @@ const runtimeAuthFiles=[
   'app/api/superuser-release/route.ts',
   'app/api/superuser-team-engine-options/route.ts',
   'app/api/superuser-team-engine-action/route.ts',
+  'app/api/superuser-module/route.ts',
+  'app/api/superuser-records/route.ts',
   'lib/server/writeAuditEvent.ts',
 ];
 for(const file of runtimeAuthFiles){
@@ -27,6 +29,9 @@ for(const file of runtimeAuthFiles){
   if(source.includes('SUPABASE_SERVICE_ROLE_KEY'))failures.push(`${file}: active Super User runtime must not depend on a service-role secret.`);
   if(!source.includes('Bearer ${actor.accessToken}')&&file!=='lib/server/requireSuperUser.ts'&&file!=='app/api/superuser-auth/session/route.ts')failures.push(`${file}: authenticated RLS token propagation is missing.`);
 }
+const navSource=read('app/api/hub-navigation/route.ts');
+if(!navSource.includes("hubId === 'superuser' ? await requireSuperUser(request) : null"))failures.push('Super User navigation must require the authenticated Super User identity.');
+if(!navSource.includes('actor?.accessToken'))failures.push('Super User navigation must propagate the caller JWT through RLS.');
 const requireSource=read('lib/server/requireSuperUser.ts');
 if(!requireSource.includes('auth_user_id=eq.')||!requireSource.includes('Bearer ${token}'))failures.push('Super User authorization must remain bound to auth_user_id and the caller JWT.');
 const sessionSource=read('app/api/superuser-auth/session/route.ts');
