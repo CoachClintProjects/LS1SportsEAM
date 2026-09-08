@@ -1,25 +1,5 @@
 'use client';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-let supabase: SupabaseClient | null = null;
-
-function getSupabaseClient() {
-  if (supabase) return supabase;
-  if (typeof window === 'undefined') {
-    throw new Error('Hub navigation Supabase access is only available in the browser.');
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    throw new Error('Supabase browser configuration is missing.');
-  }
-
-  supabase = createClient(url, key);
-  return supabase;
-}
-
 export type NavigationItem = {
   id: string;
   label: string;
@@ -58,6 +38,14 @@ type DbNavRow = {
   sort_order: number | null;
   parent_id: string | null;
   is_active?: boolean | null;
+};
+
+type NavigationPayload = {
+  hubId: string;
+  rows: DbNavRow[];
+  generatedAt: string;
+  source: string;
+  error?: string;
 };
 
 const ATHLETE_NAV_BY_AGE: Record<string, string[]> = {
@@ -101,8 +89,8 @@ function buildSections(rows: DbNavRow[], hubId: string): NavigationSection[] {
   }
 
   const sections: NavigationSection[] = [];
-  const parents = roots.filter((item) => item.children?.length);
-  const standalone = roots.filter((item) => !item.children?.length);
+  const parents = roots.filter(item => item.children?.length);
+  const standalone = roots.filter(item => !item.children?.length);
 
   for (const parent of parents) {
     sections.push({
@@ -120,63 +108,35 @@ function buildSections(rows: DbNavRow[], hubId: string): NavigationSection[] {
     });
   }
 
-  return sections.filter((section) => section.items.length > 0);
+  return sections.filter(section => section.items.length > 0);
 }
 
 export async function getNavigation(
   hubId: string,
   switcherValue = '',
 ): Promise<NavigationSection[]> {
-  if (!hubId) return [];
+  if (!hubId || typeof window === 'undefined') return [];
 
   try {
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from('hub_navigation')
-      .select('nav_id,label,path,icon,description,sort_order,parent_id,is_active')
-      .eq('hub_id', hubId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+    const query = new URLSearchParams({ hub: hubId });
+    if (switcherValue) query.set('switcher', switcherValue);
 
-    if (error || !data?.length) return [];
-
-    let rows = data as DbNavRow[];
-
-    if (hubId === 'admin' && switcherValue) {
-      const { data: role } = await client
-        .from('admin_roles')
-        .select('role_id')
-        .eq('role_name', switcherValue)
-        .maybeSingle();
-
-      if (role?.role_id) {
-        const { data: permissions } = await client
-          .from('hub_role_navigation')
-          .select('nav_id')
-          .eq('role_id', role.role_id)
-          .eq('can_view', true);
-
-        const allowed = new Set((permissions || []).map((item: { nav_id: string }) => item.nav_id));
-        const childParents = new Set(
-          rows
-            .filter((row) => row.parent_id && allowed.has(row.nav_id))
-            .map((row) => row.parent_id as string),
-        );
-
-        rows = rows.filter(
-          (row) =>
-            allowed.has(row.nav_id) ||
-            childParents.has(row.nav_id) ||
-            row.label === 'Command Center',
-        );
-      }
+    const response = await fetch(`/api/hub-navigation?${query.toString()}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    const payload = (await response.json().catch(() => null)) as NavigationPayload | null;
+    if (!response.ok || !payload?.rows?.length) {
+      throw new Error(payload?.error || `Navigation API returned ${response.status}`);
     }
+
+    let rows = payload.rows;
 
     if (hubId === 'athlete') {
       const allowedLabels = new Set(
         ATHLETE_NAV_BY_AGE[switcherValue] || ATHLETE_NAV_BY_AGE['5-8'],
       );
-      rows = rows.filter((row) => allowedLabels.has(row.label));
+      rows = rows.filter(row => allowedLabels.has(row.label));
     }
 
     return buildSections(rows, hubId);
