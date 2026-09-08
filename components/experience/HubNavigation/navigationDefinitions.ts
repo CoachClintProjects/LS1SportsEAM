@@ -1,5 +1,7 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
+
 export type NavigationItem = {
   id: string;
   label: string;
@@ -121,10 +123,11 @@ export async function getNavigation(
     const query = new URLSearchParams({ hub: hubId });
     if (switcherValue) query.set('switcher', switcherValue);
 
-    const response = await fetch(`/api/hub-navigation?${query.toString()}`, {
-      cache: 'no-store',
-      credentials: 'same-origin',
-    });
+    const request = `/api/hub-navigation?${query.toString()}`;
+    const response = hubId === 'superuser'
+      ? await authenticatedFetch(request, { cache: 'no-store', credentials: 'same-origin' })
+      : await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
+
     const payload = (await response.json().catch(() => null)) as NavigationPayload | null;
     if (!response.ok || !payload?.rows?.length) {
       throw new Error(payload?.error || `Navigation API returned ${response.status}`);
