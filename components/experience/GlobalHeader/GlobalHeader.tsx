@@ -206,7 +206,7 @@ export function GlobalHeader() {
             )}
           </div>
 
-          <button type="button" aria-label="Profile" title="Profile" onClick={() => goSuperUser('identity')} className="ml-2 flex h-10 items-center gap-2 rounded-lg border border-transparent px-2 transition-colors duration-150 hover:border-neutral-800 hover:bg-neutral-900">
+          <button type="button" aria-label="Profile" title="Profile" onClick={() => activeHubId === 'superuser' && router.push('/superuser/profile')} className="ml-2 flex h-10 items-center gap-2 rounded-lg border border-transparent px-2 transition-colors duration-150 hover:border-neutral-800 hover:bg-neutral-900">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#FA4616]/50 bg-[#171a1a]"><UserCircle className="h-[18px] w-[18px] text-neutral-300" strokeWidth={1.8} /></span>
             <span className="hidden text-xs font-semibold text-neutral-300 2xl:block">Profile</span>
           </button>
