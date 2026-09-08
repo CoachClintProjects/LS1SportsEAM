@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { Suspense } from 'react';
 import '@/app/globals.css';
 
 import { GlobalShell } from '@/components/experience/GlobalShell/GlobalShell';
@@ -26,6 +26,10 @@ export const metadata = {
   description: 'LS1Sports Sports ERP Intelligence',
 };
 
+function NavigationFallback() {
+  return <div className="h-full w-full bg-[#080909]" aria-hidden="true" />;
+}
+
 // =====================================================
 // SECTION: ROOT LAYOUT
 // =====================================================
@@ -49,7 +53,11 @@ export default function RootLayout({
 
           <GlobalShell
             header={<GlobalHeader />}
-            navigation={<HubSidebar />}
+            navigation={
+              <Suspense fallback={<NavigationFallback />}>
+                <HubSidebar />
+              </Suspense>
+            }
           >
             {/* =============================================
                 SECTION: PRIMARY WORKSPACE
