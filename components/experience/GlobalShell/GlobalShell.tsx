@@ -11,9 +11,14 @@ interface GlobalShellProps {
 
 export function GlobalShell({ children, header, navigation }: GlobalShellProps) {
   const pathname = usePathname();
+  const isPublicSurface = pathname === '/' || pathname === '/login';
 
-  if (pathname === '/') {
-    return <div className="h-screen w-screen overflow-y-auto overflow-x-hidden bg-[#070A09]">{children}</div>;
+  if (isPublicSurface) {
+    return (
+      <div className="h-screen w-screen overflow-y-auto overflow-x-hidden bg-[#070A09]">
+        {children}
+      </div>
+    );
   }
 
   return (
