@@ -9,6 +9,7 @@ import SuperUserApiBoundary from '@/components/hubs/superuser/SuperUserApiBounda
 import SuperUserDomainActions from '@/components/hubs/superuser/SuperUserDomainActions';
 import SuperUserSecurityActions from '@/components/hubs/superuser/SuperUserSecurityActions';
 import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanceActions';
+import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
 
 const COMMAND_VIEWS = new Set(['command-center', 'project-map', 'milestones', 'metrics']);
 
@@ -38,6 +39,7 @@ function SuperUserRouter() {
             <SuperUserDomainActions view={view} />
             <SuperUserSecurityActions view={view} />
             <SuperUserFinanceActions view={view} />
+            <SuperUserEnterpriseActions view={view} />
           </>
         )}
       </div>
