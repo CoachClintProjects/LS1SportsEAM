@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperUser, SuperUserAuthError, SuperUserIdentity } from '@/lib/server/requireSuperUser';
+import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { writeAuditEvent } from '@/lib/server/writeAuditEvent';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -23,27 +24,6 @@ async function rest(path: string, init: RequestInit = {}) {
   const text = await response.text();
   if (!response.ok) throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0, 500)}`);
   return text ? JSON.parse(text) : null;
-}
-
-async function audit(action: string, entity: string, id: string | null, details: Record<string, unknown>, actor: SuperUserIdentity) {
-  try {
-    await rest('audit_events', {
-      method: 'POST',
-      body: JSON.stringify({
-        action,
-        entity_type: entity,
-        entity_id: id,
-        actor_person_id: null,
-        details: {
-          ...details,
-          superuser_operator_id: actor.operatorId,
-          superuser_email: actor.email,
-        },
-      }),
-    });
-  } catch {
-    // Audit-table differences must not silently convert an otherwise valid mutation into a duplicate write.
-  }
 }
 
 function authError(error: unknown) {
@@ -110,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'update-task') {
       if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
+      const before = await rest(`platform_project_tasks?id=eq.${encodeURIComponent(body.id)}&select=*&limit=1`);
       const row = await rest(`platform_project_tasks?id=eq.${encodeURIComponent(body.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -119,12 +100,20 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         }),
       });
-      await audit('SUPERUSER_TASK_UPDATED', 'platform_project_tasks', body.id, body, actor);
+      await writeAuditEvent(actor, {
+        action: 'SUPERUSER_TASK_UPDATED',
+        entityType: 'platform_project_tasks',
+        entityId: body.id,
+        beforeData: before?.[0] || null,
+        afterData: row?.[0] || body,
+        reason: 'Super User project-control update',
+      });
       return NextResponse.json(row?.[0] || null);
     }
 
     if (action === 'update-unit') {
       if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
+      const before = await rest(`platform_milestone_units?id=eq.${encodeURIComponent(body.id)}&select=*&limit=1`);
       const row = await rest(`platform_milestone_units?id=eq.${encodeURIComponent(body.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -138,7 +127,14 @@ export async function POST(request: NextRequest) {
           verified_at: body.verified ? new Date().toISOString() : null,
         }),
       });
-      await audit('SUPERUSER_UNIT_UPDATED', 'platform_milestone_units', body.id, body, actor);
+      await writeAuditEvent(actor, {
+        action: 'SUPERUSER_UNIT_UPDATED',
+        entityType: 'platform_milestone_units',
+        entityId: body.id,
+        beforeData: before?.[0] || null,
+        afterData: row?.[0] || body,
+        reason: 'Super User implementation-evidence update',
+      });
       return NextResponse.json(row?.[0] || null);
     }
 
@@ -158,7 +154,14 @@ export async function POST(request: NextRequest) {
           status: 'OPEN',
         }),
       });
-      await audit('SUPPORT_TICKET_CREATED', 'support_tickets', row?.[0]?.id || null, body, actor);
+      await writeAuditEvent(actor, {
+        action: 'SUPPORT_TICKET_CREATED',
+        entityType: 'support_tickets',
+        entityId: row?.[0]?.id || null,
+        tenantId: tenant,
+        afterData: row?.[0] || body,
+        reason: 'Super User support ticket creation',
+      });
       return NextResponse.json(row?.[0] || null);
     }
 
@@ -177,19 +180,41 @@ export async function POST(request: NextRequest) {
           notes: { created_from: 'superuser', operator_id: actor.operatorId },
         }),
       });
-      await audit('CLIENT_ONBOARDING_CREATED', 'client_onboarding_cases', row?.[0]?.id || null, body, actor);
+      await writeAuditEvent(actor, {
+        action: 'CLIENT_ONBOARDING_CREATED',
+        entityType: 'client_onboarding_cases',
+        entityId: row?.[0]?.id || null,
+        tenantId: tenant,
+        afterData: row?.[0] || body,
+        reason: 'Super User client onboarding creation',
+      });
       return NextResponse.json(row?.[0] || null);
     }
 
     if (action === 'register-result-import') {
       if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
       const tenant = (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
-      const systems = await rest('competition_source_systems?select=id,name&limit=100');
-      const source = systems?.find((item: { name?: string }) => String(item.name).toLowerCase() === String(body.source_system || '').toLowerCase())?.id || null;
+      const systems = await rest('competition_source_systems?select=id,name,code&limit=100');
+      const source = systems?.find((item: { name?: string; code?: string }) => {
+        const needle = String(body.source_system || '').toLowerCase();
+        return String(item.name || '').toLowerCase() === needle || String(item.code || '').toLowerCase() === needle;
+      })?.id || null;
       const job = await rest('import_jobs', {
         method: 'POST',
-        body: JSON.stringify({ tenant_id: tenant, source_type: 'COMPETITION_RESULTS', status: 'RECEIVED' }),
-      }).catch(() => null);
+        body: JSON.stringify({
+          tenant_id: tenant,
+          source_system: body.source_system || null,
+          source_file: body.original_filename || null,
+          entity_type: 'COMPETITION_RESULTS',
+          started_at: new Date().toISOString(),
+          status: 'RECEIVED',
+          records_read: 0,
+          records_valid: 0,
+          records_rejected: 0,
+          records_created: 0,
+          records_updated: 0,
+        }),
+      });
       const row = await rest('competition_import_files', {
         method: 'POST',
         body: JSON.stringify({
@@ -199,11 +224,18 @@ export async function POST(request: NextRequest) {
           original_filename: body.original_filename,
           detected_format: body.detected_format || null,
           file_size_bytes: body.file_size_bytes || null,
-          parse_status: 'QUEUED',
+          parse_status: 'queued',
           parse_summary: { registered_by: actor.email, note: body.note || null },
         }),
       });
-      await audit('COMPETITION_IMPORT_REGISTERED', 'competition_import_files', row?.[0]?.id || null, body, actor);
+      await writeAuditEvent(actor, {
+        action: 'COMPETITION_IMPORT_REGISTERED',
+        entityType: 'competition_import_files',
+        entityId: row?.[0]?.id || null,
+        tenantId: tenant,
+        afterData: row?.[0] || body,
+        reason: 'Super User competition source registration',
+      });
       return NextResponse.json(row?.[0] || null);
     }
 
