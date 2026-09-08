@@ -27,8 +27,8 @@ jobs:
           node-version: '20.19.0'
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (mirror Vercel)
+        run: npm install
 
       - name: Regression locks
         run: npm run verify:locks
