@@ -22,6 +22,7 @@ const supabase = createClient(
 );
 
 type SearchResult = { id: string; type: string; title: string; subtitle: string; href: string };
+type HubAccess = Record<string, { allowed: boolean; units: number; reason: string }>;
 
 function getHubRoute(hubId: HubType): string {
   switch (hubId) {
@@ -49,6 +50,8 @@ export function GlobalHeader() {
   const pathname = usePathname();
   const { activeHubId, currentHub, setActiveHub } = useHub();
   const [hubMenuOpen, setHubMenuOpen] = useState(false);
+  const [hubAccess, setHubAccess] = useState<HubAccess>({});
+  const [hubAccessLoading, setHubAccessLoading] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -71,6 +74,24 @@ export function GlobalHeader() {
     setHubMenuOpen(false);
     setSearchOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (activeHubId !== 'superuser') return;
+    let active = true;
+    setHubAccessLoading(true);
+    void authenticatedFetch('/api/superuser-hub-access', { cache: 'no-store' })
+      .then(async response => {
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(json.error || 'Unable to load hub release access.');
+        if (active) setHubAccess(json.hubs || {});
+      })
+      .catch(error => {
+        console.error('[GlobalHeader] hub access failed', error);
+        if (active) setHubAccess({});
+      })
+      .finally(() => active && setHubAccessLoading(false));
+    return () => { active = false; };
+  }, [activeHubId]);
 
   useEffect(() => {
     if (activeHubId !== 'superuser' || searchQuery.trim().length < 2) {
@@ -102,6 +123,7 @@ export function GlobalHeader() {
   }, [activeHubId, searchQuery]);
 
   function handleHubSwitch(hubId: HubType) {
+    if (activeHubId === 'superuser' && hubId !== 'superuser' && !hubAccess[hubId]?.allowed) return;
     setActiveHub(hubId);
     setHubMenuOpen(false);
     router.push(getHubRoute(hubId));
@@ -159,18 +181,11 @@ export function GlobalHeader() {
             {activeHubId === 'superuser' && searchOpen && searchQuery.trim().length >= 2 && (
               <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[120] max-h-[480px] overflow-y-auto rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.6)]">
                 {searchResults.length ? searchResults.map(result => (
-                  <button
-                    key={`${result.type}-${result.id}`}
-                    type="button"
-                    onClick={() => { setSearchOpen(false); setSearchQuery(''); router.push(result.href); }}
-                    className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-neutral-900"
-                  >
+                  <button key={`${result.type}-${result.id}`} type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); router.push(result.href); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-neutral-900">
                     <span className="mt-0.5 rounded border border-neutral-800 bg-[#111313] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#FA4616]">{result.type}</span>
                     <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-white">{result.title}</span><span className="mt-1 block truncate text-[10px] text-neutral-500">{result.subtitle}</span></span>
                   </button>
-                )) : (
-                  <div className="px-4 py-6 text-center text-xs text-neutral-500">{searching ? 'Searching live LS1Sports data…' : 'No matching records.'}</div>
-                )}
+                )) : <div className="px-4 py-6 text-center text-xs text-neutral-500">{searching ? 'Searching live LS1Sports data…' : 'No matching records.'}</div>}
               </div>
             )}
           </div>
@@ -192,16 +207,18 @@ export function GlobalHeader() {
             </button>
 
             {hubMenuOpen && (
-              <div role="menu" className="absolute right-0 top-[calc(100%+10px)] z-[100] w-[280px] overflow-hidden rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
+              <div role="menu" className="absolute right-0 top-[calc(100%+10px)] z-[100] w-[300px] overflow-hidden rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
                 <div className="border-b border-neutral-800 px-3 pb-3 pt-2"><div className="text-[9px] font-bold uppercase tracking-[0.2em] text-neutral-600">Switch Workspace</div><div className="mt-1 text-[12px] font-semibold text-neutral-300">Current: {currentHub.name}</div></div>
                 <div className="pt-1">
                   {hubs.map(hub => {
                     const active = hub.id === activeHubId;
+                    const release = hubAccess[hub.id];
+                    const locked = activeHubId === 'superuser' && hub.id !== 'superuser' && !release?.allowed;
                     return (
-                      <button key={hub.id} type="button" role="menuitem" onClick={() => handleHubSwitch(hub.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${active ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                      <button key={hub.id} type="button" role="menuitem" disabled={locked || hubAccessLoading} title={locked ? release?.reason || 'Hub release is not certified.' : undefined} onClick={() => handleHubSwitch(hub.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${active ? 'bg-[#FA4616]/10 text-white' : locked ? 'cursor-not-allowed text-neutral-700' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
                         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border font-mono text-[9px] font-bold ${active ? 'border-[#FA4616]/50 bg-[#FA4616]/10 text-[#FA4616]' : 'border-neutral-800 bg-[#111313] text-neutral-600'}`}>{hub.codeLane.replace('LANE ', '')}</span>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{hub.name}</span><span className="mt-0.5 block truncate text-[10px] text-neutral-600">{hub.description}</span></span>
-                        {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" />}
+                        <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{hub.name}</span><span className="mt-0.5 block truncate text-[10px] text-neutral-600">{locked ? release?.reason || 'Release certification required' : hub.description}</span></span>
+                        {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" /> : locked ? <span className="text-[8px] font-black uppercase tracking-[.12em] text-neutral-700">LOCKED</span> : null}
                       </button>
                     );
                   })}
