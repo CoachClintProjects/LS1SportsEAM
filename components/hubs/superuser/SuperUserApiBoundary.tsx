@@ -13,7 +13,11 @@ function isProtectedApi(input: RequestInfo | URL) {
   const url = new URL(raw, window.location.origin);
   return (
     url.origin === window.location.origin &&
-    (url.pathname.startsWith('/api/superuser-') || url.pathname === '/api/competition-import')
+    (
+      url.pathname.startsWith('/api/superuser-') ||
+      url.pathname.startsWith('/api/superuser/') ||
+      url.pathname === '/api/competition-import'
+    )
   );
 }
 
