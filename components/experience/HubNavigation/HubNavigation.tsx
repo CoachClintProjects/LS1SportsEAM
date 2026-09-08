@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useHub } from '@/components/hubs/HubContext';
 import {
   getNavigation,
@@ -62,26 +62,31 @@ function getQueryKey(hubId: string) {
   return 'switcher';
 }
 
-function currentLocation() {
-  if (typeof window === 'undefined') return '';
-  return `${window.location.pathname}${window.location.search}`;
-}
-
-function isItemActive(href: string | undefined, pathname: string) {
+function isItemActive(href: string | undefined, pathname: string, search: string) {
   if (!href) return false;
-  if (typeof window === 'undefined') return pathname === href;
 
-  const target = new URL(href, window.location.origin);
-  if (target.pathname !== window.location.pathname) return false;
+  const origin = typeof window === 'undefined' ? 'https://ls1sports.local' : window.location.origin;
+  const target = new URL(href, origin);
+  if (target.pathname !== pathname) return false;
 
+  const current = new URLSearchParams(search);
   const targetView = target.searchParams.get('view');
-  if (targetView) return new URLSearchParams(window.location.search).get('view') === targetView;
+  if (targetView) return current.get('view') === targetView;
 
-  return target.search === '' || target.search === window.location.search;
+  if (target.search) {
+    for (const [key, value] of target.searchParams.entries()) {
+      if (current.get(key) !== value) return false;
+    }
+    return true;
+  }
+
+  return !current.get('view');
 }
 
 export function HubNavigation() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const router = useRouter();
   const { activeHubId, currentHub } = useHub();
 
@@ -105,10 +110,7 @@ export function HubNavigation() {
       setSwitcherConfig(config);
 
       const queryKey = getQueryKey(activeHubId);
-      const urlValue =
-        typeof window !== 'undefined'
-          ? new URLSearchParams(window.location.search).get(queryKey)
-          : null;
+      const urlValue = searchParams.get(queryKey);
       const nextValue =
         urlValue && config.options.some((option) => option.id === urlValue)
           ? urlValue
@@ -122,7 +124,7 @@ export function HubNavigation() {
     return () => {
       cancelled = true;
     };
-  }, [activeHubId, fallback]);
+  }, [activeHubId, fallback, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,17 +155,14 @@ export function HubNavigation() {
     if (typeof window === 'undefined') return;
 
     const queryKey = getQueryKey(activeHubId);
-    const query = new URLSearchParams(window.location.search);
+    const query = new URLSearchParams(search);
     query.set(queryKey, value);
 
-    if (activeHubId === 'athlete') {
-      query.delete('switcher');
-    }
-    if (activeHubId === 'admin') {
+    if (activeHubId === 'athlete' || activeHubId === 'admin') {
       query.delete('switcher');
     }
 
-    const href = `${window.location.pathname}?${query.toString()}`;
+    const href = `${pathname}?${query.toString()}`;
     window.dispatchEvent(
       new CustomEvent('ls1sports:switcher', {
         detail: { hubId: activeHubId, value },
@@ -175,15 +174,16 @@ export function HubNavigation() {
   const activeItem = useMemo(() => {
     for (const section of sections) {
       for (const item of section.items) {
-        if (isItemActive(item.href, pathname)) return item.id;
+        if (isItemActive(item.href, pathname, search)) return item.id;
       }
     }
     return '';
-  }, [pathname, sections, switcherValue]);
+  }, [pathname, search, sections]);
 
   function hrefFor(itemHref?: string) {
-    if (!itemHref || typeof window === 'undefined') return itemHref || '#';
-    const target = new URL(itemHref, window.location.origin);
+    if (!itemHref) return '#';
+    const origin = typeof window === 'undefined' ? 'https://ls1sports.local' : window.location.origin;
+    const target = new URL(itemHref, origin);
 
     if (activeHubId === 'athlete' && switcherValue) {
       target.searchParams.set('age', switcherValue);
@@ -264,6 +264,7 @@ export function HubNavigation() {
                   <Link
                     key={item.id}
                     href={href}
+                    scroll={false}
                     onClick={() =>
                       window.dispatchEvent(
                         new CustomEvent('ls1sports:navigation', {
