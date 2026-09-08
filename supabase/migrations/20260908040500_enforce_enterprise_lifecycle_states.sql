@@ -1,0 +1,16 @@
+alter table public.assets add constraint assets_status_lifecycle_chk check (status is null or lower(status) in ('active','inactive','maintenance','out_of_service','retired','disposed'));
+alter table public.maintenance_work_orders add constraint maintenance_work_orders_status_lifecycle_chk check (status is null or lower(status) in ('open','planned','approved','in_progress','on_hold','completed','cancelled'));
+alter table public.purchase_requests add constraint purchase_requests_status_lifecycle_chk check (status is null or lower(status) in ('draft','submitted','approved','authorized','rejected','ordered','cancelled'));
+alter table public.purchase_orders add constraint purchase_orders_status_lifecycle_chk check (status is null or lower(status) in ('draft','issued','partially_received','received','closed','cancelled'));
+alter table public.payroll_runs add constraint payroll_runs_status_lifecycle_chk check (status is null or lower(status) in ('draft','review','approved','posted','paid','void'));
+alter table public.workflow_definitions add constraint workflow_definitions_status_lifecycle_chk check (status is null or lower(status) in ('draft','active','inactive','retired'));
+alter table public.workflow_instances add constraint workflow_instances_status_lifecycle_chk check (status is null or lower(status) in ('pending','running','paused','completed','failed','cancelled'));
+alter table public.workflow_tasks add constraint workflow_tasks_status_lifecycle_chk check (status is null or lower(status) in ('pending','assigned','in_progress','completed','skipped','cancelled'));
+alter table public.budgets add constraint budgets_status_lifecycle_chk check (status is null or lower(status) in ('draft','submitted','approved','locked','closed','cancelled'));
+alter table public.expenses add constraint expenses_status_lifecycle_chk check (status is null or lower(status) in ('draft','submitted','approved','rejected','paid','cancelled'));
+alter table public.bank_transactions add constraint bank_transactions_reconciliation_lifecycle_chk check (reconciliation_status is null or lower(reconciliation_status) in ('unmatched','matched','reconciled','exception','ignored'));
+alter table public.ai_agents add constraint ai_agents_status_lifecycle_chk check (status is null or lower(status) in ('draft','active','suspended','inactive','retired'));
+alter table public.competition_results add constraint competition_results_status_lifecycle_chk check (status is null or lower(status) in ('provisional','official','disqualified','scratched','void'));
+alter table public.competition_reconciliations add constraint competition_reconciliations_status_lifecycle_chk check (status is null or lower(status) in ('pending','in_progress','approved','rejected','failed'));
+alter table public.client_onboarding_cases add constraint client_onboarding_cases_status_lifecycle_chk check (status is null or upper(status) in ('DISCOVERY','CLIENT','ORGANIZATION','SPORTS','PRIMARY_ADMIN','SECURITY','CONFIGURATION','DATA_SOURCES','IMPORT','VALIDATION','CLIENT_REVIEW','ACTIVATION','HANDOFF','IN_PROGRESS','ACTIVE','ON_HOLD','COMPLETED','CANCELLED'));
+alter table public.support_tickets add constraint support_tickets_status_lifecycle_chk check (status is null or lower(status) in ('open','in_progress','blocked','resolved','closed','cancelled'));
