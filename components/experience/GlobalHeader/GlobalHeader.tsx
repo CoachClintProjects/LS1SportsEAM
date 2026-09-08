@@ -111,6 +111,10 @@ export function GlobalHeader() {
     if (activeHubId === 'superuser') router.push(`/superuser?view=${encodeURIComponent(view)}`);
   }
 
+  function goSuperUserRoute(path: string) {
+    if (activeHubId === 'superuser') router.push(path);
+  }
+
   async function handleBrandExit() {
     if (exiting) return;
     setExiting(true);
@@ -174,8 +178,8 @@ export function GlobalHeader() {
 
         <div className="flex shrink-0 items-center justify-end">
           <HeaderIconButton label="Notifications" onClick={() => goSuperUser('alerts')}><Bell className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
-          <HeaderIconButton label="What's New" onClick={() => goSuperUser('product')}><Sparkles className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
-          <HeaderIconButton label="Upload" onClick={() => goSuperUser('imports')}><Upload className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
+          <HeaderIconButton label="What's New" onClick={() => goSuperUserRoute('/superuser/whats-new')}><Sparkles className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
+          <HeaderIconButton label="Upload" onClick={() => goSuperUserRoute('/superuser/upload')}><Upload className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
           <HeaderIconButton label="Help" onClick={() => goSuperUser('knowledge')}><CircleHelp className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
 
           <div className="mx-2 h-8 w-px bg-neutral-800" />
@@ -206,7 +210,7 @@ export function GlobalHeader() {
             )}
           </div>
 
-          <button type="button" aria-label="Profile" title="Profile" onClick={() => activeHubId === 'superuser' && router.push('/superuser/profile')} className="ml-2 flex h-10 items-center gap-2 rounded-lg border border-transparent px-2 transition-colors duration-150 hover:border-neutral-800 hover:bg-neutral-900">
+          <button type="button" aria-label="Profile" title="Profile" onClick={() => goSuperUserRoute('/superuser/profile')} className="ml-2 flex h-10 items-center gap-2 rounded-lg border border-transparent px-2 transition-colors duration-150 hover:border-neutral-800 hover:bg-neutral-900">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#FA4616]/50 bg-[#171a1a]"><UserCircle className="h-[18px] w-[18px] text-neutral-300" strokeWidth={1.8} /></span>
             <span className="hidden text-xs font-semibold text-neutral-300 2xl:block">Profile</span>
           </button>
