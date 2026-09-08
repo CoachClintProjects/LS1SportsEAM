@@ -10,8 +10,6 @@ import SuperUserDomainActions from '@/components/hubs/superuser/SuperUserDomainA
 import SuperUserSecurityActions from '@/components/hubs/superuser/SuperUserSecurityActions';
 import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanceActions';
 import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
-import SuperUserCompetitionActions from '@/components/hubs/superuser/SuperUserCompetitionActions';
-import SuperUserCompetitionOperations from '@/components/hubs/superuser/SuperUserCompetitionOperations';
 import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
 import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOperationsActions';
@@ -25,7 +23,7 @@ function LoadingWorkspace() {
     <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6 lg:p-7">
       <div className="text-[9px] font-black uppercase tracking-[.25em] text-emerald-400">SUPERUSER</div>
       <h1 className="mt-2 text-3xl font-black text-white">Loading workspace</h1>
-      <p className="mt-2 text-xs text-neutral-500">Preparing the LS1Sports operating control surface…</p>
+      <p className="mt-2 text-xs text-neutral-500">Preparing the LS1Sports Team Manager operating control surface…</p>
     </section>
   );
 }
@@ -54,8 +52,6 @@ function SuperUserRouter() {
             <SuperUserSecurityActions view={view} />
             <SuperUserFinanceActions view={view} />
             <SuperUserEnterpriseActions view={view} />
-            <SuperUserCompetitionActions view={view} />
-            <SuperUserCompetitionOperations view={view} />
             <SuperUserSupportActions view={view} />
             <SuperUserOperationsActions view={view} />
           </>
