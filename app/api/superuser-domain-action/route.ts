@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { superUserRest } from '@/lib/server/superUserRest';
 import { writeAuditEvent } from '@/lib/server/writeAuditEvent';
-
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-function headers(prefer = 'return=representation') {
-  if (!KEY) throw new Error('Supabase service credentials are not configured.');
-  return { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', Prefer: prefer };
-}
-
-async function rest(path: string, init: RequestInit = {}) {
-  if (!URL || !KEY) throw new Error('Supabase service credentials are not configured.');
-  const response = await fetch(`${URL}/rest/v1/${path}`, { ...init, headers: { ...headers(), ...(init.headers || {}) }, cache: 'no-store' });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0, 500)}`);
-  return text ? JSON.parse(text) : null;
-}
 
 function text(value: unknown, label: string, max = 160) {
   const result = String(value || '').trim();
@@ -56,18 +41,13 @@ function rejectSecrets(value: Record<string, unknown>) {
   if (scan(value)) throw new Error('Secrets and credentials cannot be stored in generic integration configuration. Use the approved secret-management path.');
 }
 
-async function defaultTenantId() {
-  return (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
-}
-
-async function row(table: string, id: string) {
-  return (await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0] || null;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const actor = await requireSuperUser(request);
     if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
+    const rest = (path: string, init: RequestInit = {}) => superUserRest<any>(actor, path, init);
+    const defaultTenantId = async () => (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
+    const row = async (table: string, id: string) => (await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0] || null;
     const body = await request.json();
     const action = String(body.action || '');
     const tenantId = await defaultTenantId();
