@@ -18,7 +18,8 @@ function safeNext(value: string | null) {
 export function LoginGate() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = useMemo(() => safeNext(searchParams.get('next')), [searchParams]);
+  const requestedNext = searchParams.get('next');
+  const next = useMemo(() => safeNext(requestedNext), [requestedNext]);
   const [mode, setMode] = useState<'login' | 'demo'>('login');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -33,14 +34,31 @@ export function LoginGate() {
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError || !data.session?.access_token) {
       setError('Unable to sign in with those credentials.');
       setBusy(false);
       return;
     }
 
-    router.replace(next);
+    let destination = next;
+    const superUserResponse = await fetch('/api/superuser-auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: data.session.access_token }),
+    });
+
+    if (superUserResponse.ok) {
+      if (!requestedNext) destination = '/superuser';
+    } else if (next.startsWith('/superuser')) {
+      const result = await superUserResponse.json().catch(() => ({}));
+      await supabase.auth.signOut({ scope: 'local' });
+      setError(result.error || 'This account is not authorized for Super User access.');
+      setBusy(false);
+      return;
+    }
+
+    router.replace(destination);
     router.refresh();
   }
 
