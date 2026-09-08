@@ -2,49 +2,598 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
 import { writeAuditEvent } from '@/lib/server/writeAuditEvent';
 
-const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;const KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-export const dynamic='force-dynamic';export const revalidate=0;
-type Row=Record<string,unknown>;
-function headers(){if(!KEY)throw new Error('Supabase service credentials are not configured.');return{apikey:KEY,Authorization:`Bearer ${KEY}`,'Content-Type':'application/json',Prefer:'return=representation'}}
-async function rest(path:string,init:RequestInit={}){if(!URL||!KEY)throw new Error('Supabase service credentials are not configured.');const response=await fetch(`${URL}/rest/v1/${path}`,{...init,headers:{...headers(),...(init.headers||{})},cache:'no-store'});const text=await response.text();if(!response.ok)throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0,500)}`);return text?JSON.parse(text):null}
-function req(value:unknown,label:string,max=200){const s=String(value||'').trim();if(!s)throw new Error(`${label} is required.`);if(s.length>max)throw new Error(`${label} is too long.`);return s}
-function opt(value:unknown,max=1000){const s=String(value||'').trim();if(!s)return null;if(s.length>max)throw new Error('Value is too long.');return s}
-function num(value:unknown,label:string){const n=Number(value);if(!Number.isFinite(n))throw new Error(`${label} must be numeric.`);return n}
-function json(value:unknown,label:string,fallback:unknown={}){if(value===undefined||value===null||value==='')return fallback;if(typeof value==='object')return value;try{return JSON.parse(String(value))}catch{throw new Error(`${label} must be valid JSON.`)}}
-async function one(table:string,id:string){return(await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0]||null}
-async function tenant(){return(await rest('tenants?select=id&limit=1'))?.[0]?.id||null}
-async function audit(actor:Awaited<ReturnType<typeof requireSuperUser>>,tenantId:string|null,action:string,table:string,id:string|null,before:unknown,after:unknown,reason:string){await writeAuditEvent(actor,{action,entityType:table,entityId:id,tenantId,beforeData:before??null,afterData:after??null,reason})}
-async function competitionForResult(result:Row){if(!result.competition_entry_id)return null;const entry=await one('competition_entries',String(result.competition_entry_id));if(!entry?.competition_event_id)return null;const event=await one('competition_events',String(entry.competition_event_id));return event?.competition_id?String(event.competition_id):null}
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export async function POST(request:NextRequest){try{const actor=await requireSuperUser(request);if(!actor.canManagePlatformSettings)throw new SuperUserAuthError('Platform-management permission required.',403);const body=await request.json() as Row;const action=String(body.action||'');const tenantId=await tenant();
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-if(action==='create-competition'){const item=(await rest('competitions',{method:'POST',body:JSON.stringify({tenant_id:tenantId,organization_id:body.organization_id||null,sport_id:body.sport_id||null,format_id:body.format_id||null,name:req(body.name,'Competition name'),competition_type:opt(body.competition_type,100),starts_at:body.starts_at||null,ends_at:body.ends_at||null,timezone:opt(body.timezone,100),city:opt(body.city,120),region:opt(body.region,120),country_code:req(body.country_code||'CA','Country code',3).toUpperCase(),status:'planned',sanction_number:opt(body.sanction_number,120),venue_facility_id:body.venue_facility_id||null})}))?.[0];await audit(actor,tenantId,'COMPETITION_CREATED','competitions',item?.id||null,null,item||body,'Super User created LS1 competition');return NextResponse.json(item)}
-if(action==='set-competition-status'){const id=req(body.id,'Competition ID',80),before=await one('competitions',id);if(!before)return NextResponse.json({error:'Competition not found.'},{status:404});const status=req(body.status,'Competition status',50).toLowerCase();const after=(await rest(`competitions?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status})}))?.[0];await audit(actor,tenantId,'COMPETITION_STATUS_CHANGED','competitions',id,before,after,'Super User changed competition lifecycle');return NextResponse.json(after)}
-if(action==='create-session'){const item=(await rest('competition_sessions',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),name:req(body.name,'Session name'),session_no:body.session_no?Number(body.session_no):null,starts_at:body.starts_at||null,ends_at:body.ends_at||null,status:'planned'})}))?.[0];await audit(actor,tenantId,'COMPETITION_SESSION_CREATED','competition_sessions',item?.id||null,null,item||body,'Super User created competition session');return NextResponse.json(item)}
-if(action==='create-event'){const item=(await rest('competition_events',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),session_id:body.session_id||null,code:req(body.code,'Event code',80),name:req(body.name,'Event name'),sequence_no:body.sequence_no?Number(body.sequence_no):null,event_definition:json(body.event_definition,'Event definition',{})})}))?.[0];await audit(actor,tenantId,'COMPETITION_EVENT_CREATED','competition_events',item?.id||null,null,item||body,'Super User created competition event');return NextResponse.json(item)}
-if(action==='create-entry'){const item=(await rest('competition_entries',{method:'POST',body:JSON.stringify({competition_event_id:req(body.competition_event_id,'Competition event ID',80),athlete_id:body.athlete_id||null,team_id:body.team_id||null,seed_value:body.seed_value===''||body.seed_value===undefined?null:num(body.seed_value,'Seed value'),seed_unit:opt(body.seed_unit,40),entry_status:'entered',eligibility_status:'pending',scratch_status:null})}))?.[0];await audit(actor,tenantId,'COMPETITION_ENTRY_CREATED','competition_entries',item?.id||null,null,item||body,'Super User created competition entry pending eligibility');return NextResponse.json(item)}
-if(action==='record-eligibility-decision'){const competitionId=req(body.competition_id,'Competition ID',80),entryId=String(body.competition_entry_id||'').trim()||null,decision=req(body.decision,'Decision',50).toLowerCase();const item=(await rest('competition_eligibility_decisions',{method:'POST',body:JSON.stringify({competition_id:competitionId,competition_entry_id:entryId,athlete_id:body.athlete_id||null,rule_code:opt(body.rule_code,100),decision,severity:opt(body.severity,50),evidence:json(body.evidence,'Eligibility evidence',{}),decided_by_type:'superuser_review',decided_by:null,ruleset_id:body.ruleset_id||null,supersedes_id:body.supersedes_id||null})}))?.[0];if(entryId)await rest(`competition_entries?id=eq.${encodeURIComponent(entryId)}`,{method:'PATCH',body:JSON.stringify({eligibility_status:decision})});await audit(actor,tenantId,'COMPETITION_ELIGIBILITY_DECIDED','competition_eligibility_decisions',item?.id||null,null,item||body,'Eligibility decision recorded with evidence');return NextResponse.json(item)}
+type Row = Record<string, unknown>;
 
-if(action==='create-seeding-run'){const item=(await rest('competition_seeding_runs',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),competition_event_id:body.competition_event_id||null,run_no:Number(body.run_no||1),algorithm_code:req(body.algorithm_code,'Seeding algorithm',100),parameters:json(body.parameters,'Seeding parameters',{}),status:'draft'})}))?.[0];await audit(actor,tenantId,'SEEDING_RUN_CREATED','competition_seeding_runs',item?.id||null,null,item||body,'LS1Sports seeding run created');return NextResponse.json(item)}
-if(action==='add-seeding-assignment'){const item=(await rest('competition_seeding_assignments',{method:'POST',body:JSON.stringify({seeding_run_id:req(body.seeding_run_id,'Seeding run ID',80),competition_entry_id:req(body.competition_entry_id,'Competition entry ID',80),heat_no:body.heat_no?Number(body.heat_no):null,lane_no:body.lane_no?Number(body.lane_no):null,seed_rank:body.seed_rank?Number(body.seed_rank):null,seed_value:body.seed_value===''||body.seed_value===undefined?null:num(body.seed_value,'Seed value'),seed_unit:opt(body.seed_unit,40),assignment_status:'assigned',rationale:json(body.rationale,'Seeding rationale',{})})}))?.[0];await audit(actor,tenantId,'SEEDING_ASSIGNMENT_CREATED','competition_seeding_assignments',item?.id||null,null,item||body,'LS1Sports seeding assignment recorded with rationale');return NextResponse.json(item)}
-if(action==='approve-seeding-run'){const id=req(body.id,'Seeding run ID',80),before=await one('competition_seeding_runs',id);if(!before)return NextResponse.json({error:'Seeding run not found.'},{status:404});const assignments=await rest(`competition_seeding_assignments?seeding_run_id=eq.${encodeURIComponent(id)}&select=id`);if(!assignments?.length)throw new Error('Seeding run cannot be approved without assignments.');const after=(await rest(`competition_seeding_runs?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status:'approved',approved_at:new Date().toISOString()})}))?.[0];await audit(actor,tenantId,'SEEDING_RUN_APPROVED','competition_seeding_runs',id,before,after,'Super User approved LS1Sports seeding output');return NextResponse.json(after)}
+function headers() {
+  if (!KEY) throw new Error('Supabase service credentials are not configured.');
+  return {
+    apikey: KEY,
+    Authorization: `Bearer ${KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+}
 
-if(action==='record-scratch'){const item=(await rest('competition_scratches',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),competition_entry_id:body.competition_entry_id||null,athlete_id:body.athlete_id||null,reason_code:opt(body.reason_code,80),reason_text:opt(body.reason_text),status:'requested',audit_context:json(body.audit_context,'Scratch audit context',{})})}))?.[0];await audit(actor,tenantId,'COMPETITION_SCRATCH_RECORDED','competition_scratches',item?.id||null,null,item||body,'Competition scratch recorded');return NextResponse.json(item)}
-if(action==='approve-scratch'){const id=req(body.id,'Scratch ID',80),before=await one('competition_scratches',id);if(!before)return NextResponse.json({error:'Scratch not found.'},{status:404});const after=(await rest(`competition_scratches?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status:'approved',approved_at:new Date().toISOString()})}))?.[0];if(before.competition_entry_id)await rest(`competition_entries?id=eq.${encodeURIComponent(String(before.competition_entry_id))}`,{method:'PATCH',body:JSON.stringify({scratch_status:'approved',entry_status:'scratched'})});await audit(actor,tenantId,'COMPETITION_SCRATCH_APPROVED','competition_scratches',id,before,after,'Scratch approved and entry state synchronized');return NextResponse.json(after)}
-if(action==='record-checkin'){const item=(await rest('competition_checkins',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),session_id:body.session_id||null,athlete_id:body.athlete_id||null,team_id:body.team_id||null,entry_id:body.entry_id||null,checkin_type:req(body.checkin_type||'positive','Check-in type',50),status:'confirmed',checked_in_at:new Date().toISOString(),source:'LS1SPORTS',notes:opt(body.notes)})}))?.[0];await audit(actor,tenantId,'COMPETITION_CHECKIN_RECORDED','competition_checkins',item?.id||null,null,item||body,'LS1Sports check-in recorded');return NextResponse.json(item)}
+async function rest(path: string, init: RequestInit = {}) {
+  if (!URL || !KEY) throw new Error('Supabase service credentials are not configured.');
+  const response = await fetch(`${URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { ...headers(), ...(init.headers || {}) },
+    cache: 'no-store',
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0, 500)}`);
+  return text ? JSON.parse(text) : null;
+}
 
-if(action==='record-result'){const result=(await rest('competition_results',{method:'POST',body:JSON.stringify({competition_entry_id:body.competition_entry_id||null,athlete_id:body.athlete_id||null,team_id:body.team_id||null,result_value:body.result_value===''||body.result_value===undefined?null:num(body.result_value,'Result value'),result_unit:opt(body.result_unit,40),rank:body.rank?Number(body.rank):null,status:req(body.status||'provisional','Result status',50),recorded_at:new Date().toISOString(),source_system:'LS1SPORTS',source_record_id:opt(body.source_record_id,160),validation_status:'pending',canonical:false})}))?.[0];if(!result?.id)throw new Error('Result creation failed.');const version=(await rest('competition_result_versions',{method:'POST',body:JSON.stringify({competition_result_id:result.id,version_no:1,result_snapshot:result,change_reason:'Initial LS1Sports result',source_system:'LS1SPORTS',source_record_id:body.source_record_id||null,canonical:false})}))?.[0];await audit(actor,tenantId,'COMPETITION_RESULT_RECORDED','competition_results',result.id,null,{result,version},'LS1Sports independently recorded result');return NextResponse.json({result,version})}
-if(action==='revise-result'){const id=req(body.id,'Result ID',80),before=await one('competition_results',id);if(!before)return NextResponse.json({error:'Result not found.'},{status:404});const versions=await rest(`competition_result_versions?competition_result_id=eq.${encodeURIComponent(id)}&select=version_no&order=version_no.desc&limit=1`);const versionNo=Number(versions?.[0]?.version_no||0)+1;const patch:Row={};for(const key of ['result_value','result_unit','rank','status'])if(body[key]!==undefined&&body[key]!=='')patch[key]=key==='result_value'||key==='rank'?Number(body[key]):body[key];patch.validation_status='pending';patch.canonical=false;const after=(await rest(`competition_results?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(patch)}))?.[0];const version=(await rest('competition_result_versions',{method:'POST',body:JSON.stringify({competition_result_id:id,version_no:versionNo,result_snapshot:after,change_reason:req(body.change_reason,'Change reason'),source_system:'LS1SPORTS',canonical:false})}))?.[0];await audit(actor,tenantId,'COMPETITION_RESULT_REVISED','competition_results',id,before,{result:after,version},'Result revision invalidated prior validation and canonical status');return NextResponse.json({result:after,version})}
-if(action==='set-result-validation'){const id=req(body.id,'Result ID',80),before=await one('competition_results',id);if(!before)return NextResponse.json({error:'Result not found.'},{status:404});const status=req(body.validation_status,'Validation status',50).toLowerCase();const after=(await rest(`competition_results?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({validation_status:status,canonical:false})}))?.[0];await audit(actor,tenantId,'COMPETITION_RESULT_VALIDATION_CHANGED','competition_results',id,before,after,'LS1Sports result validation state changed');return NextResponse.json(after)}
-if(action==='promote-canonical-result'){const id=req(body.id,'Result ID',80),before=await one('competition_results',id);if(!before)return NextResponse.json({error:'Result not found.'},{status:404});if(!['verified','validated'].includes(String(before.validation_status).toLowerCase()))throw new Error('Result must be LS1Sports-validated before canonical promotion.');const competitionId=await competitionForResult(before);if(!competitionId)throw new Error('Result must resolve to a competition through its entry.');const reconciliations=await rest(`competition_reconciliations?competition_id=eq.${encodeURIComponent(competitionId)}&select=id,status`);for(const rec of reconciliations||[]){const open=await rest(`competition_reconciliation_items?reconciliation_id=eq.${encodeURIComponent(rec.id)}&resolution_status=neq.resolved&select=id&limit=1`);if(open?.length)throw new Error('Canonical promotion blocked by unresolved external verification differences.');}const after=(await rest(`competition_results?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({canonical:true,status:'official'})}))?.[0];const versions=await rest(`competition_result_versions?competition_result_id=eq.${encodeURIComponent(id)}&select=id,version_no&order=version_no.desc&limit=1`);if(versions?.[0]?.id)await rest(`competition_result_versions?id=eq.${encodeURIComponent(versions[0].id)}`,{method:'PATCH',body:JSON.stringify({canonical:true})});await audit(actor,tenantId,'COMPETITION_RESULT_CANONICALIZED','competition_results',id,before,after,'Validated LS1Sports result promoted after verification exceptions resolved');return NextResponse.json(after)}
+function req(value: unknown, label: string, max = 200) {
+  const text = String(value || '').trim();
+  if (!text) throw new Error(`${label} is required.`);
+  if (text.length > max) throw new Error(`${label} is too long.`);
+  return text;
+}
 
-if(action==='start-reconciliation'){const item=(await rest('competition_reconciliations',{method:'POST',body:JSON.stringify({competition_id:body.competition_id||null,source_system_id:body.source_system_id||null,source_artifact_id:body.source_artifact_id||null,reconciliation_type:req(body.reconciliation_type||'parallel_verification','Reconciliation type',100),status:'in_progress',summary:{purpose:'External system verification only; LS1Sports remains canonical source'}})}))?.[0];await audit(actor,tenantId,'COMPETITION_RECONCILIATION_STARTED','competition_reconciliations',item?.id||null,null,item||body,'Parallel external verification started');return NextResponse.json(item)}
-if(action==='add-reconciliation-item'){const item=(await rest('competition_reconciliation_items',{method:'POST',body:JSON.stringify({reconciliation_id:req(body.reconciliation_id,'Reconciliation ID',80),entity_type:req(body.entity_type,'Entity type',100),source_record_key:opt(body.source_record_key,160),canonical_entity_id:body.canonical_entity_id||null,comparison_status:req(body.comparison_status,'Comparison status',50),source_payload:json(body.source_payload,'Source payload',{}),canonical_payload:json(body.canonical_payload,'Canonical payload',{}),differences:json(body.differences,'Differences',{}),resolution_status:'open'})}))?.[0];await audit(actor,tenantId,'COMPETITION_RECONCILIATION_ITEM_ADDED','competition_reconciliation_items',item?.id||null,null,item||body,'External comparison evidence recorded without altering canonical data');return NextResponse.json(item)}
-if(action==='resolve-reconciliation-item'){const id=req(body.id,'Reconciliation item ID',80),before=await one('competition_reconciliation_items',id);if(!before)return NextResponse.json({error:'Reconciliation item not found.'},{status:404});const after=(await rest(`competition_reconciliation_items?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({resolution_status:'resolved',resolved_at:new Date().toISOString(),differences:json(body.differences,'Resolution differences',before.differences||{})})}))?.[0];await audit(actor,tenantId,'COMPETITION_RECONCILIATION_ITEM_RESOLVED','competition_reconciliation_items',id,before,after,'Verification difference resolved with evidence');return NextResponse.json(after)}
-if(action==='approve-reconciliation'){const id=req(body.id,'Reconciliation ID',80),before=await one('competition_reconciliations',id);if(!before)return NextResponse.json({error:'Reconciliation not found.'},{status:404});const open=await rest(`competition_reconciliation_items?reconciliation_id=eq.${encodeURIComponent(id)}&resolution_status=neq.resolved&select=id&limit=1`);if(open?.length)throw new Error('Reconciliation cannot be approved while differences remain unresolved.');const after=(await rest(`competition_reconciliations?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status:'approved',completed_at:new Date().toISOString(),approved_at:new Date().toISOString()})}))?.[0];await audit(actor,tenantId,'COMPETITION_RECONCILIATION_APPROVED','competition_reconciliations',id,before,after,'Parallel verification approved after every difference resolved');return NextResponse.json(after)}
+function opt(value: unknown, max = 1000) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (text.length > max) throw new Error('Value is too long.');
+  return text;
+}
 
-if(action==='create-judicial-case'){const item=(await rest('competition_judicial_cases',{method:'POST',body:JSON.stringify({competition_id:req(body.competition_id,'Competition ID',80),case_type:req(body.case_type,'Case type',80),entity_type:req(body.entity_type,'Entity type',80),entity_id:body.entity_id||null,status:'open',summary:opt(body.summary),rule_reference:opt(body.rule_reference,160),evidence:json(body.evidence,'Judicial evidence',{})})}))?.[0];await audit(actor,tenantId,'COMPETITION_JUDICIAL_CASE_CREATED','competition_judicial_cases',item?.id||null,null,item||body,'Competition judicial case opened');return NextResponse.json(item)}
-if(action==='decide-judicial-case'){const id=req(body.id,'Judicial case ID',80),before=await one('competition_judicial_cases',id);if(!before)return NextResponse.json({error:'Judicial case not found.'},{status:404});const after=(await rest(`competition_judicial_cases?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status:'decided',decision:req(body.decision,'Decision'),decided_at:new Date().toISOString()})}))?.[0];await audit(actor,tenantId,'COMPETITION_JUDICIAL_CASE_DECIDED','competition_judicial_cases',id,before,after,'Competition judicial decision recorded');return NextResponse.json(after)}
-if(action==='publish-competition'){const competitionId=req(body.competition_id,'Competition ID',80);const unresolved=await rest(`competition_reconciliations?competition_id=eq.${encodeURIComponent(competitionId)}&status=neq.approved&select=id&limit=1`);if(unresolved?.length)throw new Error('Publication blocked until all parallel verification reconciliations are approved.');const publication=(await rest('competition_publications',{method:'POST',body:JSON.stringify({competition_id:competitionId,publication_type:req(body.publication_type,'Publication type',100),version_no:Number(body.version_no||1),status:'published',content_ref:opt(body.content_ref,500),payload:json(body.payload,'Publication payload',{}),checksum_sha256:opt(body.checksum_sha256,128),published_at:new Date().toISOString(),supersedes_id:body.supersedes_id||null})}))?.[0];await audit(actor,tenantId,'COMPETITION_PUBLISHED','competition_publications',publication?.id||null,null,publication||body,'Competition publication released after verification gates');return NextResponse.json(publication)}
+function num(value: unknown, label: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${label} must be numeric.`);
+  return parsed;
+}
 
-return NextResponse.json({error:'Unsupported competition action.'},{status:400});}catch(error){if(error instanceof SuperUserAuthError)return NextResponse.json({error:error.message},{status:error.status});return NextResponse.json({error:error instanceof Error?error.message:'Competition action failed.'},{status:400})}}
+function json(value: unknown, label: string, fallback: unknown = {}) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(String(value));
+  } catch {
+    throw new Error(`${label} must be valid JSON.`);
+  }
+}
+
+async function one(table: string, id: string) {
+  return (await rest(`${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`))?.[0] || null;
+}
+
+async function tenant() {
+  return (await rest('tenants?select=id&limit=1'))?.[0]?.id || null;
+}
+
+async function audit(
+  actor: Awaited<ReturnType<typeof requireSuperUser>>,
+  tenantId: string | null,
+  action: string,
+  table: string,
+  id: string | null,
+  before: unknown,
+  after: unknown,
+  reason: string,
+) {
+  await writeAuditEvent(actor, {
+    action,
+    entityType: table,
+    entityId: id,
+    tenantId,
+    beforeData: before ?? null,
+    afterData: after ?? null,
+    reason,
+  });
+}
+
+async function competitionForResult(result: Row) {
+  if (!result.competition_entry_id) return null;
+  const entry = await one('competition_entries', String(result.competition_entry_id));
+  if (!entry?.competition_event_id) return null;
+  const event = await one('competition_events', String(entry.competition_event_id));
+  return event?.competition_id ? String(event.competition_id) : null;
+}
+
+async function assertVerificationClear(competitionId: string) {
+  const reconciliations = await rest(
+    `competition_reconciliations?competition_id=eq.${encodeURIComponent(competitionId)}&select=id,status`,
+  );
+
+  for (const reconciliation of reconciliations || []) {
+    if (String(reconciliation.status || '').toLowerCase() !== 'approved') {
+      throw new Error('Canonical promotion blocked until every started external verification reconciliation is approved.');
+    }
+
+    const openItems = await rest(
+      `competition_reconciliation_items?reconciliation_id=eq.${encodeURIComponent(reconciliation.id)}&resolution_status=neq.resolved&select=id&limit=1`,
+    );
+    if (openItems?.length) {
+      throw new Error('Canonical promotion blocked by unresolved external verification differences.');
+    }
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const actor = await requireSuperUser(request);
+    if (!actor.canManagePlatformSettings) {
+      throw new SuperUserAuthError('Platform-management permission required.', 403);
+    }
+
+    const body = (await request.json()) as Row;
+    const action = String(body.action || '');
+    const tenantId = await tenant();
+
+    if (action === 'create-competition') {
+      const item = (await rest('competitions', {
+        method: 'POST',
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          organization_id: body.organization_id || null,
+          sport_id: body.sport_id || null,
+          format_id: body.format_id || null,
+          name: req(body.name, 'Competition name'),
+          competition_type: opt(body.competition_type, 100),
+          starts_at: body.starts_at || null,
+          ends_at: body.ends_at || null,
+          timezone: opt(body.timezone, 100),
+          city: opt(body.city, 120),
+          region: opt(body.region, 120),
+          country_code: req(body.country_code || 'CA', 'Country code', 3).toUpperCase(),
+          status: 'planned',
+          sanction_number: opt(body.sanction_number, 120),
+          venue_facility_id: body.venue_facility_id || null,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_CREATED', 'competitions', item?.id || null, null, item || body, 'Super User created LS1 competition');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'set-competition-status') {
+      const id = req(body.id, 'Competition ID', 80);
+      const before = await one('competitions', id);
+      if (!before) return NextResponse.json({ error: 'Competition not found.' }, { status: 404 });
+      const status = req(body.status, 'Competition status', 50).toLowerCase();
+      const after = (await rest(`competitions?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_STATUS_CHANGED', 'competitions', id, before, after, 'Super User changed competition lifecycle');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'create-session') {
+      const item = (await rest('competition_sessions', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          name: req(body.name, 'Session name'),
+          session_no: body.session_no ? Number(body.session_no) : null,
+          starts_at: body.starts_at || null,
+          ends_at: body.ends_at || null,
+          status: 'planned',
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_SESSION_CREATED', 'competition_sessions', item?.id || null, null, item || body, 'Super User created competition session');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'create-event') {
+      const item = (await rest('competition_events', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          session_id: body.session_id || null,
+          code: req(body.code, 'Event code', 80),
+          name: req(body.name, 'Event name'),
+          sequence_no: body.sequence_no ? Number(body.sequence_no) : null,
+          event_definition: json(body.event_definition, 'Event definition', {}),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_EVENT_CREATED', 'competition_events', item?.id || null, null, item || body, 'Super User created competition event');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'create-entry') {
+      const item = (await rest('competition_entries', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_event_id: req(body.competition_event_id, 'Competition event ID', 80),
+          athlete_id: body.athlete_id || null,
+          team_id: body.team_id || null,
+          seed_value: body.seed_value === '' || body.seed_value === undefined ? null : num(body.seed_value, 'Seed value'),
+          seed_unit: opt(body.seed_unit, 40),
+          entry_status: 'entered',
+          eligibility_status: 'pending',
+          scratch_status: null,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_ENTRY_CREATED', 'competition_entries', item?.id || null, null, item || body, 'Super User created competition entry pending eligibility');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'record-eligibility-decision') {
+      const competitionId = req(body.competition_id, 'Competition ID', 80);
+      const entryId = String(body.competition_entry_id || '').trim() || null;
+      const decision = req(body.decision, 'Decision', 50).toLowerCase();
+      const item = (await rest('competition_eligibility_decisions', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: competitionId,
+          competition_entry_id: entryId,
+          athlete_id: body.athlete_id || null,
+          rule_code: opt(body.rule_code, 100),
+          decision,
+          severity: opt(body.severity, 50),
+          evidence: json(body.evidence, 'Eligibility evidence', {}),
+          decided_by_type: 'superuser_review',
+          decided_by: actor.personId,
+          ruleset_id: body.ruleset_id || null,
+          supersedes_id: body.supersedes_id || null,
+        }),
+      }))?.[0];
+      if (entryId) {
+        await rest(`competition_entries?id=eq.${encodeURIComponent(entryId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ eligibility_status: decision }),
+        });
+      }
+      await audit(actor, tenantId, 'COMPETITION_ELIGIBILITY_DECIDED', 'competition_eligibility_decisions', item?.id || null, null, item || body, 'Eligibility decision recorded with evidence');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'create-seeding-run') {
+      const item = (await rest('competition_seeding_runs', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          competition_event_id: body.competition_event_id || null,
+          run_no: Number(body.run_no || 1),
+          algorithm_code: req(body.algorithm_code, 'Seeding algorithm', 100),
+          parameters: json(body.parameters, 'Seeding parameters', {}),
+          status: 'draft',
+          generated_by: actor.personId,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'SEEDING_RUN_CREATED', 'competition_seeding_runs', item?.id || null, null, item || body, 'LS1Sports seeding run created');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'add-seeding-assignment') {
+      const item = (await rest('competition_seeding_assignments', {
+        method: 'POST',
+        body: JSON.stringify({
+          seeding_run_id: req(body.seeding_run_id, 'Seeding run ID', 80),
+          competition_entry_id: req(body.competition_entry_id, 'Competition entry ID', 80),
+          heat_no: body.heat_no ? Number(body.heat_no) : null,
+          lane_no: body.lane_no ? Number(body.lane_no) : null,
+          seed_rank: body.seed_rank ? Number(body.seed_rank) : null,
+          seed_value: body.seed_value === '' || body.seed_value === undefined ? null : num(body.seed_value, 'Seed value'),
+          seed_unit: opt(body.seed_unit, 40),
+          assignment_status: 'assigned',
+          rationale: json(body.rationale, 'Seeding rationale', {}),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'SEEDING_ASSIGNMENT_CREATED', 'competition_seeding_assignments', item?.id || null, null, item || body, 'LS1Sports seeding assignment recorded with rationale');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'approve-seeding-run') {
+      const id = req(body.id, 'Seeding run ID', 80);
+      const before = await one('competition_seeding_runs', id);
+      if (!before) return NextResponse.json({ error: 'Seeding run not found.' }, { status: 404 });
+      const assignments = await rest(`competition_seeding_assignments?seeding_run_id=eq.${encodeURIComponent(id)}&select=id`);
+      if (!assignments?.length) throw new Error('Seeding run cannot be approved without assignments.');
+      const after = (await rest(`competition_seeding_runs?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'approved', approved_by: actor.personId, approved_at: new Date().toISOString() }),
+      }))?.[0];
+      await audit(actor, tenantId, 'SEEDING_RUN_APPROVED', 'competition_seeding_runs', id, before, after, 'Super User approved LS1Sports seeding output');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'record-scratch') {
+      const item = (await rest('competition_scratches', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          competition_entry_id: body.competition_entry_id || null,
+          athlete_id: body.athlete_id || null,
+          reason_code: opt(body.reason_code, 80),
+          reason_text: opt(body.reason_text),
+          status: 'requested',
+          requested_by: actor.personId,
+          audit_context: json(body.audit_context, 'Scratch audit context', {}),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_SCRATCH_RECORDED', 'competition_scratches', item?.id || null, null, item || body, 'Competition scratch recorded');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'approve-scratch') {
+      const id = req(body.id, 'Scratch ID', 80);
+      const before = await one('competition_scratches', id);
+      if (!before) return NextResponse.json({ error: 'Scratch not found.' }, { status: 404 });
+      const after = (await rest(`competition_scratches?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'approved', approved_by: actor.personId, approved_at: new Date().toISOString() }),
+      }))?.[0];
+      if (before.competition_entry_id) {
+        await rest(`competition_entries?id=eq.${encodeURIComponent(String(before.competition_entry_id))}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ scratch_status: 'approved', entry_status: 'scratched' }),
+        });
+      }
+      await audit(actor, tenantId, 'COMPETITION_SCRATCH_APPROVED', 'competition_scratches', id, before, after, 'Scratch approved and entry state synchronized');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'record-checkin') {
+      const item = (await rest('competition_checkins', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          session_id: body.session_id || null,
+          athlete_id: body.athlete_id || null,
+          team_id: body.team_id || null,
+          entry_id: body.entry_id || null,
+          checkin_type: req(body.checkin_type || 'positive', 'Check-in type', 50),
+          status: 'confirmed',
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: actor.personId,
+          source: 'LS1SPORTS',
+          notes: opt(body.notes),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_CHECKIN_RECORDED', 'competition_checkins', item?.id || null, null, item || body, 'LS1Sports check-in recorded');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'record-result') {
+      const result = (await rest('competition_results', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_entry_id: body.competition_entry_id || null,
+          athlete_id: body.athlete_id || null,
+          team_id: body.team_id || null,
+          result_value: body.result_value === '' || body.result_value === undefined ? null : num(body.result_value, 'Result value'),
+          result_unit: opt(body.result_unit, 40),
+          rank: body.rank ? Number(body.rank) : null,
+          status: req(body.status || 'provisional', 'Result status', 50),
+          recorded_at: new Date().toISOString(),
+          source_system: 'LS1SPORTS',
+          source_record_id: opt(body.source_record_id, 160),
+          validation_status: 'pending',
+          canonical: false,
+        }),
+      }))?.[0];
+      if (!result?.id) throw new Error('Result creation failed.');
+      const version = (await rest('competition_result_versions', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_result_id: result.id,
+          version_no: 1,
+          result_snapshot: result,
+          change_reason: 'Initial LS1Sports result',
+          source_system: 'LS1SPORTS',
+          source_record_id: body.source_record_id || null,
+          changed_by: actor.personId,
+          canonical: false,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RESULT_RECORDED', 'competition_results', result.id, null, { result, version }, 'LS1Sports independently recorded result');
+      return NextResponse.json({ result, version });
+    }
+
+    if (action === 'revise-result') {
+      const id = req(body.id, 'Result ID', 80);
+      const before = await one('competition_results', id);
+      if (!before) return NextResponse.json({ error: 'Result not found.' }, { status: 404 });
+      const versions = await rest(`competition_result_versions?competition_result_id=eq.${encodeURIComponent(id)}&select=version_no&order=version_no.desc&limit=1`);
+      const versionNo = Number(versions?.[0]?.version_no || 0) + 1;
+      const patch: Row = {};
+      for (const key of ['result_value', 'result_unit', 'rank', 'status']) {
+        if (body[key] !== undefined && body[key] !== '') patch[key] = key === 'result_value' || key === 'rank' ? Number(body[key]) : body[key];
+      }
+      patch.validation_status = 'pending';
+      patch.canonical = false;
+      const after = (await rest(`competition_results?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      }))?.[0];
+      const version = (await rest('competition_result_versions', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_result_id: id,
+          version_no: versionNo,
+          result_snapshot: after,
+          change_reason: req(body.change_reason, 'Change reason'),
+          source_system: 'LS1SPORTS',
+          changed_by: actor.personId,
+          canonical: false,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RESULT_REVISED', 'competition_results', id, before, { result: after, version }, 'Result revision invalidated prior validation and canonical status');
+      return NextResponse.json({ result: after, version });
+    }
+
+    if (action === 'set-result-validation') {
+      const id = req(body.id, 'Result ID', 80);
+      const before = await one('competition_results', id);
+      if (!before) return NextResponse.json({ error: 'Result not found.' }, { status: 404 });
+      const status = req(body.validation_status, 'Validation status', 50).toLowerCase();
+      const after = (await rest(`competition_results?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ validation_status: status, canonical: false }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RESULT_VALIDATION_CHANGED', 'competition_results', id, before, after, 'LS1Sports result validation state changed');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'promote-canonical-result') {
+      const id = req(body.id, 'Result ID', 80);
+      const before = await one('competition_results', id);
+      if (!before) return NextResponse.json({ error: 'Result not found.' }, { status: 404 });
+      if (!['verified', 'validated'].includes(String(before.validation_status).toLowerCase())) {
+        throw new Error('Result must be LS1Sports-validated before canonical promotion.');
+      }
+      const competitionId = await competitionForResult(before);
+      if (!competitionId) throw new Error('Result must resolve to a competition through its entry.');
+      await assertVerificationClear(competitionId);
+      const after = (await rest(`competition_results?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ canonical: true, status: 'official' }),
+      }))?.[0];
+      const versions = await rest(`competition_result_versions?competition_result_id=eq.${encodeURIComponent(id)}&select=id,version_no&order=version_no.desc&limit=1`);
+      if (versions?.[0]?.id) {
+        await rest(`competition_result_versions?id=eq.${encodeURIComponent(versions[0].id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ canonical: true }),
+        });
+      }
+      await audit(actor, tenantId, 'COMPETITION_RESULT_CANONICALIZED', 'competition_results', id, before, after, 'Validated LS1Sports result promoted only after all started verification runs were approved');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'start-reconciliation') {
+      const item = (await rest('competition_reconciliations', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: body.competition_id || null,
+          source_system_id: body.source_system_id || null,
+          source_artifact_id: body.source_artifact_id || null,
+          reconciliation_type: req(body.reconciliation_type || 'parallel_verification', 'Reconciliation type', 100),
+          status: 'in_progress',
+          summary: { purpose: 'External system verification only; LS1Sports remains canonical source' },
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RECONCILIATION_STARTED', 'competition_reconciliations', item?.id || null, null, item || body, 'Parallel external verification started');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'add-reconciliation-item') {
+      const item = (await rest('competition_reconciliation_items', {
+        method: 'POST',
+        body: JSON.stringify({
+          reconciliation_id: req(body.reconciliation_id, 'Reconciliation ID', 80),
+          entity_type: req(body.entity_type, 'Entity type', 100),
+          source_record_key: opt(body.source_record_key, 160),
+          canonical_entity_id: body.canonical_entity_id || null,
+          comparison_status: req(body.comparison_status, 'Comparison status', 50),
+          source_payload: json(body.source_payload, 'Source payload', {}),
+          canonical_payload: json(body.canonical_payload, 'Canonical payload', {}),
+          differences: json(body.differences, 'Differences', {}),
+          resolution_status: 'open',
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RECONCILIATION_ITEM_ADDED', 'competition_reconciliation_items', item?.id || null, null, item || body, 'External comparison evidence recorded without altering canonical data');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'resolve-reconciliation-item') {
+      const id = req(body.id, 'Reconciliation item ID', 80);
+      const before = await one('competition_reconciliation_items', id);
+      if (!before) return NextResponse.json({ error: 'Reconciliation item not found.' }, { status: 404 });
+      const after = (await rest(`competition_reconciliation_items?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          resolution_status: 'resolved',
+          resolved_by: actor.personId,
+          resolved_at: new Date().toISOString(),
+          differences: json(body.differences, 'Resolution differences', before.differences || {}),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RECONCILIATION_ITEM_RESOLVED', 'competition_reconciliation_items', id, before, after, 'Verification difference resolved with evidence');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'approve-reconciliation') {
+      const id = req(body.id, 'Reconciliation ID', 80);
+      const before = await one('competition_reconciliations', id);
+      if (!before) return NextResponse.json({ error: 'Reconciliation not found.' }, { status: 404 });
+      const openItems = await rest(`competition_reconciliation_items?reconciliation_id=eq.${encodeURIComponent(id)}&resolution_status=neq.resolved&select=id&limit=1`);
+      if (openItems?.length) throw new Error('Reconciliation cannot be approved while differences remain unresolved.');
+      const after = (await rest(`competition_reconciliations?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'approved',
+          completed_at: new Date().toISOString(),
+          approved_by: actor.personId,
+          approved_at: new Date().toISOString(),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_RECONCILIATION_APPROVED', 'competition_reconciliations', id, before, after, 'Parallel verification approved after every difference resolved');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'create-judicial-case') {
+      const item = (await rest('competition_judicial_cases', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: req(body.competition_id, 'Competition ID', 80),
+          case_type: req(body.case_type, 'Case type', 80),
+          entity_type: req(body.entity_type, 'Entity type', 80),
+          entity_id: body.entity_id || null,
+          status: 'open',
+          summary: opt(body.summary),
+          rule_reference: opt(body.rule_reference, 160),
+          evidence: json(body.evidence, 'Judicial evidence', {}),
+          filed_by: actor.personId,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_JUDICIAL_CASE_CREATED', 'competition_judicial_cases', item?.id || null, null, item || body, 'Competition judicial case opened');
+      return NextResponse.json(item);
+    }
+
+    if (action === 'decide-judicial-case') {
+      const id = req(body.id, 'Judicial case ID', 80);
+      const before = await one('competition_judicial_cases', id);
+      if (!before) return NextResponse.json({ error: 'Judicial case not found.' }, { status: 404 });
+      const after = (await rest(`competition_judicial_cases?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'decided',
+          decision: req(body.decision, 'Decision'),
+          decided_by: actor.personId,
+          decided_at: new Date().toISOString(),
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_JUDICIAL_CASE_DECIDED', 'competition_judicial_cases', id, before, after, 'Competition judicial decision recorded');
+      return NextResponse.json(after);
+    }
+
+    if (action === 'publish-competition') {
+      const competitionId = req(body.competition_id, 'Competition ID', 80);
+      await assertVerificationClear(competitionId);
+      const publication = (await rest('competition_publications', {
+        method: 'POST',
+        body: JSON.stringify({
+          competition_id: competitionId,
+          publication_type: req(body.publication_type, 'Publication type', 100),
+          version_no: Number(body.version_no || 1),
+          status: 'published',
+          content_ref: opt(body.content_ref, 500),
+          payload: json(body.payload, 'Publication payload', {}),
+          checksum_sha256: opt(body.checksum_sha256, 128),
+          published_by: actor.personId,
+          published_at: new Date().toISOString(),
+          supersedes_id: body.supersedes_id || null,
+        }),
+      }))?.[0];
+      await audit(actor, tenantId, 'COMPETITION_PUBLISHED', 'competition_publications', publication?.id || null, null, publication || body, 'Competition publication released only after all started verification runs were approved');
+      return NextResponse.json(publication);
+    }
+
+    return NextResponse.json({ error: 'Unsupported competition action.' }, { status: 400 });
+  } catch (error) {
+    if (error instanceof SuperUserAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Competition action failed.' }, { status: 400 });
+  }
+}
