@@ -1,77 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperUser, SuperUserAuthError } from '@/lib/server/requireSuperUser';
+import { requireSuperUser, SuperUserAuthError, type SuperUserIdentity } from '@/lib/server/requireSuperUser';
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xedfstgwotzxnztpembv.supabase.co';
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
 type Row = Record<string, unknown>;
 
-async function rest(path: string) {
-  if (!URL || !KEY) throw new Error('Supabase service credentials are not configured.');
-  const response = await fetch(`${URL}/rest/v1/${path}`, {
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Accept: 'application/json' },
-    cache: 'no-store',
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0, 300)}`);
-  return text ? JSON.parse(text) as Row[] : [];
-}
+async function rest(actor:SuperUserIdentity,path:string){if(!URL||!KEY)throw new Error('Supabase authenticated access is not configured.');const response=await fetch(`${URL}/rest/v1/${path}`,{headers:{apikey:KEY,Authorization:`Bearer ${actor.accessToken}`,Accept:'application/json'},cache:'no-store'});const text=await response.text();if(!response.ok)throw new Error(`Supabase ${path} returned ${response.status}: ${text.slice(0,300)}`);return text?JSON.parse(text) as Row[]:[]}
+function option(id:unknown,label:unknown,detail?:unknown){return{id:String(id||''),label:String(label||id||'Unnamed'),detail:detail?String(detail):null}}
 
-function option(id: unknown, label: unknown, detail?: unknown) {
-  return { id: String(id || ''), label: String(label || id || 'Unnamed'), detail: detail ? String(detail) : null };
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const actor = await requireSuperUser(request);
-    if (!actor.canManagePlatformSettings) throw new SuperUserAuthError('Platform-management permission required.', 403);
-
-    const [organizations, sports, programs, seasons, teams, people, athletes, memberships, rosterMemberships] = await Promise.all([
-      rest('organizations?select=id,name,code,status&order=name.asc&limit=500'),
-      rest('sports?select=id,name,code&order=name.asc&limit=200'),
-      rest('programs?select=id,name,code,status&order=name.asc&limit=500'),
-      rest('seasons?select=id,name,code,status&order=starts_on.desc.nullslast&limit=500'),
-      rest('teams?select=id,name,code,status&order=name.asc&limit=500'),
-      rest('people?select=id,first_name,last_name,preferred_name,email,status&order=last_name.asc&limit=1000'),
-      rest('athletes?select=id,person_id,athlete_number,status&limit=1000'),
-      rest('memberships?select=id,membership_number,membership_type,status,person_id&order=starts_on.desc.nullslast&limit=1000'),
-      rest('team_memberships?select=id,team_id,athlete_id,person_id,membership_type,status,jersey_number&limit=1000'),
-    ]);
-
-    const personById = new Map(people.map(row => [String(row.id), row]));
-    const teamById = new Map(teams.map(row => [String(row.id), row]));
-
-    return NextResponse.json({
-      organizations: organizations.map(row => option(row.id, row.name, [row.code, row.status].filter(Boolean).join(' · '))),
-      sports: sports.map(row => option(row.id, row.name, row.code)),
-      programs: programs.map(row => option(row.id, row.name, [row.code, row.status].filter(Boolean).join(' · '))),
-      seasons: seasons.map(row => option(row.id, row.name, [row.code, row.status].filter(Boolean).join(' · '))),
-      teams: teams.map(row => option(row.id, row.name, [row.code, row.status].filter(Boolean).join(' · '))),
-      people: people.map(row => option(row.id, [row.preferred_name || row.first_name, row.last_name].filter(Boolean).join(' '), row.email || row.status)),
-      athletes: athletes.map(row => {
-        const person = personById.get(String(row.person_id)) || {};
-        const name = [person.preferred_name || person.first_name, person.last_name].filter(Boolean).join(' ') || `Athlete ${row.athlete_number || ''}`.trim();
-        return option(row.id, name, [row.athlete_number ? `#${row.athlete_number}` : null, row.status].filter(Boolean).join(' · '));
-      }),
-      memberships: memberships.map(row => {
-        const person = personById.get(String(row.person_id)) || {};
-        const name = [person.preferred_name || person.first_name, person.last_name].filter(Boolean).join(' ') || 'Membership';
-        return option(row.id, name, [row.membership_number, row.membership_type, row.status].filter(Boolean).join(' · '));
-      }),
-      rosterMemberships: rosterMemberships.map(row => {
-        const team = teamById.get(String(row.team_id)) || {};
-        const athlete = athletes.find(item => String(item.id) === String(row.athlete_id));
-        const person = personById.get(String(row.person_id || athlete?.person_id)) || {};
-        const name = [person.preferred_name || person.first_name, person.last_name].filter(Boolean).join(' ') || 'Roster member';
-        return option(row.id, name, [team.name, row.membership_type, row.jersey_number ? `#${row.jersey_number}` : null, row.status].filter(Boolean).join(' · '));
-      }),
-      generatedAt: new Date().toISOString(),
-      source: 'LS1SportsEAM canonical Team Engine references',
-    }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
-  } catch (error) {
-    if (error instanceof SuperUserAuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Team Engine references unavailable.' }, { status: 500 });
-  }
-}
+export async function GET(request:NextRequest){try{const actor=await requireSuperUser(request);if(!actor.canManagePlatformSettings)throw new SuperUserAuthError('Platform-management permission required.',403);
+const[organizations,sports,programs,seasons,teams,people,athletes,memberships,rosterMemberships]=await Promise.all([
+rest(actor,'organizations?select=id,name,code,status&order=name.asc&limit=500'),rest(actor,'sports?select=id,name,code&order=name.asc&limit=200'),rest(actor,'programs?select=id,name,code,status&order=name.asc&limit=500'),rest(actor,'seasons?select=id,name,code,status&order=starts_on.desc.nullslast&limit=500'),rest(actor,'teams?select=id,name,code,status&order=name.asc&limit=500'),rest(actor,'people?select=id,first_name,last_name,preferred_name,email,status&order=last_name.asc&limit=1000'),rest(actor,'athletes?select=id,person_id,athlete_number,status&limit=1000'),rest(actor,'memberships?select=id,membership_number,membership_type,status,person_id&order=starts_on.desc.nullslast&limit=1000'),rest(actor,'team_memberships?select=id,team_id,athlete_id,person_id,membership_type,status,jersey_number&limit=1000')]);
+const personById=new Map(people.map(row=>[String(row.id),row])),teamById=new Map(teams.map(row=>[String(row.id),row]));
+return NextResponse.json({organizations:organizations.map(row=>option(row.id,row.name,[row.code,row.status].filter(Boolean).join(' · '))),sports:sports.map(row=>option(row.id,row.name,row.code)),programs:programs.map(row=>option(row.id,row.name,[row.code,row.status].filter(Boolean).join(' · '))),seasons:seasons.map(row=>option(row.id,row.name,[row.code,row.status].filter(Boolean).join(' · '))),teams:teams.map(row=>option(row.id,row.name,[row.code,row.status].filter(Boolean).join(' · '))),people:people.map(row=>option(row.id,[row.preferred_name||row.first_name,row.last_name].filter(Boolean).join(' '),row.email||row.status)),athletes:athletes.map(row=>{const person=personById.get(String(row.person_id))||{};const name=[person.preferred_name||person.first_name,person.last_name].filter(Boolean).join(' ')||`Athlete ${row.athlete_number||''}`.trim();return option(row.id,name,[row.athlete_number?`#${row.athlete_number}`:null,row.status].filter(Boolean).join(' · '))}),memberships:memberships.map(row=>{const person=personById.get(String(row.person_id))||{};const name=[person.preferred_name||person.first_name,person.last_name].filter(Boolean).join(' ')||'Membership';return option(row.id,name,[row.membership_number,row.membership_type,row.status].filter(Boolean).join(' · '))}),rosterMemberships:rosterMemberships.map(row=>{const team=teamById.get(String(row.team_id))||{};const athlete=athletes.find(item=>String(item.id)===String(row.athlete_id));const person=personById.get(String(row.person_id||athlete?.person_id))||{};const name=[person.preferred_name||person.first_name,person.last_name].filter(Boolean).join(' ')||'Roster member';return option(row.id,name,[team.name,row.membership_type,row.jersey_number?`#${row.jersey_number}`:null,row.status].filter(Boolean).join(' · '))}),generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical Team Engine references'},{headers:{'Cache-Control':'no-store, max-age=0, must-revalidate'}})}catch(error){if(error instanceof SuperUserAuthError)return NextResponse.json({error:error.message},{status:error.status});return NextResponse.json({error:error instanceof Error?error.message:'Team Engine references unavailable.'},{status:500})}}
