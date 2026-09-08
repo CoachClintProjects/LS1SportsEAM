@@ -10,6 +10,7 @@ import SuperUserDomainActions from '@/components/hubs/superuser/SuperUserDomainA
 import SuperUserSecurityActions from '@/components/hubs/superuser/SuperUserSecurityActions';
 import SuperUserFinanceActions from '@/components/hubs/superuser/SuperUserFinanceActions';
 import SuperUserEnterpriseActions from '@/components/hubs/superuser/SuperUserEnterpriseActions';
+import SuperUserTeamManagerActions from '@/components/hubs/superuser/SuperUserTeamManagerActions';
 import SuperUserSupportActions from '@/components/hubs/superuser/SuperUserSupportActions';
 import SuperUserProjectControlActions from '@/components/hubs/superuser/SuperUserProjectControlActions';
 import SuperUserOperationsActions from '@/components/hubs/superuser/SuperUserOperationsActions';
@@ -48,6 +49,7 @@ function SuperUserRouter() {
         ) : (
           <>
             <SuperUserModuleWorkspace view={view} />
+            <SuperUserTeamManagerActions view={view} />
             <SuperUserDomainActions view={view} />
             <SuperUserSecurityActions view={view} />
             <SuperUserFinanceActions view={view} />
