@@ -6,6 +6,7 @@ export type SuperUserIdentity = {
   userId: string;
   email: string;
   operatorId: string;
+  personId: string | null;
   displayName: string;
   canOnboardClients: boolean;
   canManagePlatformSettings: boolean;
@@ -45,7 +46,7 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
   if (!user.id || !email) throw new SuperUserAuthError('Authenticated user has no usable identity.', 403);
 
   const operatorResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/platform_superuser_operators?select=id,email,display_name,active,can_onboard_clients,can_manage_platform_settings&email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`,
+    `${SUPABASE_URL}/rest/v1/platform_superuser_operators?select=id,email,display_name,person_id,active,can_onboard_clients,can_manage_platform_settings&email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`,
     {
       headers: {
         apikey: SERVICE_KEY,
@@ -59,6 +60,7 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
 
   const operators = (await operatorResponse.json()) as Array<{
     id: string;
+    person_id: string | null;
     display_name: string | null;
     can_onboard_clients: boolean | null;
     can_manage_platform_settings: boolean | null;
@@ -70,6 +72,7 @@ export async function requireSuperUser(request: Request): Promise<SuperUserIdent
     userId: user.id,
     email,
     operatorId: operator.id,
+    personId: operator.person_id || null,
     displayName: operator.display_name || email,
     canOnboardClients: Boolean(operator.can_onboard_clients),
     canManagePlatformSettings: Boolean(operator.can_manage_platform_settings),
