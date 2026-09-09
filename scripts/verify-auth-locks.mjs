@@ -13,6 +13,7 @@ if(/const\s+supabase\s*=\s*createClient\s*\(/.test(loginSource)||/const\s+supaba
 
 const runtimeAuthFiles=[
   'lib/server/requireSuperUser.ts',
+  'lib/server/superUserRest.ts',
   'app/api/superuser-auth/session/route.ts',
   'app/api/superuser-command/route.ts',
   'app/api/superuser-delivery-scope/route.ts',
@@ -37,8 +38,13 @@ for(const file of runtimeAuthFiles){
   const source=read(file);
   if(!source){failures.push(`${file}: missing Super User runtime auth target.`);continue;}
   if(source.includes('SUPABASE_SERVICE_ROLE_KEY'))failures.push(`${file}: active Super User runtime must not depend on a service-role secret.`);
-  if(!source.includes('Bearer ${actor.accessToken}')&&file!=='lib/server/requireSuperUser.ts'&&file!=='app/api/superuser-auth/session/route.ts')failures.push(`${file}: authenticated RLS token propagation is missing.`);
+  if(file==='lib/server/requireSuperUser.ts'||file==='app/api/superuser-auth/session/route.ts')continue;
+  const directBearer=source.includes('Bearer ${actor.accessToken}');
+  const centralizedBearer=source.includes('superUserRest')||source.includes('superUserRpc')||source.includes('superUserHeaders');
+  if(!directBearer&&!centralizedBearer)failures.push(`${file}: authenticated RLS token propagation is missing.`);
 }
+const restSource=read('lib/server/superUserRest.ts');
+if(!restSource.includes('Bearer ${actor.accessToken}')||!restSource.includes("headers.set('Authorization'"))failures.push('lib/server/superUserRest.ts: centralized authenticated RLS propagation contract is missing.');
 const navSource=read('app/api/hub-navigation/route.ts');
 if(!navSource.includes("hubId === 'superuser' ? await requireSuperUser(request) : null"))failures.push('Super User navigation must require the authenticated Super User identity.');
 if(!navSource.includes('actor?.accessToken'))failures.push('Super User navigation must propagate the caller JWT through RLS.');
