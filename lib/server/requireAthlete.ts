@@ -31,6 +31,12 @@ async function rest<T>(token:string,path:string):Promise<T>{
   return (text?JSON.parse(text):null) as T;
 }
 
+function cookieToken(request:Request){
+  const cookie=request.headers.get('cookie')||'';
+  const pair=cookie.split(';').map(v=>v.trim()).find(v=>v.startsWith('ls1_superuser_session='));
+  return pair?decodeURIComponent(pair.slice('ls1_superuser_session='.length)):'';
+}
+
 function ageBand(birthDate:string|null|undefined):AthleteIdentity['ageBand']{
   if(!birthDate) return null;
   const birth=new Date(`${birthDate}T00:00:00Z`);
@@ -50,7 +56,8 @@ function ageBand(birthDate:string|null|undefined):AthleteIdentity['ageBand']{
 export async function requireAthlete(request:Request):Promise<AthleteIdentity>{
   if(!SUPABASE_URL||!PUBLIC_KEY) throw new AthleteAuthError('Athlete authentication is not configured.',500);
   const auth=request.headers.get('authorization')||'';
-  const token=auth.startsWith('Bearer ')?auth.slice(7).trim():'';
+  const headerToken=auth.startsWith('Bearer ')?auth.slice(7).trim():'';
+  const token=headerToken||cookieToken(request);
   if(!token) throw new AthleteAuthError('Authentication required.',401);
 
   const userResponse=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:headers(token),cache:'no-store'});
@@ -63,6 +70,7 @@ export async function requireAthlete(request:Request):Promise<AthleteIdentity>{
   const operators=await rest<Array<{display_name:string|null;person_id:string|null}>>(token,`platform_superuser_operators?select=display_name,person_id&auth_user_id=eq.${encodeURIComponent(userId)}&active=eq.true&limit=1`);
   if(operators?.[0]) return {userId,email,personId:operators[0].person_id||null,athleteId:null,athleteNumber:null,ageBand:null,isSuperUser:true,displayName:operators[0].display_name||email||'SuperUser',accessToken:token};
 
+  if(!headerToken) throw new AthleteAuthError('Athlete session token required.',401);
   const users=await rest<Array<{person_id:string|null;status:string}>>(token,`users?select=person_id,status&id=eq.${encodeURIComponent(userId)}&limit=1`);
   const personId=users?.[0]?.person_id||null;
   if(!personId||String(users?.[0]?.status||'').toUpperCase()!=='ACTIVE') throw new AthleteAuthError('Athlete Hub access requires an active person identity.',403);
