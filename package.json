@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "verify:locks": "node scripts/verify-regression-locks.mjs && node scripts/verify-auth-locks.mjs && node scripts/verify-admin-locks.mjs",
+    "verify:locks": "node scripts/verify-regression-locks.mjs && node scripts/verify-auth-locks.mjs && node scripts/verify-admin-locks.mjs && node scripts/verify-admin-authority-locks.mjs",
     "prebuild": "npm run verify:locks",
     "build": "next build",
     "start": "next start",
@@ -21,8 +21,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
