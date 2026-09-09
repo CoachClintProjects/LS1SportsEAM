@@ -2,25 +2,46 @@
    LS1Sports Global Styles
    ===================================================== */
 
-/* =====================================================
-   TAILWIND
-   ===================================================== */
-
 @import "tailwindcss";
-
-/* =====================================================
-   DOCUMENT
-   ===================================================== */
 
 :root {
   color-scheme: dark;
-  background: #050807;
-  color: #f8faf9;
-}
 
-/* =====================================================
-   ROOT
-   ===================================================== */
+  /* Brand */
+  --ls1-brand: #fa4616;
+  --ls1-brand-strong: #ff2b24;
+  --ls1-brand-soft: rgba(250, 70, 22, 0.14);
+
+  /* Surfaces */
+  --ls1-bg: #050807;
+  --ls1-surface-1: #090c0b;
+  --ls1-surface-2: #101313;
+  --ls1-surface-3: #181b1d;
+  --ls1-border: #2a2e30;
+  --ls1-border-strong: #3a3f42;
+
+  /* Typography */
+  --ls1-text: #f8faf9;
+  --ls1-text-muted: #9da5aa;
+  --ls1-text-faint: #6f777c;
+
+  /* Semantic operational language */
+  --ls1-success: #27d17f;
+  --ls1-success-bg: rgba(39, 209, 127, 0.16);
+  --ls1-warning: #f5c542;
+  --ls1-warning-bg: rgba(245, 197, 66, 0.17);
+  --ls1-danger: #ff5c67;
+  --ls1-danger-bg: rgba(255, 92, 103, 0.16);
+  --ls1-info: #4d9cff;
+  --ls1-info-bg: rgba(77, 156, 255, 0.16);
+  --ls1-ai: #b779ff;
+  --ls1-ai-bg: rgba(183, 121, 255, 0.16);
+  --ls1-teal: #2ed3c6;
+  --ls1-teal-bg: rgba(46, 211, 198, 0.16);
+
+  background: var(--ls1-bg);
+  color: var(--ls1-text);
+}
 
 html,
 body {
@@ -28,23 +49,15 @@ body {
   min-height: 100%;
   margin: 0;
   padding: 0;
-  background: #050807;
-  color: #f8faf9;
+  background: var(--ls1-bg);
+  color: var(--ls1-text);
 }
-
-/* =====================================================
-   GLOBAL BOX MODEL
-   ===================================================== */
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
-/* =====================================================
-   BODY
-   ===================================================== */
 
 body {
   min-height: 100vh;
@@ -59,10 +72,6 @@ body {
     sans-serif;
 }
 
-/* =====================================================
-   FORM CONTROLS
-   ===================================================== */
-
 button,
 input,
 textarea,
@@ -74,20 +83,19 @@ button {
   cursor: pointer;
 }
 
-/* =====================================================
-   LINKS
-   ===================================================== */
-
 a {
   color: inherit;
   text-decoration: none;
 }
 
-/* =====================================================
-   SELECTION
-   ===================================================== */
-
 ::selection {
-  background: #fa4616;
+  background: var(--ls1-brand);
   color: #ffffff;
 }
+
+/* Shared semantic helpers. These intentionally describe meaning, not modules. */
+.ls1-status-success { color: var(--ls1-success); background: var(--ls1-success-bg); }
+.ls1-status-warning { color: var(--ls1-warning); background: var(--ls1-warning-bg); }
+.ls1-status-danger { color: var(--ls1-danger); background: var(--ls1-danger-bg); }
+.ls1-status-info { color: var(--ls1-info); background: var(--ls1-info-bg); }
+.ls1-status-ai { color: var(--ls1-ai); background: var(--ls1-ai-bg); }
