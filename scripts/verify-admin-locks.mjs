@@ -16,12 +16,15 @@ const assuranceApi='app/api/admin-competition-assurance/route.ts';
 const adminApi='app/api/admin-command/route.ts';
 const relationship='components/hubs/admin/RelationshipDirectory.tsx';
 const records='components/records/ThreeColumnRecordWorkspace.tsx';
+const operational='components/hubs/admin/AdminOperationalWorkspace.tsx';
+const operationalApi='app/api/admin-operational-snapshot/route.ts';
+const operationalWrappers=['components/hubs/admin/OrganizationArchitecture.tsx','components/hubs/admin/Facilities.tsx','components/hubs/admin/Payroll.tsx','components/hubs/admin/Compliance.tsx','components/hubs/admin/Reporting.tsx'];
 const globals='app/globals.css';
 const migrationCompetition='supabase/migrations/20260909084000_build_admin_competition_operations.sql';
 const migrationDigest='supabase/migrations/20260909084500_surface_competitions_in_admin_daily_digest.sql';
 const migrationAssurance='supabase/migrations/20260909090000_build_competition_entry_assurance.sql';
 
-for(const rel of [workspace,command,data,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
+for(const rel of [workspace,command,data,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,operational,operationalApi,...operationalWrappers,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
 
 if(exists(workspace)){
   const src=read(workspace);
@@ -38,6 +41,20 @@ if(exists(data)){
   const src=read(data);
   for(const forbidden of ['demoInvoices','demoPayments','DEMO-1001','Demo Event Safety Vendor','HPAC Family Account']) if(src.includes(forbidden)) fail(`${data}: fabricated finance fallback ${forbidden} must not return.`);
   for(const marker of ['No invoices yet','No payments yet','No billing accounts yet','will not display fabricated financial activity']) if(!src.includes(marker)) fail(`${data}: truthful finance zero-state marker ${marker} is missing.`);
+}
+if(exists(operational)){
+  const src=read(operational);
+  for(const marker of ['Live tenant-scoped data only','does not substitute demo records','No payroll runs exist yet','No sample reports are being shown']) if(!src.includes(marker)) fail(`${operational}: truthful operational zero-state marker ${marker} is missing.`);
+}
+if(exists(operationalApi)){
+  const src=read(operationalApi);
+  for(const marker of ['requireAdmin(request)','adminRest','organizations?select=','facilities?select=','payroll_runs?select=','compliance_requirements?select=','report_definitions?select=']) if(!src.includes(marker)) fail(`${operationalApi}: live Admin operational source ${marker} is missing.`);
+  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${operationalApi}: operational snapshots must remain caller-JWT/RLS authorized.`);
+}
+for(const rel of operationalWrappers) if(exists(rel)){
+  const src=read(rel);
+  for(const forbidden of ['Sarah Johnson','Mike Wilson','Lisa Brown','Competition Pool','Training Pool','Monthly Athlete Report','Financial Summary Q3','Halifax Aquatics Club']) if(src.includes(forbidden)) fail(`${rel}: fabricated Admin record ${forbidden} must not return.`);
+  if(!src.includes('AdminOperationalWorkspace')) fail(`${rel}: workspace must use the canonical live operational renderer.`);
 }
 if(exists(competitionApi)){
   const src=read(competitionApi);
