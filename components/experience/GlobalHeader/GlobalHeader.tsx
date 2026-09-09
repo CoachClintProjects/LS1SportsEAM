@@ -111,9 +111,22 @@ export function GlobalHeader() {
   }, [activeHubId, searchQuery]);
 
   function handleHubSwitch(hubId: HubType) {
-    setActiveHub(hubId);
+    const targetRoute = getHubRoute(hubId);
     setHubMenuOpen(false);
-    router.push(getHubRoute(hubId));
+
+    if (hubId === activeHubId) return;
+
+    // SuperUser has a server-side session/layout boundary that the ordinary hubs
+    // do not share. A full route transition guarantees that boundary is torn
+    // down before the destination hub mounts instead of allowing a pending
+    // SuperUser refresh/replace to pull the client back to /superuser.
+    if (activeHubId === 'superuser' && hubId !== 'superuser') {
+      window.location.assign(targetRoute);
+      return;
+    }
+
+    setActiveHub(hubId);
+    router.push(targetRoute);
   }
 
   function goSuperUser(view: string) {
