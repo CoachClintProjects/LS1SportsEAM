@@ -18,7 +18,8 @@ import { Imports } from './Imports';
 import { Compliance } from './Compliance';
 import { Reporting } from './Reporting';
 import { VendorDirectory, ExternalOrganizationDirectory } from './RelationshipDirectory';
-import { RostersView,MembershipView,ProgramsView,TeamsView,SeasonsView,BillingView,InvoicesView,PaymentsView } from './AdminDataWorkspaces';
+import { RostersView,ProgramsView,TeamsView,SeasonsView,BillingView,InvoicesView,PaymentsView } from './AdminDataWorkspaces';
+import { MembershipView } from './AdminMembershipDirectory';
 import { AdminCompetitionOperations } from './AdminCompetitionOperations';
 
 const componentRegistry: Record<string, React.ComponentType> = { CommandCenter,OrganizationArchitecture,TeamManager,RegistrarValidation,RostersView,MembershipView,ProgramsView,TeamsView,SeasonsView,FinanceAccounting,BillingView,InvoicesView,PaymentsView,Facilities,VendorDirectory,ExternalOrganizationDirectory,Payroll,Imports,Compliance,Reporting,AdminCompetitionOperations };
