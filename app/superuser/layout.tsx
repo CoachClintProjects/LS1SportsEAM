@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { verifySuperUserToken } from '@/lib/server/superuserAuth';
+import SuperUserSessionBridge from '@/components/hubs/superuser/SuperUserSessionBridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export default async function SuperUserLayout({ children }: { children: ReactNod
   const operator = await verifySuperUserToken(token);
 
   if (!operator) {
-    redirect('/login?next=/superuser');
+    return <SuperUserSessionBridge />;
   }
 
   return <>{children}</>;
