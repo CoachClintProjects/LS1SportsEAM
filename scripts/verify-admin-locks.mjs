@@ -34,6 +34,11 @@ if(exists(command)){
   if(!src.includes('Action Center: What Should I Do Today?')) fail(`${command}: Admin action-center contract is missing.`);
   if(!src.includes('15000')) fail(`${command}: Admin daily digest must retain visible operational refresh behavior.`);
 }
+if(exists(data)){
+  const src=read(data);
+  for(const forbidden of ['demoInvoices','demoPayments','DEMO-1001','Demo Event Safety Vendor','HPAC Family Account']) if(src.includes(forbidden)) fail(`${data}: fabricated finance fallback ${forbidden} must not return.`);
+  for(const marker of ['No invoices yet','No payments yet','No billing accounts yet','will not display fabricated financial activity']) if(!src.includes(marker)) fail(`${data}: truthful finance zero-state marker ${marker} is missing.`);
+}
 if(exists(competitionApi)){
   const src=read(competitionApi);
   for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','competition_participation_responses','competition_logistics_requirements','send-reminders','set-response','update-logistics']) if(!src.includes(marker)) fail(`${competitionApi}: required competition operations marker ${marker} is missing.`);
