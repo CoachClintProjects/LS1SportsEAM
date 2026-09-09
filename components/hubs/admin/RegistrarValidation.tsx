@@ -1,12 +1,13 @@
 'use client';
 
-export function RegistrarValidation() {
-  return (
-    <div className="text-white p-6">
-      <h1 className="text-2xl font-black">Registrar</h1>
-      <p className="text-neutral-400">Registration management content coming soon.</p>
-    </div>
-  );
-}
+import { useEffect,useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { ClipboardCheck,RefreshCw } from 'lucide-react';
 
+type Registration={id:string;athlete_id:string;season_id:string;program_id:string;submitted_at:string|null;approved_at:string|null;status:string;source:string|null};
+export function RegistrarValidation(){
+ const[rows,setRows]=useState<Registration[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ useEffect(()=>{async function load(){try{const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key)throw new Error('Supabase browser configuration is missing.');const{data,error}=await createClient(url,key).from('registrations').select('id,athlete_id,season_id,program_id,submitted_at,approved_at,status,source').order('submitted_at',{ascending:false});if(error)throw error;setRows((data||[]) as Registration[])}catch(e:any){setError(e.message||'Unable to load registrations.')}finally{setLoading(false)}}void load()},[]);
+ return <main className="space-y-5 p-5 text-white lg:p-7"><header className="border-b border-neutral-800 pb-5"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#FA4616]"><ClipboardCheck className="h-4 w-4"/>Registrar</div><h1 className="mt-2 text-3xl font-black">Registration queue</h1><p className="mt-1 text-sm text-neutral-400">Submitted athlete registrations, approval state and source. This view uses the live registration table.</p></header>{loading?<div className="flex items-center gap-2 rounded-xl border border-neutral-800 p-6 text-neutral-400"><RefreshCw className="h-4 w-4 animate-spin"/>Loading registrations…</div>:error?<div className="rounded-xl border border-red-500/30 p-4 text-red-200">{error}</div>:rows.length?<div className="overflow-hidden rounded-2xl border border-neutral-800"><table className="w-full text-left text-sm"><thead className="bg-[#0d1010] text-xs uppercase text-neutral-500"><tr><th className="p-4">Status</th><th className="p-4">Submitted</th><th className="p-4">Source</th><th className="p-4">Approved</th></tr></thead><tbody className="divide-y divide-neutral-800">{rows.map(r=><tr key={r.id}><td className="p-4 font-bold capitalize">{r.status}</td><td className="p-4">{r.submitted_at?new Date(r.submitted_at).toLocaleString('en-CA'):'—'}</td><td className="p-4">{r.source||'—'}</td><td className="p-4">{r.approved_at?new Date(r.approved_at).toLocaleString('en-CA'):'—'}</td></tr>)}</tbody></table></div>:<section className="rounded-2xl border border-dashed border-neutral-700 bg-[#090b0b] p-10 text-center"><ClipboardCheck className="mx-auto h-6 w-6 text-emerald-400"/><h2 className="mt-3 text-lg font-black">No registrations</h2><p className="mx-auto mt-2 max-w-xl text-sm text-neutral-400">There are currently no registration records in the authorized organization scope. New submissions will appear here automatically; this is a live zero state, not a placeholder.</p></section>}</main>
+}
 export default RegistrarValidation;
