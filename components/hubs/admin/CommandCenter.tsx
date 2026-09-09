@@ -1,256 +1,59 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Plus,
-  RefreshCw,
-  Wallet,
-  X,
-} from 'lucide-react';
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import { Activity,AlertTriangle,CalendarDays,CheckCircle2,ChevronRight,Clock3,Plus,RefreshCw,Sparkles,X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 
-type Row = Record<string, any>;
-type Payload = {
-  invoices: Row[];
-  vendorBills: Row[];
-  tasks: Row[];
-  metrics: {
-    arBalance: number;
-    apBalance: number;
-    openInvoices: number;
-    pastDue: number;
-    activeAthletes: number;
-    activeTeams: number;
-  };
-  generatedAt: string;
-  source: string;
-  error?: string;
+type Row=Record<string,any>;
+type Payload={
+ actor:{displayName:string;roles:string[];isSuperUser:boolean};events:Row[];tasks:Row[];quickActions:Row[];registrations:Row[];invoices:Row[];vendorBills:Row[];activity:Row[];
+ metrics:{priorityWork:number;todayEvents:number;pendingRegistrations:number;arBalance:number;apBalance:number;pastDue:number;activeAthletes:number;activeTeams:number};generatedAt:string;source:string;error?:string;
 };
 
-const money = (value: unknown) =>
-  new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(value || 0));
+type Drawer={kind:'event'|'task'|'metric';title:string;row?:Row;metric?:{label:string;value:string|number;description:string}};
+const roleLabel=(roles:string[])=>roles.map(role=>({org_admin:'Organization Admin',registrar:'Registrar',treasurer:'Treasurer',operations:'Operations',compliance:'Compliance',reporting:'Reporting',team_engine:'Team Engine Admin'}[role]||role)).join(' · ');
+const money=(value:unknown)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0}).format(Number(value||0));
+const time=(value:unknown)=>value?new Date(String(value)).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):'—';
+const dateTime=(value:unknown)=>value?new Date(String(value)).toLocaleString('en-CA',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';
+function Panel({children,className=''}:{children:React.ReactNode;className?:string}){return <section className={`rounded-2xl border border-neutral-800 bg-[#090b0b] ${className}`}>{children}</section>}
 
-function Panel({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5">{children}</section>;
-}
+export function CommandCenter(){
+ const router=useRouter();
+ const[data,setData]=useState<Payload|null>(null),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[drawer,setDrawer]=useState<Drawer|null>(null),[showTask,setShowTask]=useState(false),[saving,setSaving]=useState(false),[title,setTitle]=useState(''),[description,setDescription]=useState('');
+ const pollRef=useRef(true);
+ const load=useCallback(async(background=false)=>{background?setRefreshing(true):setLoading(true);setError('');try{const response=await authenticatedFetch('/api/admin-command',{cache:'no-store'}),json=await response.json();if(!response.ok)throw new Error(json.error||`Admin brief returned ${response.status}`);setData(json)}catch(cause){setError(cause instanceof Error?cause.message:'Unable to load Admin daily brief.')}finally{setLoading(false);setRefreshing(false)}},[]);
+ useEffect(()=>{pollRef.current=true;void load();const tick=()=>{if(document.visibilityState==='visible'&&pollRef.current)void load(true)};const timer=window.setInterval(tick,15000);document.addEventListener('visibilitychange',tick);return()=>{pollRef.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick)}},[load]);
+ async function action(body:Record<string,unknown>){setSaving(true);setError('');try{const response=await authenticatedFetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),json=await response.json();if(!response.ok)throw new Error(json.error||'Admin action failed.');await load(true);return true}catch(cause){setError(cause instanceof Error?cause.message:'Admin action failed.');return false}finally{setSaving(false)}}
+ async function createTask(){const ok=await action({action:'create-task',title,description,priority:'normal'});if(ok){setTitle('');setDescription('');setShowTask(false)}}
+ const roles=data?.actor.roles||[],isRegistrar=roles.some(r=>r==='registrar'||r==='org_admin'),isTreasurer=roles.some(r=>r==='treasurer'||r==='org_admin');
+ const today=useMemo(()=>{const now=new Date(),start=new Date(now);start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);return(data?.events||[]).filter(e=>{const t=new Date(e.starts_at).getTime();return t>=start.getTime()&&t<end.getTime()})},[data?.events]);
+ const upcoming=useMemo(()=>{const ids=new Set(today.map(e=>e.id));return(data?.events||[]).filter(e=>!ids.has(e.id)).slice(0,8)},[data?.events,today]);
+ const firstName=(data?.actor.displayName||'Admin').split(/[ @]/)[0];
+ const metrics=[
+  {label:'Priority work',value:data?.metrics.priorityWork??'—',description:'Open operational and Admin work visible to your authorized scope.'},
+  {label:'Today',value:data?.metrics.todayEvents??'—',description:'Calendar items scheduled for today in your authorized organizations.'},
+  ...(isRegistrar?[{label:'Registration queue',value:data?.metrics.pendingRegistrations??'—',description:'Registration records not yet approved or completed.'}]:[]),
+  ...(isTreasurer?[{label:'Past due',value:data?.metrics.pastDue??'—',description:'Open receivables whose due date has passed.'},{label:'Receivables',value:money(data?.metrics.arBalance),description:'Current outstanding accounts receivable balance.'}]:[]),
+  {label:'Active teams',value:data?.metrics.activeTeams??'—',description:'Active Team Engine teams visible to this Admin scope.'},
+ ];
+ if(loading&&!data)return <main className="p-7 text-white"><div className="flex min-h-[55vh] items-center justify-center gap-3 text-neutral-400"><RefreshCw className="h-5 w-5 animate-spin"/>Loading your daily operating brief…</div></main>;
+ return <main className="space-y-6 p-5 text-white lg:p-7">
+  <section className="flex flex-wrap items-start justify-between gap-5"><div><div className="text-sm font-semibold text-neutral-300">{new Date().toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div><h1 className="mt-2 text-3xl font-black text-white">Good morning, {firstName}</h1><div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-400"><span>{roleLabel(roles)||'Admin'}</span><span>·</span><span>{data?.source||'LS1SportsEAM'}</span></div></div><div className="flex gap-2"><button onClick={()=>setShowTask(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-3 text-xs font-black text-black"><Plus className="h-4 w-4"/>New task</button><button onClick={()=>void load(true)} disabled={refreshing} className="rounded-xl border border-neutral-700 p-3 text-neutral-300 hover:text-white"><RefreshCw className={`h-4 w-4 ${refreshing?'animate-spin':''}`}/></button></div></section>
+  {error&&<div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-200"><AlertTriangle className="h-4 w-4"/>{error}</div>}
 
-export function CommandCenter() {
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showTask, setShowTask] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  <Panel className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-800 p-5"><div><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#FA4616]"><CalendarDays className="h-4 w-4"/>Today</div><h2 className="mt-1 text-xl font-black">Your operating calendar</h2><p className="mt-1 text-sm text-neutral-400">What your organizations need from you today. Calendar data is live from LS1Sports.</p></div><div className="text-xs text-neutral-400">Live read {data?.generatedAt?new Date(data.generatedAt).toLocaleTimeString('en-CA'):'—'}</div></div><div className="grid lg:grid-cols-[1.35fr_.65fr]"><div className="border-b border-neutral-800 p-5 lg:border-b-0 lg:border-r"><div className="space-y-2">{today.length?today.map(event=><button key={event.id} onClick={()=>setDrawer({kind:'event',title:event.title,row:event})} className="grid w-full grid-cols-[86px_1fr_auto] items-center gap-4 rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-[#FA4616]/50"><div className="text-sm font-black text-white">{time(event.starts_at)}</div><div><div className="font-bold text-white">{event.title}</div><div className="mt-1 text-xs text-neutral-400">{event.event_type||'Calendar event'} · {event.status||'scheduled'}</div></div><ChevronRight className="h-4 w-4 text-neutral-500"/></button>):<div className="rounded-xl border border-dashed border-neutral-700 p-7 text-center"><CheckCircle2 className="mx-auto h-5 w-5 text-emerald-400"/><div className="mt-2 font-bold">No scheduled items today</div><div className="mt-1 text-sm text-neutral-400">Your next operating dates are shown at right.</div></div>}</div></div><div className="p-5"><div className="text-xs font-black uppercase tracking-[.14em] text-neutral-300">Coming up</div><div className="mt-3 space-y-2">{upcoming.length?upcoming.map(event=><button key={event.id} onClick={()=>setDrawer({kind:'event',title:event.title,row:event})} className="w-full rounded-xl border border-neutral-800 p-3 text-left hover:border-[#FA4616]/40"><div className="text-xs font-bold text-[#FA4616]">{dateTime(event.starts_at)}</div><div className="mt-1 text-sm font-bold text-white">{event.title}</div></button>):<div className="text-sm text-neutral-500">No upcoming calendar items in the current window.</div>}</div></div></div></Panel>
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetch('/api/admin-command', { cache: 'no-store' });
-      const json = (await response.json()) as Payload;
-      if (!response.ok) throw new Error(json.error || 'Unable to load Admin command data.');
-      setData(json);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load Admin command data.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{metrics.map(metric=><button key={metric.label} onClick={()=>setDrawer({kind:'metric',title:metric.label,metric})} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left transition hover:border-[#FA4616]/45"><div className="text-xs font-semibold uppercase tracking-[.12em] text-neutral-300">{metric.label}</div><div className="mt-2 text-3xl font-black text-white">{metric.value}</div><div className="mt-3 text-xs font-bold text-[#FA4616]">Open detail →</div></button>)}</div>
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  <div className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><Panel className="p-5"><div className="flex items-center justify-between gap-4"><div><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#FA4616]"><Activity className="h-4 w-4"/>Priority work</div><h2 className="mt-1 text-xl font-black">What needs your attention</h2></div><div className="text-2xl font-black">{data?.tasks.length||0}</div></div><div className="mt-4 space-y-2">{(data?.tasks||[]).slice(0,10).map(task=><button key={`${task.source}-${task.id}`} onClick={()=>setDrawer({kind:'task',title:task.title||task.work_type,row:task})} className="flex w-full items-start gap-3 rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-[#FA4616]/40"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#FA4616]"/><div className="min-w-0 flex-1"><div className="font-bold text-white">{task.title||task.work_type}</div><div className="mt-1 text-xs text-neutral-400">{task.description||'No description'}{task.due_at?` · due ${dateTime(task.due_at)}`:''} · {task.priority||'normal'}</div></div><ChevronRight className="h-4 w-4 text-neutral-500"/></button>)}{!data?.tasks.length&&<div className="rounded-xl border border-dashed border-neutral-700 p-6 text-sm text-neutral-400">No open Admin work is assigned in your current scope.</div>}</div></Panel>
+   <Panel className="p-5"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#FA4616]"><Sparkles className="h-4 w-4"/>Quick actions</div><h2 className="mt-1 text-xl font-black">Start the next correct workflow</h2><div className="mt-4 space-y-2">{(data?.quickActions||[]).map(action=><button key={action.id} onClick={()=>router.push(action.href)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-neutral-800 bg-[#0d1010] p-4 text-left hover:border-[#FA4616]/45"><div><div className="font-bold text-white">{action.label}</div><div className="mt-1 text-xs leading-5 text-neutral-400">{action.description}</div></div><ChevronRight className="h-4 w-4 shrink-0 text-[#FA4616]"/></button>)}{!data?.quickActions.length&&<div className="rounded-xl border border-dashed border-neutral-700 p-6 text-sm text-neutral-400">No quick actions are configured for this Admin role yet.</div>}</div></Panel></div>
 
-  async function action(body: Record<string, unknown>) {
-    setSaving(true);
-    setError('');
-    try {
-      const response = await fetch('/api/admin-command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Admin action failed.');
-      await load();
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Admin action failed.');
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
+  <div className="grid gap-6 xl:grid-cols-2"><Panel className="p-5"><div className="text-xs font-black uppercase tracking-[.16em] text-[#FA4616]">Exceptions</div><h2 className="mt-1 text-xl font-black">Role-specific watch list</h2><div className="mt-4 space-y-3">{isRegistrar&&<div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-sm font-bold">Registration queue</div><div className="mt-1 text-2xl font-black">{data?.metrics.pendingRegistrations??0}</div><div className="mt-1 text-xs text-neutral-400">Submitted records awaiting completion or approval.</div></div>}{isTreasurer&&<><div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-sm font-bold">Past-due receivables</div><div className="mt-1 text-2xl font-black">{data?.metrics.pastDue??0}</div></div><div className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-sm font-bold">Payables exposure</div><div className="mt-1 text-2xl font-black">{money(data?.metrics.apBalance)}</div></div></>}{!isRegistrar&&!isTreasurer&&<div className="rounded-xl border border-dashed border-neutral-700 p-6 text-sm text-neutral-400">No specialized exception panel applies to this role yet. Priority work remains authoritative.</div>}</div></Panel>
+   <Panel className="p-5"><div className="text-xs font-black uppercase tracking-[.16em] text-[#FA4616]">Activity feed</div><h2 className="mt-1 text-xl font-black">Recent authorized activity</h2><div className="mt-4 space-y-2">{(data?.activity||[]).slice(0,8).map(item=><div key={item.id} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-sm font-bold text-white">{item.action}</div><div className="mt-1 text-xs text-neutral-400">{item.entity_type||'record'} · {dateTime(item.occurred_at)}</div></div>)}{!data?.activity.length&&<div className="rounded-xl border border-dashed border-neutral-700 p-6 text-sm text-neutral-400">No audit activity is visible to this role in the current scope.</div>}</div></Panel></div>
 
-  async function createTask() {
-    const ok = await action({ action: 'create-task', title, description, priority: 'normal' });
-    if (ok) {
-      setTitle('');
-      setDescription('');
-      setShowTask(false);
-    }
-  }
+  {drawer&&<div className="fixed inset-0 z-[100] flex justify-end bg-black/70 backdrop-blur-sm" onClick={()=>setDrawer(null)}><aside className="h-full w-full max-w-xl overflow-y-auto border-l border-neutral-800 bg-[#080a0a] p-6" onClick={e=>e.stopPropagation()}><div className="flex items-start justify-between gap-4"><div><div className="text-xs font-black uppercase tracking-[.16em] text-[#FA4616]">Admin daily brief detail</div><h2 className="mt-2 text-2xl font-black">{drawer.title}</h2></div><button onClick={()=>setDrawer(null)} className="rounded-lg border border-neutral-700 p-2 text-neutral-300"><X className="h-4 w-4"/></button></div>{drawer.metric&&<div className="mt-6 rounded-xl border border-neutral-800 bg-[#0d1010] p-5"><div className="text-4xl font-black">{drawer.metric.value}</div><p className="mt-3 text-sm leading-6 text-neutral-300">{drawer.metric.description}</p><div className="mt-4 text-xs text-neutral-500">Source: {data?.source}</div></div>}{drawer.kind==='event'&&drawer.row&&<div className="mt-6 space-y-3 text-sm"><div className="rounded-xl border border-neutral-800 p-4"><b>When:</b> {dateTime(drawer.row.starts_at)} → {time(drawer.row.ends_at)}</div><div className="rounded-xl border border-neutral-800 p-4"><b>Type:</b> {drawer.row.event_type||'Calendar event'} · {drawer.row.status||'scheduled'}</div></div>}{drawer.kind==='task'&&drawer.row&&<div className="mt-6 space-y-3"><div className="rounded-xl border border-neutral-800 p-4 text-sm leading-6 text-neutral-300">{drawer.row.description||'No additional description.'}</div><button disabled={saving} onClick={async()=>{const ok=await action({action:'complete-task',id:drawer.row!.id,source:drawer.row!.source});if(ok)setDrawer(null)}} className="w-full rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-black disabled:opacity-40">{saving?'Saving…':'Mark complete'}</button></div>}</aside></div>}
 
-  const metrics = data?.metrics;
-  const tasks = data?.tasks || [];
-  const invoices = data?.invoices || [];
-
-  return (
-    <main className="space-y-6 p-5 text-white lg:p-7">
-      <section className="flex flex-wrap items-start justify-between gap-5">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.24em] text-[#FA4616]">HPAC ADMIN · LIVE OPERATIONS</div>
-          <h1 className="mt-1 text-3xl font-black text-white">Command Center</h1>
-          <p className="mt-2 text-sm text-neutral-400">
-            {new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-          <p className="mt-1 text-[10px] text-neutral-600">
-            {data?.generatedAt ? `Live refresh ${new Date(data.generatedAt).toLocaleTimeString('en-CA')}` : 'Loading live LS1SportsEAM data'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowTask(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-3 text-xs font-black text-black"
-          >
-            <Plus className="h-4 w-4" /> New task
-          </button>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="rounded-xl border border-neutral-700 p-3 text-neutral-400 hover:text-white"
-            aria-label="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </section>
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-200">
-          <AlertTriangle className="h-4 w-4" /> {error}
-        </div>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {[
-          ['AR Balance', money(metrics?.arBalance), Wallet],
-          ['AP Balance', money(metrics?.apBalance), Wallet],
-          ['Open Invoices', metrics?.openInvoices ?? '—', Clock],
-          ['Past Due', metrics?.pastDue ?? '—', AlertTriangle],
-          ['Active Athletes', metrics?.activeAthletes ?? '—', Activity],
-          ['Active Teams', metrics?.activeTeams ?? '—', CheckCircle2],
-        ].map(([label, value, Icon]: any) => (
-          <Panel key={label}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[8px] font-black uppercase tracking-[.16em] text-neutral-600">{label}</div>
-              <Icon className="h-4 w-4 text-[#FA4616]" />
-            </div>
-            <div className="mt-3 text-2xl font-black text-white">{value}</div>
-          </Panel>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
-        <Panel>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[.18em] text-[#FA4616]">Operational work</div>
-              <h2 className="mt-1 text-xl font-black text-white">Open Admin Tasks</h2>
-            </div>
-            <div className="text-2xl font-black text-white">{tasks.length}</div>
-          </div>
-          <div className="mt-5 space-y-2">
-            {tasks.length ? (
-              tasks.map((task) => (
-                <div key={task.id} className="flex items-start gap-3 rounded-xl border border-neutral-800 bg-[#0d1010] p-4">
-                  <Activity className="mt-0.5 h-4 w-4 shrink-0 text-[#FA4616]" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-white">{task.payload?.title || task.work_type}</div>
-                    <div className="mt-1 text-xs text-neutral-500">{task.payload?.description || 'No description'} · {task.priority || 'normal'}</div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void action({ action: 'complete-task', id: task.id })}
-                    className="rounded-lg bg-emerald-400 px-3 py-2 text-[10px] font-black text-black"
-                  >
-                    Complete
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-800 p-6 text-sm text-neutral-500">No open Admin work items.</div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel>
-          <div className="text-[9px] font-black uppercase tracking-[.18em] text-[#FA4616]">Accounts receivable</div>
-          <h2 className="mt-1 text-xl font-black text-white">Recent Invoices</h2>
-          <div className="mt-5 space-y-2">
-            {invoices.length ? (
-              invoices.slice(0, 8).map((invoice) => (
-                <div key={invoice.id} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-bold text-white">{invoice.invoice_number}</div>
-                    <div className="font-black text-white">{money(invoice.balance_due)}</div>
-                  </div>
-                  <div className="mt-1 text-[10px] uppercase tracking-[.12em] text-neutral-600">
-                    {invoice.status || 'unknown'} · due {invoice.due_date || 'not set'}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-800 p-6 text-sm text-neutral-500">No invoice records are currently loaded.</div>
-            )}
-          </div>
-        </Panel>
-      </div>
-
-      {showTask && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-neutral-700 bg-[#090b0b] p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[9px] font-black uppercase tracking-[.18em] text-[#FA4616]">Write to live database</div>
-                <h2 className="mt-1 text-2xl font-black text-white">New Admin Task</h2>
-              </div>
-              <button type="button" onClick={() => setShowTask(false)} className="rounded-lg border border-neutral-700 p-2 text-neutral-400">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-6 space-y-4">
-              <input
-                autoFocus
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Task title"
-                className="w-full rounded-xl border border-neutral-700 bg-black p-3 text-white"
-              />
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Description"
-                className="min-h-28 w-full rounded-xl border border-neutral-700 bg-black p-3 text-white"
-              />
-            </div>
-            <button
-              type="button"
-              disabled={saving || !title.trim()}
-              onClick={() => void createTask()}
-              className="mt-5 w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-40"
-            >
-              {saving ? 'Saving…' : 'Create live task'}
-            </button>
-          </div>
-        </div>
-      )}
-    </main>
-  );
+  {showTask&&<div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4"><div className="w-full max-w-lg rounded-2xl border border-neutral-700 bg-[#090b0b] p-6"><div className="flex items-start justify-between"><div><div className="text-xs font-black uppercase tracking-[.16em] text-[#FA4616]">Create Admin work</div><h2 className="mt-1 text-2xl font-black">New task</h2></div><button onClick={()=>setShowTask(false)} className="rounded-lg border border-neutral-700 p-2 text-neutral-300"><X className="h-4 w-4"/></button></div><div className="mt-6 space-y-4"><input autoFocus value={title} onChange={e=>setTitle(e.target.value)} placeholder="Task title" className="w-full rounded-xl border border-neutral-700 bg-black p-3 text-white"/><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Description" className="min-h-28 w-full rounded-xl border border-neutral-700 bg-black p-3 text-white"/></div><button disabled={saving||!title.trim()} onClick={()=>void createTask()} className="mt-5 w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-40">{saving?'Saving…':'Create live task'}</button></div></div>}
+ </main>;
 }
