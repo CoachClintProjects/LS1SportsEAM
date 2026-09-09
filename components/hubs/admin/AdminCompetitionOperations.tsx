@@ -1,19 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BellRing, CalendarDays, CheckCircle2, ChevronRight, MapPin, RefreshCw, ShipWheel, Trophy, Users, XCircle } from 'lucide-react';
+import { AlertTriangle, BellRing, CalendarDays, CheckCircle2, ChevronRight, MapPin, RefreshCw, ShipWheel, Trophy } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
+import { CompetitionEntryAssurancePanel } from '@/components/competition/CompetitionEntryAssurancePanel';
 
 type Row = Record<string, any>;
-
-type Payload = {
-  competitions: Row[];
-  vendors: Row[];
-  actor?: { canManageAttendance?: boolean; canManageLogistics?: boolean };
-  generatedAt?: string;
-  source?: string;
-  error?: string;
-};
+type Payload = { competitions: Row[]; vendors: Row[]; actor?: { canManageAttendance?: boolean; canManageLogistics?: boolean }; generatedAt?: string; source?: string; error?: string };
 
 function formatDate(value: unknown) {
   if (!value) return 'Date not set';
@@ -36,7 +29,7 @@ function MetricCard({ label, value, detail, tone }: { label: string; value: numb
 
 export function AdminCompetitionOperations() {
   const [data,setData] = useState<Payload>({ competitions: [], vendors: [] });
-  const [selectedId,setSelectedId] = useState<string>('');
+  const [selectedId,setSelectedId] = useState('');
   const [loading,setLoading] = useState(true);
   const [working,setWorking] = useState(false);
   const [message,setMessage] = useState('');
@@ -72,7 +65,7 @@ export function AdminCompetitionOperations() {
 
   return <main className="min-h-full bg-[#060707] p-5 text-white lg:p-7">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><div className="flex items-center gap-2 text-sm font-black uppercase tracking-[.16em] text-[#FA4616]"><Trophy className="h-5 w-5"/>Admin operations</div><h1 className="mt-2 text-3xl font-black">Competitions</h1><p className="mt-2 max-w-3xl text-base leading-7 text-neutral-300">A simple administrative bridge to the Competition Engine: who is eligible, who is going, who has not responded, and what event logistics are still unresolved.</p></div>
+      <div><div className="flex items-center gap-2 text-sm font-black uppercase tracking-[.16em] text-[#FA4616]"><Trophy className="h-5 w-5"/>Admin operations</div><h1 className="mt-2 text-3xl font-black">Competitions</h1><p className="mt-2 max-w-4xl text-base leading-7 text-neutral-300">Who is eligible, who is going, who has not responded, whether every committed athlete is actually entered and verified, and what event logistics are unresolved.</p></div>
       <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-neutral-700 px-4 py-3 text-sm font-black text-neutral-200 hover:bg-neutral-900"><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/>Refresh</button>
     </div>
     {error && <div className="mt-5 rounded-xl border border-red-500/35 bg-red-500/10 p-4 text-base text-red-100">{error}</div>}
@@ -87,10 +80,12 @@ export function AdminCompetitionOperations() {
       {selected && <section className="space-y-5">
         <div className="rounded-2xl border border-neutral-800 bg-[#0b0d0d] p-5 lg:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="text-sm font-black uppercase tracking-[.12em] text-neutral-500">{selected.competition_type?.replaceAll('_',' ')}</div><h2 className="mt-1 text-2xl font-black">{selected.name}</h2><div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-base text-neutral-300"><span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4"/>{formatDate(selected.starts_at)} – {formatDate(selected.ends_at)}</span>{(selected.city||selected.region)&&<span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4"/>{[selected.city,selected.region].filter(Boolean).join(', ')}</span>}</div></div><StatusPill value={selected.status}/></div></div>
 
-        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"><MetricCard label="Eligible" value={selected.attendance?.eligible||0} detail="Authoritative eligibility evidence" tone="info"/><MetricCard label="Going" value={selected.attendance?.going||0} detail="Confirmed attendance" tone="success"/><MetricCard label="No response" value={selected.attendance?.awaiting||0} detail="Needs a simple response" tone="warning"/><MetricCard label="Not going" value={selected.attendance?.notGoing||0} detail="Declined attendance" tone="danger"/></div>
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"><MetricCard label="Eligible" value={selected.attendance?.eligible||0} detail="Authoritative eligibility evidence" tone="info"/><MetricCard label="Going" value={selected.attendance?.going||0} detail="Intent to attend" tone="success"/><MetricCard label="No response" value={selected.attendance?.awaiting||0} detail="Needs follow-up" tone="warning"/><MetricCard label="Not going" value={selected.attendance?.notGoing||0} detail="Declined attendance" tone="danger"/></div>
+
+        <CompetitionEntryAssurancePanel competitionId={selected.id} mode="admin" />
 
         <div className="grid gap-5 2xl:grid-cols-[1.1fr_.9fr]">
-          <section className="overflow-hidden rounded-2xl border border-neutral-800 bg-[#0b0d0d]"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4"><div><div className="text-lg font-black">Who is going?</div><div className="mt-1 text-sm text-neutral-400">Nothing more complicated than Going / Not Going / Awaiting response.</div></div>{data.actor?.canManageAttendance&&<div className="flex gap-2"><button disabled={working} onClick={() => void act({action:'sync-eligible'}, 'Eligibility synchronized. {created} response records created.')} className="rounded-lg border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-sm font-black text-blue-100 disabled:opacity-50">Sync eligible</button><button disabled={working||!(selected.attendance?.awaiting>0)} onClick={() => void act({action:'send-reminders'}, '{delivered} in-app reminder(s) sent.')} className="inline-flex items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm font-black text-amber-100 disabled:opacity-40"><BellRing className="h-4 w-4"/>Remind nonresponders</button></div>}</div>
+          <section className="overflow-hidden rounded-2xl border border-neutral-800 bg-[#0b0d0d]"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4"><div><div className="text-lg font-black">Eligible athlete response</div><div className="mt-1 text-sm text-neutral-400">Family-facing response stays simple: Going / Not Going / Awaiting response. Going is never presented as entry confirmation.</div></div>{data.actor?.canManageAttendance&&<div className="flex flex-wrap gap-2"><button disabled={working} onClick={() => void act({action:'sync-eligible'}, 'Eligibility synchronized. {created} response records created.')} className="rounded-lg border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-sm font-black text-blue-100 disabled:opacity-50">Sync eligible</button><button disabled={working||!(selected.attendance?.awaiting>0)} onClick={() => void act({action:'send-reminders'}, '{delivered} in-app reminder(s) sent.')} className="inline-flex items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm font-black text-amber-100 disabled:opacity-40"><BellRing className="h-4 w-4"/>Remind nonresponders</button></div>}</div>
             {selected.participation?.length ? <div className="divide-y divide-neutral-800">{selected.participation.map((row:Row)=><div key={row.id} className="flex flex-wrap items-center gap-3 px-5 py-4"><div className="min-w-[220px] flex-1"><div className="text-base font-black">{personName(row)}</div><div className="mt-1 text-sm text-neutral-500">{row.athlete?.person?.email || 'No email shown'}</div></div><StatusPill value={row.response_status}/>{data.actor?.canManageAttendance&&<div className="flex gap-2"><button disabled={working} onClick={()=>void act({action:'set-response',responseId:row.id,responseStatus:'going'},'Response updated.')} className="rounded-lg border border-emerald-500/30 px-3 py-2 text-sm font-bold text-emerald-200 hover:bg-emerald-500/10">Going</button><button disabled={working} onClick={()=>void act({action:'set-response',responseId:row.id,responseStatus:'not_going'},'Response updated.')} className="rounded-lg border border-red-500/30 px-3 py-2 text-sm font-bold text-red-200 hover:bg-red-500/10">Not going</button></div>}</div>)}</div> : <div className="p-6"><div className="text-base font-black">No attendance responses yet</div><p className="mt-2 text-base leading-7 text-neutral-400">Eligibility has not produced attendance-response records for this competition. LS1 will not invent athletes or qualification decisions.</p></div>}
           </section>
 
