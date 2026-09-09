@@ -7,7 +7,7 @@ import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 type Row = Record<string, any>;
 export type OperationalArea = 'organization' | 'facilities' | 'payroll' | 'compliance' | 'reporting';
 
-type Snapshot = { records: Row[]; related: Row[]; options?: Record<string, Row[]>; canWrite?: boolean };
+type Snapshot = { records: Row[]; related: Row[]; options?: Record<string, Row[]>; canWrite?: boolean; canManageRequirements?: boolean };
 const configs: Record<OperationalArea, { eyebrow: string; title: string; subtitle: string; empty: string; columns: Array<[string, string]>; relatedLabel?: string }> = {
   organization: { eyebrow: 'Organization', title: 'Organization Architecture', subtitle: 'Canonical organization hierarchy and operating entities', empty: 'No organization records are available for this tenant.', columns: [['name','Organization'],['organization_type','Type'],['code','Code'],['status','Status']], relatedLabel: 'Sites / legal entities' },
   facilities: { eyebrow: 'Facilities', title: 'Facility Management', subtitle: 'Facilities and booking activity from the live operations ledger', empty: 'No facilities have been configured yet.', columns: [['name','Facility'],['facility_type','Type'],['capacity','Capacity'],['timezone','Timezone'],['status','Status']], relatedLabel: 'Bookings' },
@@ -45,7 +45,7 @@ export function AdminOperationalWorkspace({ area }: { area: OperationalArea }) {
     try {
       const response = await authenticatedFetch(`/api/admin-operational-snapshot?area=${encodeURIComponent(area)}`, { cache: 'no-store' });
       const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to load Admin operational data.');
-      setSnapshot({ records: payload.records || [], related: payload.related || [], options: payload.options || {}, canWrite: Boolean(payload.canWrite) });
+      setSnapshot({ records: payload.records || [], related: payload.related || [], options: payload.options || {}, canWrite: Boolean(payload.canWrite), canManageRequirements: Boolean(payload.canManageRequirements) });
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load Admin operational data.'); }
     finally { setLoading(false); }
   }, [area]);
@@ -73,7 +73,7 @@ export function AdminOperationalWorkspace({ area }: { area: OperationalArea }) {
   const actionOptions: Array<[string,string]> = area === 'organization' ? [['create-organization','Add organization'],['create-site','Add site'],['create-legal-entity','Add legal entity']]
     : area === 'facilities' ? [['create-facility','Add facility'],['create-booking','Book facility']]
     : area === 'payroll' ? [['create-payroll-run','Create payroll run'],['add-payroll-line','Add payroll line'],['set-payroll-status','Advance payroll lifecycle']]
-    : area === 'compliance' ? [['create-compliance-requirement','Add requirement'],['create-background-check','Start background check'],['set-background-check-status','Complete / review background check']]
+    : area === 'compliance' ? [...(snapshot.canManageRequirements ? [['create-compliance-requirement','Add platform requirement'] as [string,string]] : []),['create-background-check','Start background check'],['set-background-check-status','Complete / review background check']]
     : [['create-report-definition','Create report'],['run-report','Run report']];
 
   const field = (name: string, label: string, type = 'text', placeholder = '') => <label className="block"><span className={labelClass}>{label}</span><input type={type} value={form[name] ?? ''} placeholder={placeholder} onChange={(e)=>setForm((f)=>({ ...f, [name]: e.target.value }))} className={inputClass}/></label>;
@@ -86,7 +86,7 @@ export function AdminOperationalWorkspace({ area }: { area: OperationalArea }) {
     if (action === 'create-legal-entity') return <>{select('organization_id','Organization',snapshot.records,(r)=>r.name)}{field('legal_name','Legal name')}{field('registration_number','Registration #')}{field('country_code','Country','text','CA')}{field('base_currency','Currency','text','CAD')}</>;
     if (action === 'create-facility') return <>{select('site_id','Site',options.sites || [],(r)=>r.name)}{field('code','Facility code')}{field('name','Facility name')}{field('facility_type','Facility type')}{field('capacity','Capacity','number')}{field('timezone','Timezone','text','America/Edmonton')}</>;
     if (action === 'create-booking') return <>{select('facility_id','Facility',snapshot.records,(r)=>r.name)}{select('team_id','Team (optional)',options.teams || [],(r)=>r.name)}{field('starts_at','Starts','datetime-local')}{field('ends_at','Ends','datetime-local')}</>;
-    if (action === 'create-payroll-run') return <>{select('legal_entity_id','Legal entity (optional)',options.legalEntities || [],(r)=>r.legal_name)}{field('period_start','Period start','date')}{field('period_end','Period end','date')}{field('pay_date','Pay date','date')}</>;
+    if (action === 'create-payroll-run') return <>{select('legal_entity_id','Legal entity',options.legalEntities || [],(r)=>r.legal_name)}{field('period_start','Period start','date')}{field('period_end','Period end','date')}{field('pay_date','Pay date','date')}</>;
     if (action === 'add-payroll-line') return <>{select('payroll_run_id','Payroll run',snapshot.records,(r)=>`${r.period_start} → ${r.period_end} · ${r.status}`)}{select('person_id','Staff / person',options.people || [],personName)}{field('earnings','Earnings','number')}{field('deductions','Deductions','number')}</>;
     if (action === 'set-payroll-status') return <>{select('id','Payroll run',snapshot.records,(r)=>`${r.period_start} → ${r.period_end} · ${r.status}`)}{staticSelect('status','New status',['approved','paid','draft'])}{field('reason','Reason')}</>;
     if (action === 'create-compliance-requirement') return <>{field('code','Requirement code')}{field('name','Requirement name')}{field('applies_to_role','Applies to role')}{staticSelect('severity','Severity',['required','warning','advisory'])}{field('validity_days','Validity days','number')}<label className="flex items-center gap-2 text-sm text-neutral-300"><input type="checkbox" checked={Boolean(form.applies_to_minor)} onChange={(e)=>setForm((f)=>({ ...f, applies_to_minor:e.target.checked }))}/>Applies to minors</label></>;
