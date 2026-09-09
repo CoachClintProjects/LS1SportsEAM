@@ -9,6 +9,8 @@ const fail=message=>failures.push(message);
 const workspace='components/hubs/admin/AdminWorkspace.tsx';
 const command='components/hubs/admin/CommandCenter.tsx';
 const data='components/hubs/admin/AdminDataWorkspaces.tsx';
+const finance='components/hubs/admin/FinanceAccounting.tsx';
+const financeApi='app/api/admin-finance/route.ts';
 const competitionUi='components/hubs/admin/AdminCompetitionOperations.tsx';
 const assuranceUi='components/competition/CompetitionEntryAssurancePanel.tsx';
 const competitionApi='app/api/admin-competitions/route.ts';
@@ -24,7 +26,7 @@ const migrationCompetition='supabase/migrations/20260909084000_build_admin_compe
 const migrationDigest='supabase/migrations/20260909084500_surface_competitions_in_admin_daily_digest.sql';
 const migrationAssurance='supabase/migrations/20260909090000_build_competition_entry_assurance.sql';
 
-for(const rel of [workspace,command,data,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,operational,operationalApi,...operationalWrappers,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
+for(const rel of [workspace,command,data,finance,financeApi,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,operational,operationalApi,...operationalWrappers,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
 
 if(exists(workspace)){
   const src=read(workspace);
@@ -42,14 +44,24 @@ if(exists(data)){
   for(const forbidden of ['demoInvoices','demoPayments','DEMO-1001','Demo Event Safety Vendor','HPAC Family Account']) if(src.includes(forbidden)) fail(`${data}: fabricated finance fallback ${forbidden} must not return.`);
   for(const marker of ['No invoices yet','No payments yet','No billing accounts yet','will not display fabricated financial activity']) if(!src.includes(marker)) fail(`${data}: truthful finance zero-state marker ${marker} is missing.`);
 }
+if(exists(finance)){
+  const src=read(finance);
+  for(const forbidden of ['Smith Family','Jones Family','Wilson Family','Brown Family','$42,890','$12,340']) if(src.includes(forbidden)) fail(`${finance}: fabricated finance overview ${forbidden} must not return.`);
+  for(const marker of ['/api/admin-finance','No fabricated finance activity is displayed','Save & audit']) if(!src.includes(marker)) fail(`${finance}: governed live finance marker ${marker} is missing.`);
+}
+if(exists(financeApi)){
+  const src=read(financeApi);
+  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','create-invoice','record-payment','set-invoice-status','billing_accounts','balance_due']) if(!src.includes(marker)) fail(`${financeApi}: governed finance lifecycle ${marker} is missing.`);
+  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${financeApi}: Admin finance must remain caller-JWT/RLS authorized.`);
+}
 if(exists(operational)){
   const src=read(operational);
-  for(const marker of ['Live tenant-scoped data only','does not substitute demo records','No payroll runs exist yet','No sample reports are being shown']) if(!src.includes(marker)) fail(`${operational}: truthful operational zero-state marker ${marker} is missing.`);
+  for(const marker of ['Live tenant-scoped data only','Save & audit','RLS + audit controlled','No payroll runs exist yet','No sample reports are being shown']) if(!src.includes(marker)) fail(`${operational}: operational workspace contract ${marker} is missing.`);
 }
 if(exists(operationalApi)){
   const src=read(operationalApi);
-  for(const marker of ['requireAdmin(request)','adminRest','organizations?select=','facilities?select=','payroll_runs?select=','compliance_requirements?select=','report_definitions?select=']) if(!src.includes(marker)) fail(`${operationalApi}: live Admin operational source ${marker} is missing.`);
-  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${operationalApi}: operational snapshots must remain caller-JWT/RLS authorized.`);
+  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','create-organization','create-site','create-facility','create-booking','create-payroll-run','add-payroll-line','set-payroll-status','create-background-check','set-background-check-status','create-report-definition','run-report']) if(!src.includes(marker)) fail(`${operationalApi}: governed Admin lifecycle ${marker} is missing.`);
+  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${operationalApi}: operational workflows must remain caller-JWT/RLS authorized.`);
 }
 for(const rel of operationalWrappers) if(exists(rel)){
   const src=read(rel);
