@@ -19,8 +19,9 @@ import { Compliance } from './Compliance';
 import { Reporting } from './Reporting';
 import { VendorDirectory, ExternalOrganizationDirectory } from './RelationshipDirectory';
 import { RostersView,MembershipView,ProgramsView,TeamsView,SeasonsView,BillingView,InvoicesView,PaymentsView } from './AdminDataWorkspaces';
+import { AdminCompetitionOperations } from './AdminCompetitionOperations';
 
-const componentRegistry: Record<string, React.ComponentType> = { CommandCenter,OrganizationArchitecture,TeamManager,RegistrarValidation,RostersView,MembershipView,ProgramsView,TeamsView,SeasonsView,FinanceAccounting,BillingView,InvoicesView,PaymentsView,Facilities,VendorDirectory,ExternalOrganizationDirectory,Payroll,Imports,Compliance,Reporting };
+const componentRegistry: Record<string, React.ComponentType> = { CommandCenter,OrganizationArchitecture,TeamManager,RegistrarValidation,RostersView,MembershipView,ProgramsView,TeamsView,SeasonsView,FinanceAccounting,BillingView,InvoicesView,PaymentsView,Facilities,VendorDirectory,ExternalOrganizationDirectory,Payroll,Imports,Compliance,Reporting,AdminCompetitionOperations };
 const FallbackComponent=({componentName}:{componentName?:string})=><div className="flex h-full items-center justify-center p-12"><div className="text-center"><div className="text-2xl font-black text-white">Admin Workspace</div><p className="mt-2 text-sm text-neutral-500">{componentName?`Component "${componentName}" is being built.`:'This workspace is being built.'}</p></div></div>;
 
 export function AdminWorkspace(){
