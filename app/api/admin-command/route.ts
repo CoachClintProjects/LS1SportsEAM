@@ -7,14 +7,14 @@ export const revalidate=0;
 
 type Row=Record<string,any>;
 const has=(roles:string[],...wanted:string[])=>wanted.some(role=>roles.includes(role));
-const todayBounds=()=>{const now=new Date(),start=new Date(now);start.setUTCHours(0,0,0,0);const end=new Date(start);end.setUTCDate(end.getUTCDate()+14);return{start:start.toISOString(),end:end.toISOString()}};
+const operatingWindow=()=>{const now=new Date(),start=new Date(now);start.setUTCHours(0,0,0,0);const end=new Date(start);end.setUTCDate(end.getUTCDate()+120);return{start:start.toISOString(),end:end.toISOString()}};
 
 export async function GET(request:NextRequest){
  try{
-  const actor=await requireAdmin(request),roles=actor.roles,{start,end}=todayBounds();
+  const actor=await requireAdmin(request),roles=actor.roles,{start,end}=operatingWindow();
   const actionFilter=roles.length?`&role_name=in.(${roles.map(encodeURIComponent).join(',')})`:'';
   const basePromises:[Promise<any>,Promise<any>,Promise<any>,Promise<any>]=[
-   adminRest(actor,`calendar_events?select=id,title,event_type,starts_at,ends_at,timezone,status,metadata&starts_at=gte.${encodeURIComponent(start)}&starts_at=lt.${encodeURIComponent(end)}&order=starts_at.asc&limit=40`),
+   adminRest(actor,`calendar_events?select=id,title,event_type,starts_at,ends_at,timezone,status,metadata&starts_at=gte.${encodeURIComponent(start)}&starts_at=lt.${encodeURIComponent(end)}&order=starts_at.asc&limit=120`),
    adminRest(actor,'operational_tasks?select=id,title,description,priority,status,due_at,assigned_to&status=neq.completed&order=due_at.asc.nullslast&limit=30'),
    adminRest(actor,'work_items?select=id,work_type,status,priority,payload,owner_person_id&status=neq.completed&limit=30'),
    adminRest(actor,`admin_home_role_actions?select=id,role_name,action_key,label,description,href,sort_order&is_active=eq.true${actionFilter}&order=sort_order.asc`),
@@ -48,7 +48,7 @@ export async function GET(request:NextRequest){
     activeAthletes:athletes.filter(row=>String(row.status||'').toUpperCase()==='ACTIVE').length,
     activeTeams:teams.filter(row=>String(row.status||'').toLowerCase()==='active').length,
    },
-   generatedAt:new Date().toISOString(),source:'LS1SportsEAM Supabase · authenticated Admin RLS',
+   generatedAt:new Date().toISOString(),source:'LS1SportsEAM Supabase · authenticated Admin RLS · 120-day operating calendar',
   },{headers:{'Cache-Control':'no-store'}});
  }catch(error){
   if(error instanceof AdminAuthError)return NextResponse.json({error:error.message},{status:error.status});
