@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "verify:locks": "node scripts/verify-regression-locks.mjs && node scripts/verify-auth-locks.mjs && node scripts/verify-admin-locks.mjs && node scripts/verify-admin-authority-locks.mjs",
+    "verify:locks": "node scripts/verify-regression-locks.mjs && node scripts/verify-auth-locks.mjs && node scripts/verify-admin-locks.mjs && node scripts/verify-admin-authority-locks.mjs && node scripts/verify-athlete-locks.mjs",
     "prebuild": "npm run verify:locks",
     "build": "next build",
     "start": "next start",
