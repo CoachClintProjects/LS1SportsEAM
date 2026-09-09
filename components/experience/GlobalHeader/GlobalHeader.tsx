@@ -31,7 +31,6 @@ function getBrowserSupabase() {
 }
 
 type SearchResult = { id: string; type: string; title: string; subtitle: string; href: string };
-type HubAccess = Record<string, { allowed: boolean; units: number; reason: string }>;
 
 function getHubRoute(hubId: HubType): string {
   switch (hubId) {
@@ -59,8 +58,6 @@ export function GlobalHeader() {
   const pathname = usePathname();
   const { activeHubId, currentHub, setActiveHub } = useHub();
   const [hubMenuOpen, setHubMenuOpen] = useState(false);
-  const [hubAccess, setHubAccess] = useState<HubAccess>({});
-  const [hubAccessLoading, setHubAccessLoading] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -83,24 +80,6 @@ export function GlobalHeader() {
     setHubMenuOpen(false);
     setSearchOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (activeHubId !== 'superuser') return;
-    let active = true;
-    setHubAccessLoading(true);
-    void authenticatedFetch('/api/superuser-hub-access', { cache: 'no-store' })
-      .then(async response => {
-        const json = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(json.error || 'Unable to load hub release access.');
-        if (active) setHubAccess(json.hubs || {});
-      })
-      .catch(error => {
-        console.error('[GlobalHeader] hub access failed', error);
-        if (active) setHubAccess({});
-      })
-      .finally(() => active && setHubAccessLoading(false));
-    return () => { active = false; };
-  }, [activeHubId]);
 
   useEffect(() => {
     if (activeHubId !== 'superuser' || searchQuery.trim().length < 2) {
@@ -132,7 +111,6 @@ export function GlobalHeader() {
   }, [activeHubId, searchQuery]);
 
   function handleHubSwitch(hubId: HubType) {
-    if (activeHubId === 'superuser' && hubId !== 'superuser' && !hubAccess[hubId]?.allowed) return;
     setActiveHub(hubId);
     setHubMenuOpen(false);
     router.push(getHubRoute(hubId));
@@ -168,7 +146,7 @@ export function GlobalHeader() {
         <div className="flex w-[275px] shrink-0 items-center">
           <button type="button" onClick={() => void handleBrandExit()} disabled={exiting} aria-label="Exit LS1Sports and return to corporate site" title="Exit LS1Sports" className="flex flex-col items-start justify-center disabled:opacity-60">
             <span className="text-[22px] font-black leading-none tracking-[-0.04em] text-white">LS1<span className="text-[#FA4616]">Sports</span></span>
-            <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-neutral-500">{exiting ? 'Signing out…' : 'Sports ERP Intelligence'}</span>
+            <span className="mt-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{exiting ? 'Signing out…' : 'Sports ERP Intelligence'}</span>
           </button>
         </div>
 
@@ -183,19 +161,19 @@ export function GlobalHeader() {
                 value={searchQuery}
                 onChange={event => { setSearchQuery(event.target.value); setSearchOpen(true); }}
                 onFocus={() => searchQuery.trim().length >= 2 && setSearchOpen(true)}
-                className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-600"
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-neutral-600"
               />
-              <span className="hidden rounded border border-neutral-800 bg-[#0b0d0d] px-2 py-1 font-mono text-[9px] text-neutral-600 md:block">{searching ? '…' : '/'}</span>
+              <span className="hidden rounded border border-neutral-800 bg-[#0b0d0d] px-2 py-1 font-mono text-xs text-neutral-600 md:block">{searching ? '…' : '/'}</span>
             </div>
 
             {activeHubId === 'superuser' && searchOpen && searchQuery.trim().length >= 2 && (
               <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[120] max-h-[480px] overflow-y-auto rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.6)]">
                 {searchResults.length ? searchResults.map(result => (
                   <button key={`${result.type}-${result.id}`} type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); router.push(result.href); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left hover:bg-neutral-900">
-                    <span className="mt-0.5 rounded border border-neutral-800 bg-[#111313] px-2 py-1 text-[8px] font-black uppercase tracking-[.12em] text-[#FA4616]">{result.type}</span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-white">{result.title}</span><span className="mt-1 block truncate text-[10px] text-neutral-500">{result.subtitle}</span></span>
+                    <span className="mt-0.5 rounded border border-neutral-800 bg-[#111313] px-2 py-1 text-xs font-black uppercase tracking-[.1em] text-[#FA4616]">{result.type}</span>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-white">{result.title}</span><span className="mt-1 block truncate text-xs text-neutral-500">{result.subtitle}</span></span>
                   </button>
-                )) : <div className="px-4 py-6 text-center text-xs text-neutral-500">{searching ? 'Searching live LS1Sports data…' : 'No matching records.'}</div>}
+                )) : <div className="px-4 py-6 text-center text-sm text-neutral-500">{searching ? 'Searching live LS1Sports data…' : 'No matching records.'}</div>}
               </div>
             )}
           </div>
@@ -212,23 +190,24 @@ export function GlobalHeader() {
           <div ref={hubMenuRef} className="relative">
             <button type="button" aria-label="Switch Hub" aria-haspopup="menu" aria-expanded={hubMenuOpen} onClick={() => setHubMenuOpen(open => !open)} className={`flex h-10 items-center gap-2 rounded-lg border px-3 transition-all duration-150 ${hubMenuOpen ? 'border-neutral-700 bg-neutral-900' : 'border-transparent hover:border-neutral-800 hover:bg-neutral-900'}`}>
               <Grid2X2 className="h-[17px] w-[17px] text-neutral-400" strokeWidth={1.8} />
-              <span className="hidden max-w-[120px] truncate text-[12px] font-semibold text-neutral-200 xl:block">{currentHub.name}</span>
+              <span className="hidden max-w-[140px] truncate text-sm font-semibold text-neutral-200 xl:block">{currentHub.name}</span>
               <ChevronDown className={`h-3.5 w-3.5 text-neutral-500 transition-transform duration-150 ${hubMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {hubMenuOpen && (
-              <div role="menu" className="absolute right-0 top-[calc(100%+10px)] z-[100] w-[300px] overflow-hidden rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
-                <div className="border-b border-neutral-800 px-3 pb-3 pt-2"><div className="text-[9px] font-bold uppercase tracking-[0.2em] text-neutral-600">Switch Workspace</div><div className="mt-1 text-[12px] font-semibold text-neutral-300">Current: {currentHub.name}</div></div>
+              <div role="menu" className="absolute right-0 top-[calc(100%+10px)] z-[100] w-[320px] overflow-hidden rounded-xl border border-neutral-800 bg-[#0b0d0d] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
+                <div className="border-b border-neutral-800 px-3 pb-3 pt-2">
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-neutral-500">Switch Workspace</div>
+                  <div className="mt-1 text-sm font-semibold text-neutral-300">Current: {currentHub.name}</div>
+                </div>
                 <div className="pt-1">
                   {hubs.map(hub => {
                     const active = hub.id === activeHubId;
-                    const release = hubAccess[hub.id];
-                    const locked = activeHubId === 'superuser' && hub.id !== 'superuser' && !release?.allowed;
                     return (
-                      <button key={hub.id} type="button" role="menuitem" disabled={locked || hubAccessLoading} title={locked ? release?.reason || 'Hub release is not certified.' : undefined} onClick={() => handleHubSwitch(hub.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${active ? 'bg-[#FA4616]/10 text-white' : locked ? 'cursor-not-allowed text-neutral-700' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border font-mono text-[9px] font-bold ${active ? 'border-[#FA4616]/50 bg-[#FA4616]/10 text-[#FA4616]' : 'border-neutral-800 bg-[#111313] text-neutral-600'}`}>{hub.codeLane.replace('LANE ', '')}</span>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{hub.name}</span><span className="mt-0.5 block truncate text-[10px] text-neutral-600">{locked ? release?.reason || 'Release certification required' : hub.description}</span></span>
-                        {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" /> : locked ? <span className="text-[8px] font-black uppercase tracking-[.12em] text-neutral-700">LOCKED</span> : null}
+                      <button key={hub.id} type="button" role="menuitem" onClick={() => handleHubSwitch(hub.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${active ? 'bg-[#FA4616]/10 text-white' : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'}`}>
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border font-mono text-xs font-bold ${active ? 'border-[#FA4616]/50 bg-[#FA4616]/10 text-[#FA4616]' : 'border-neutral-800 bg-[#111313] text-neutral-500'}`}>{hub.codeLane.replace('LANE ', '')}</span>
+                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{hub.name}</span><span className="mt-0.5 block truncate text-xs text-neutral-500">{hub.description}</span></span>
+                        {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FA4616]" /> : null}
                       </button>
                     );
                   })}
@@ -239,7 +218,7 @@ export function GlobalHeader() {
 
           <button type="button" aria-label="Profile" title="Profile" onClick={() => goSuperUserRoute('/superuser/profile')} className="ml-2 flex h-10 items-center gap-2 rounded-lg border border-transparent px-2 transition-colors duration-150 hover:border-neutral-800 hover:bg-neutral-900">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#FA4616]/50 bg-[#171a1a]"><UserCircle className="h-[18px] w-[18px] text-neutral-300" strokeWidth={1.8} /></span>
-            <span className="hidden text-xs font-semibold text-neutral-300 2xl:block">Profile</span>
+            <span className="hidden text-sm font-semibold text-neutral-300 2xl:block">Profile</span>
           </button>
         </div>
       </div>
