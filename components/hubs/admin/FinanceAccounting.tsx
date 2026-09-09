@@ -1,178 +1,24 @@
-﻿'use client';
-
-import { useState, useEffect } from 'react';
-import { renderIconSync } from '@/lib/icons';
-
-interface Invoice {
-  id: string;
-  family_name: string;
-  amount: number;
-  status: string;
-  due_date: string;
+'use client';
+import { useCallback,useEffect,useMemo,useState } from 'react';
+import { RefreshCw,ShieldCheck } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
+type Row=Record<string,any>;
+const input='w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#FA4616]';
+const money=(v:any)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Number(v||0));
+export function FinanceAccounting(){
+ const[data,setData]=useState<any>({customers:[],billingAccounts:[],invoices:[],payments:[],vendorBills:[],organizations:[],legalEntities:[],metrics:{arBalance:0,apBalance:0,openInvoices:0,pastDue:0},canWrite:false});
+ const[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[action,setAction]=useState(''),[form,setForm]=useState<Row>({});
+ const load=useCallback(async()=>{setLoading(true);setError('');try{const r=await authenticatedFetch('/api/admin-finance',{cache:'no-store'});const p=await r.json();if(!r.ok)throw new Error(p.error||'Unable to load finance.');setData(p)}catch(e){setError(e instanceof Error?e.message:'Unable to load finance.')}finally{setLoading(false)}},[]);
+ useEffect(()=>{void load()},[load]);
+ const submit=async()=>{setSaving(true);setError('');setSuccess('');try{const r=await authenticatedFetch('/api/admin-finance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...form})});const p=await r.json();if(!r.ok)throw new Error(p.error||'Finance action failed.');setSuccess('Saved. Finance audit evidence recorded.');setForm({});await load()}catch(e){setError(e instanceof Error?e.message:'Finance action failed.')}finally{setSaving(false)}};
+ const select=(name:string,label:string,rows:Row[],get:(r:Row)=>string)=><label className="block"><span className="text-[10px] font-bold uppercase text-neutral-500">{label}</span><select className={input} value={form[name]??''} onChange={e=>setForm(f=>({...f,[name]:e.target.value}))}><option value="">Select…</option>{rows.map(r=><option key={r.id} value={r.id}>{get(r)}</option>)}</select></label>;
+ const field=(name:string,label:string,type='text')=><label className="block"><span className="text-[10px] font-bold uppercase text-neutral-500">{label}</span><input type={type} className={input} value={form[name]??''} onChange={e=>setForm(f=>({...f,[name]:e.target.value}))}/></label>;
+ const actionFields=()=>action==='create-customer'?<>{select('organization_id','Organization',data.organizations,r=>r.name)}{field('display_name','Customer name')}{field('customer_code','Customer code')}</>:action==='create-billing-account'?<>{select('customer_id','Customer',data.customers,r=>r.display_name)}{field('currency','Currency')}{field('payment_terms_days','Terms days','number')}{field('credit_limit','Credit limit','number')}</>:action==='create-invoice'?<>{select('customer_id','Customer',data.customers,r=>r.display_name)}{select('legal_entity_id','Legal entity',data.legalEntities,r=>r.legal_name)}{field('invoice_number','Invoice #')}{field('invoice_date','Invoice date','date')}{field('due_date','Due date','date')}{field('subtotal','Subtotal','number')}{field('tax_total','Tax','number')}</>:action==='set-invoice-status'?<>{select('id','Invoice',data.invoices,r=>`${r.invoice_number} · ${r.status}`)}<label className="block"><span className="text-[10px] font-bold uppercase text-neutral-500">Status</span><select className={input} value={form.status??''} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="">Select…</option><option value="issued">issued</option><option value="void">void</option></select></label>{field('reason','Reason')}</>:action==='record-payment'?<>{select('invoice_id','Invoice',data.invoices.filter((r:Row)=>Number(r.balance_due)>0),r=>`${r.invoice_number} · ${money(r.balance_due)} due`)}{field('amount','Amount','number')}{field('payment_date','Payment date','date')}{field('method','Method')}{field('processor_reference','Reference')}</>:null;
+ const invoices=useMemo(()=>data.invoices||[],[data.invoices]);
+ return <main className="space-y-5 p-6 text-white"><header className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[.24em] text-[#FA4616]">Finance & Accounting</div><h1 className="mt-1 text-2xl font-black">Financial Overview</h1><p className="text-sm text-neutral-400">Live AR/AP ledger, billing controls, invoices and payments</p></div><button onClick={()=>void load()} className="flex items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button></header>
+ <section className="grid grid-cols-2 gap-3 md:grid-cols-4"><div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4"><div className="text-xs text-neutral-500">AR balance</div><div className="text-2xl font-black">{money(data.metrics.arBalance)}</div></div><div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4"><div className="text-xs text-neutral-500">AP balance</div><div className="text-2xl font-black">{money(data.metrics.apBalance)}</div></div><div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4"><div className="text-xs text-neutral-500">Open invoices</div><div className="text-2xl font-black">{data.metrics.openInvoices}</div></div><div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4"><div className="text-xs text-neutral-500">Past due</div><div className="text-2xl font-black">{data.metrics.pastDue}</div></div></section>
+ {data.canWrite&&<section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-4"><div className="mb-3 flex items-center gap-2 text-sm font-bold"><ShieldCheck className="h-4 w-4 text-[#FA4616]"/>Governed finance action</div><select className={input} value={action} onChange={e=>{setAction(e.target.value);setForm({});setError('');setSuccess('')}}><option value="">Choose an action…</option><option value="create-customer">Create customer</option><option value="create-billing-account">Create billing account</option><option value="create-invoice">Create invoice</option><option value="set-invoice-status">Issue / void invoice</option><option value="record-payment">Record payment</option></select>{action&&<><div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">{actionFields()}</div><button disabled={saving} onClick={()=>void submit()} className="mt-4 rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black disabled:opacity-50">{saving?'Saving…':'Save & audit'}</button></>}</section>}
+ {success&&<div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">{success}</div>}{error&&<div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+ <section className="overflow-hidden rounded-2xl border border-neutral-800 bg-[#090b0b]"><div className="border-b border-neutral-800 p-4 text-sm font-bold">Invoices · live ledger only</div>{loading?<div className="p-8 text-center text-neutral-500">Loading authorized finance records…</div>:invoices.length===0?<div className="p-10 text-center"><div className="font-bold">No invoices yet</div><p className="mt-2 text-sm text-neutral-500">No fabricated finance activity is displayed.</p></div>:<div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b border-neutral-800 text-left text-[10px] uppercase tracking-wider text-neutral-500"><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Due</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{invoices.map((r:Row)=><tr key={r.id} className="border-b border-neutral-800/50"><td className="px-4 py-3 font-bold">{r.invoice_number}</td><td className="px-4 py-3 text-neutral-400">{r.invoice_date||'—'}</td><td className="px-4 py-3 text-neutral-400">{r.due_date||'—'}</td><td className="px-4 py-3">{money(r.total)}</td><td className="px-4 py-3">{money(r.balance_due)}</td><td className="px-4 py-3 capitalize">{r.status}</td></tr>)}</tbody></table></div>}</section><p className="text-xs text-neutral-600">All values above are calculated from authoritative finance tables under the signed-in Admin identity and RLS.</p></main>
 }
-
-export function FinanceAccounting() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const DollarIcon = renderIconSync('dollar-sign');
-  const WalletIcon = renderIconSync('wallet');
-  const ReceiptIcon = renderIconSync('receipt');
-  const TrendingUpIcon = renderIconSync('trending-up');
-  const TrendingDownIcon = renderIconSync('trending-down');
-  const PlusIcon = renderIconSync('plus');
-  const SearchIcon = renderIconSync('search');
-  const ChevronDownIcon = renderIconSync('chevron-down');
-  const EyeIcon = renderIconSync('eye');
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const mockInvoices: Invoice[] = [
-        { id: 'INV-2026-101', family_name: 'Smith Family', amount: 450.00, status: 'OVERDUE', due_date: '2026-08-15' },
-        { id: 'INV-2026-102', family_name: 'Jones Family', amount: 325.00, status: 'PENDING', due_date: '2026-09-10' },
-        { id: 'INV-2026-103', family_name: 'Wilson Family', amount: 275.00, status: 'PAID', due_date: '2026-08-30' },
-        { id: 'INV-2026-104', family_name: 'Brown Family', amount: 500.00, status: 'OVERDUE', due_date: '2026-08-20' },
-      ];
-      setInvoices(mockInvoices);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PAID': return 'bg-emerald-400/10 text-emerald-400';
-      case 'PENDING': return 'bg-amber-400/10 text-amber-400';
-      case 'OVERDUE': return 'bg-red-400/10 text-red-400';
-      default: return 'bg-neutral-400/10 text-neutral-400';
-    }
-  };
-
-  const tabs = ['Overview', 'Billing', 'Invoices', 'Payments', 'Budgets'];
-
-  return (
-    <div className="p-6 text-white">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.24em] text-[#FA4616]">💰 Finance & Accounting</div>
-          <h1 className="mt-1 text-2xl font-black text-white">Financial Overview</h1>
-          <p className="text-sm text-neutral-400">Manage billing, invoices, and payments</p>
-        </div>
-        <button className="flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-2 text-sm font-bold text-black hover:bg-[#FA4616]/90 transition-colors">
-          {PlusIcon}
-          New Invoice
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-6 flex gap-1 border-b border-neutral-800">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab.toLowerCase())}
-            className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 ${
-              activeTab === tab.toLowerCase()
-                ? 'border-[#FA4616] text-white'
-                : 'border-transparent text-neutral-500 hover:text-white'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Metrics */}
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4">
-          <div className="flex items-center gap-2 text-neutral-500">
-            {DollarIcon}
-            <span className="text-xs">AR Balance</span>
-          </div>
-          <div className="mt-1 text-2xl font-black text-white">$42,890</div>
-          <div className="flex items-center gap-1 text-xs text-emerald-400">
-            {TrendingUpIcon} 12%
-          </div>
-        </div>
-        <div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4">
-          <div className="flex items-center gap-2 text-neutral-500">
-            {WalletIcon}
-            <span className="text-xs">AP Balance</span>
-          </div>
-          <div className="mt-1 text-2xl font-black text-white">$12,340</div>
-          <div className="flex items-center gap-1 text-xs text-red-400">
-            {TrendingDownIcon} 5%
-          </div>
-        </div>
-        <div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4">
-          <div className="flex items-center gap-2 text-neutral-500">
-            {ReceiptIcon}
-            <span className="text-xs">Open Invoices</span>
-          </div>
-          <div className="mt-1 text-2xl font-black text-white">24</div>
-        </div>
-        <div className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4">
-          <div className="flex items-center gap-2 text-neutral-500">
-            <span className="text-xs">Past Due</span>
-          </div>
-          <div className="mt-1 text-2xl font-black text-white">8</div>
-        </div>
-      </div>
-
-      {/* Invoices Table */}
-      <div className="overflow-x-auto rounded-2xl border border-neutral-800 bg-[#090b0b]">
-        <div className="flex items-center justify-between border-b border-neutral-800 p-4">
-          <div className="relative flex-1 max-w-sm">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">{SearchIcon}</span>
-            <input type="text" placeholder="Search invoices..." className="w-full rounded-lg border border-neutral-800 bg-black py-2 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 focus:border-[#FA4616] focus:outline-none" />
-          </div>
-          <button className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-neutral-400 hover:border-neutral-600 hover:text-white transition-colors">
-            {ChevronDownIcon}
-            Filter
-          </button>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-neutral-800 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Family</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Due Date</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
-            ) : invoices.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-500">No invoices found</td></tr>
-            ) : (
-              invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-neutral-400">{inv.id}</td>
-                  <td className="px-4 py-3 font-medium text-white">{inv.family_name}</td>
-                  <td className="px-4 py-3 font-bold text-white">${inv.amount.toFixed(2)}</td>
-                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${getStatusColor(inv.status)}`}>{inv.status}</span></td>
-                  <td className="px-4 py-3 text-neutral-400">{new Date(inv.due_date).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button className="rounded-lg px-3 py-1 text-xs font-bold text-[#FA4616] hover:bg-[#FA4616]/10 transition-colors">{EyeIcon} View</button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 export default FinanceAccounting;
