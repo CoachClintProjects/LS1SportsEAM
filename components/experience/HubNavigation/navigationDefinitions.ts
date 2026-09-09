@@ -51,11 +51,11 @@ type NavigationPayload = {
 };
 
 const ATHLETE_NAV_BY_AGE: Record<string, string[]> = {
-  '5-8': ['Overview'],
-  '9-11': ['Overview', 'Goals', 'Achievements'],
-  '12-14': ['Overview', 'Development', 'Goals', 'Achievements'],
-  '15-17': ['Overview', 'Performance', 'Development', 'Goals', 'Documents', 'Recruiting'],
-  '18+': ['Overview', 'Passport', 'Performance', 'Development', 'Documents', 'Recruiting'],
+  '5-8': ['Overview', 'Calendar', 'Competition', 'Achievements', 'Settings', 'Send Feedback'],
+  '9-11': ['Overview', 'Calendar', 'Competition', 'Development', 'Goals', 'Logbook', 'Skills', 'Achievements', 'Settings', 'Send Feedback'],
+  '12-14': ['Overview', 'Performance', 'Calendar', 'Competition', 'Development', 'Goals', 'Journey', 'Logbook', 'Skills', 'Achievements', 'Settings', 'Send Feedback'],
+  '15-17': ['Overview', 'Performance', 'Training', 'Calendar', 'Competition', 'Development', 'Goals', 'Journey', 'Logbook', 'Documents', 'Media', 'Recruiting', 'Achievements', 'Settings', 'Send Feedback'],
+  '18+': ['Overview', 'Passport', 'Performance', 'Training', 'Calendar', 'Competition', 'Development', 'Goals', 'Journey', 'Health', 'Logbook', 'Documents', 'Media', 'Recruiting', 'Achievements', 'Settings', 'Send Feedback'],
 };
 
 function buildSections(rows: DbNavRow[], hubId: string): NavigationSection[] {
@@ -95,28 +95,17 @@ function buildSections(rows: DbNavRow[], hubId: string): NavigationSection[] {
   const standalone = roots.filter(item => !item.children?.length);
 
   for (const parent of parents) {
-    sections.push({
-      id: parent.id,
-      label: parent.label.toUpperCase(),
-      items: parent.children || [],
-    });
+    sections.push({ id: parent.id, label: parent.label.toUpperCase(), items: parent.children || [] });
   }
 
   if (standalone.length) {
-    sections.unshift({
-      id: `${hubId}-main`,
-      label: hubId.toUpperCase(),
-      items: standalone,
-    });
+    sections.unshift({ id: `${hubId}-main`, label: hubId.toUpperCase(), items: standalone });
   }
 
   return sections.filter(section => section.items.length > 0);
 }
 
-export async function getNavigation(
-  hubId: string,
-  switcherValue = '',
-): Promise<NavigationSection[]> {
+export async function getNavigation(hubId: string, switcherValue = ''): Promise<NavigationSection[]> {
   if (!hubId || typeof window === 'undefined') return [];
 
   try {
@@ -129,16 +118,11 @@ export async function getNavigation(
       : await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
 
     const payload = (await response.json().catch(() => null)) as NavigationPayload | null;
-    if (!response.ok || !payload?.rows?.length) {
-      throw new Error(payload?.error || `Navigation API returned ${response.status}`);
-    }
+    if (!response.ok || !payload?.rows?.length) throw new Error(payload?.error || `Navigation API returned ${response.status}`);
 
     let rows = payload.rows;
-
     if (hubId === 'athlete') {
-      const allowedLabels = new Set(
-        ATHLETE_NAV_BY_AGE[switcherValue] || ATHLETE_NAV_BY_AGE['5-8'],
-      );
+      const allowedLabels = new Set(ATHLETE_NAV_BY_AGE[switcherValue] || ATHLETE_NAV_BY_AGE['5-8']);
       rows = rows.filter(row => allowedLabels.has(row.label));
     }
 
