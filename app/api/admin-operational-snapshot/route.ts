@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
         adminRest<Row[]>(actor, 'background_checks?select=id,person_id,check_type,provider,reference_number,submitted_at,completed_at,expires_on,status,result_classification&order=submitted_at.desc&limit=250'),
         loadPeople(actor),
       ]);
-      return NextResponse.json({ records, related: checks, options: { people }, canWrite: canWrite(actor, area) });
+      return NextResponse.json({ records, related: checks, options: { people }, canWrite: canWrite(actor, area), canManageRequirements: actor.isSuperUser });
     }
 
     const [records, runs] = await Promise.all([
@@ -155,10 +155,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, record: rows?.[0] });
     }
     if (action === 'create-payroll-run') {
+      const legal_entity_id = String(body.legal_entity_id || '');
       const period_start = String(body.period_start || ''); const period_end = String(body.period_end || '');
-      if (!period_start || !period_end) throw new Error('Payroll period start and end are required.');
+      if (!legal_entity_id || !period_start || !period_end) throw new Error('Legal entity, payroll period start and end are required.');
       if (period_end < period_start) throw new Error('Payroll period end must be on or after start.');
-      const rows = await adminRest<Row[]>(actor, 'payroll_runs', { method: 'POST', body: JSON.stringify({ legal_entity_id: text(body.legal_entity_id), period_start, period_end, pay_date: text(body.pay_date), status: 'draft', gross_total: 0, net_total: 0 }) });
+      const rows = await adminRest<Row[]>(actor, 'payroll_runs', { method: 'POST', body: JSON.stringify({ legal_entity_id, period_start, period_end, pay_date: text(body.pay_date), status: 'draft', gross_total: 0, net_total: 0 }) });
       await writeAdminAuditEvent(actor, { action: 'PAYROLL_RUN_CREATED', entityType: 'payroll_run', entityId: rows?.[0]?.id, tenantId, afterData: rows?.[0] });
       return NextResponse.json({ ok: true, record: rows?.[0] });
     }
@@ -183,6 +184,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, record: rows?.[0] });
     }
     if (action === 'create-compliance-requirement') {
+      if (!actor.isSuperUser) throw new AdminAuthError('Compliance requirement definitions are platform-level and require SuperUser authority.', 403);
       const code = String(body.code || '').trim(); const name = String(body.name || '').trim(); if (!code || !name) throw new Error('Requirement code and name are required.');
       const rows = await adminRest<Row[]>(actor, 'compliance_requirements', { method: 'POST', body: JSON.stringify({ code, name, applies_to_role: text(body.applies_to_role), applies_to_minor: Boolean(body.applies_to_minor), severity: text(body.severity) || 'required', validity_days: body.validity_days === '' ? null : numberValue(body.validity_days), rule_definition: {} }) });
       await writeAdminAuditEvent(actor, { action: 'COMPLIANCE_REQUIREMENT_CREATED', entityType: 'compliance_requirement', entityId: rows?.[0]?.id, tenantId, afterData: rows?.[0] });
@@ -212,7 +214,7 @@ export async function POST(request: NextRequest) {
     if (action === 'run-report') {
       const report_id = String(body.report_id || ''); if (!report_id) throw new Error('Report definition is required.');
       const report = (await adminRest<Row[]>(actor, `report_definitions?select=*&id=eq.${encodeURIComponent(report_id)}&limit=1`))?.[0]; if (!report) throw new Error('Report definition not found.');
-      const created = await adminRest<Row[]>(actor, 'report_runs', { method: 'POST', body: JSON.stringify({ report_id, requested_by: actor.userId, status: 'running', started_at: new Date().toISOString(), row_count: 0 }) });
+      const created = await adminRest<Row[]>(actor, 'report_runs', { method: 'POST', body: JSON.stringify({ report_id, requested_by: actor.personId, status: 'running', started_at: new Date().toISOString(), row_count: 0 }) });
       const runId = created?.[0]?.id; const row_count = await countReportRows(actor, String(report.report_type || 'membership').toLowerCase());
       const completed_at = new Date().toISOString();
       const rows = await adminRest<Row[]>(actor, `report_runs?id=eq.${encodeURIComponent(runId)}`, { method: 'PATCH', body: JSON.stringify({ status: 'completed', completed_at, row_count, output_location: `summary://admin/report-runs/${runId}` }) });
