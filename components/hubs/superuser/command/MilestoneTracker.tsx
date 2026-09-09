@@ -1,106 +1,26 @@
-﻿'use client';
+'use client';
 
-// =====================================================
-// LS1Sports SuperUser - Milestone Tracker
-//
-// SECTION: RESPONSIBILITY
-// - Display the 14-milestone development control surface.
-// - Provide a clean contract for live milestone telemetry.
-// - Avoid fabricated progress values.
-//
-// SECTION: FUTURE DATA SOURCE
-// - Development intelligence / milestone service.
-// =====================================================
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Circle, Clock3, RefreshCw } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 
-import React from 'react';
-import {
-  CheckCircle2,
-  Circle,
-  Clock3,
-  AlertTriangle,
-} from 'lucide-react';
+type Milestone = { id:string; code:string; name:string; domain?:string; status?:string; target_percent?:number; metric_definition?:Record<string,any>; sort_order?:number };
+type Unit = { id:string; milestone_id:string; unit_key:string; status:string; implementation_percent:number; operational_percent:number; validation_percent:number; evidence_source?:string|null; evidence_ref?:string|null; verified_at?:string|null };
+type Payload = { milestones:Milestone[]; units:Unit[]; generatedAt?:string; source?:string; progressModel?:string; error?:string };
 
-// =====================================================
-// SECTION: MILESTONE MODEL
-// =====================================================
+function unitPercent(unit:Unit){return (Number(unit.implementation_percent||0)+Number(unit.operational_percent||0)+Number(unit.validation_percent||0))/3;}
+function statusIcon(percent:number,hasBlocker:boolean){if(hasBlocker)return <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400"/>;if(percent>=100)return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400"/>;if(percent>0)return <Clock3 className="h-4 w-4 shrink-0 text-amber-400"/>;return <Circle className="h-4 w-4 shrink-0 text-neutral-700"/>;}
 
-const milestones = [
-  'Platform Foundation',
-  'Identity & Security',
-  'Master Data',
-  'Real Data Onboarding',
-  'Team Manager',
-  'Athlete Intelligence',
-  'Coach Operations',
-  'Parent Operations',
-  'Admin Operations',
-  'Finance & Accounting',
-  'Competition / Meet Systems',
-  'AI & Automation',
-  'Multi-Sport Expansion',
-  'Production Readiness',
-];
-
-// =====================================================
-// SECTION: COMPONENT
-// =====================================================
-
-export function MilestoneTracker() {
-  return (
-    <section className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-[9px] font-bold uppercase tracking-[0.25em] text-neutral-600">
-            Development Intelligence
-          </div>
-
-          <h2 className="mt-1 text-xl font-black text-white">
-            14-Milestone Platform Tracker
-          </h2>
-        </div>
-
-        <div className="rounded-lg border border-neutral-800 bg-[#0d1010] px-3 py-2">
-          <div className="text-[8px] font-bold uppercase tracking-[0.2em] text-neutral-600">
-            Source
-          </div>
-          <div className="mt-1 text-[10px] font-bold text-neutral-400">
-            LIVE DEVELOPMENT MODEL
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {milestones.map((milestone, index) => (
-          <div
-            key={milestone}
-            className="flex items-center gap-3 rounded-lg border border-neutral-800/70 bg-[#0d1010] px-3 py-3"
-          >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-800 bg-[#080909] font-mono text-[9px] text-neutral-600">
-              {String(index + 1).padStart(2, '0')}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[11px] font-semibold text-neutral-300">
-                {milestone}
-              </div>
-
-              <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-neutral-700">
-                Live status connector pending
-              </div>
-            </div>
-
-            {index < 4 ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-            ) : index < 7 ? (
-              <Clock3 className="h-4 w-4 shrink-0 text-amber-400" />
-            ) : index === 7 ? (
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-            ) : (
-              <Circle className="h-4 w-4 shrink-0 text-neutral-700" />
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+export function MilestoneTracker(){
+ const[data,setData]=useState<Payload|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const load=useCallback(async()=>{try{setLoading(true);const r=await authenticatedFetch('/api/superuser-command',{cache:'no-store',credentials:'same-origin'});const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||`Command API returned ${r.status}`);setData(j);setError('');}catch(e){setError(e instanceof Error?e.message:'Development telemetry unavailable');}finally{setLoading(false);}},[]);
+ useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),15000);return()=>window.clearInterval(timer);},[load]);
+ const rows=useMemo(()=>{const milestones=data?.milestones||[],units=data?.units||[];return milestones.map(m=>{const children=units.filter(u=>u.milestone_id===m.id);const percent=children.length?children.reduce((sum,u)=>sum+unitPercent(u),0)/children.length:Number(m.metric_definition?.gate_progress||0);const verified=children.filter(u=>u.verified_at).length;const blocked=children.some(u=>String(u.status).toLowerCase()==='blocked');return{...m,children,percent,verified,blocked};});},[data]);
+ return <section className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-6">
+  <div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-[9px] font-bold uppercase tracking-[0.25em] text-neutral-600">Development Intelligence</div><h2 className="mt-1 text-xl font-black text-white">Live Platform Milestone Tracker</h2><div className="mt-1 text-[10px] text-neutral-600">Implementation + operational + validation evidence · refreshes every 15 seconds</div></div><div className="flex items-center gap-2"><div className="rounded-lg border border-neutral-800 bg-[#0d1010] px-3 py-2"><div className="text-[8px] font-bold uppercase tracking-[0.2em] text-neutral-600">Source</div><div className="mt-1 text-[10px] font-bold text-neutral-400">{data?.source||'LS1SportsEAM Supabase'}</div></div><button onClick={()=>void load()} className="rounded-lg border border-neutral-800 bg-[#0d1010] p-3 text-neutral-500" aria-label="Refresh development telemetry"><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/></button></div></div>
+  {error&&<div className="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs text-rose-300">{error}</div>}
+  <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-3">{rows.map((m,index)=><div key={m.id} className="rounded-lg border border-neutral-800/70 bg-[#0d1010] px-3 py-3"><div className="flex items-center gap-3"><div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-800 bg-[#080909] font-mono text-[9px] text-neutral-600">{String(index+1).padStart(2,'0')}</div><div className="min-w-0 flex-1"><div className="truncate text-[11px] font-semibold text-neutral-300">{m.name}</div><div className="mt-1 flex items-center gap-2 text-[9px] uppercase tracking-[0.12em] text-neutral-600"><span>{m.children.length} evidence units</span><span>·</span><span>{m.verified} verified</span></div></div>{statusIcon(m.percent,m.blocked)}</div><div className="mt-3 flex items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-900"><div className="h-full rounded-full bg-neutral-400" style={{width:`${Math.max(0,Math.min(100,m.percent))}%`}}/></div><div className="w-10 text-right font-mono text-[10px] font-bold text-neutral-400">{Math.round(m.percent)}%</div></div></div>)}</div>
+  {!rows.length&&!loading&&!error&&<div className="mt-5 rounded-lg border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-600">No milestone telemetry is available.</div>}
+  <div className="mt-4 text-[9px] text-neutral-700">Generated {data?.generatedAt?new Date(data.generatedAt).toLocaleString():'—'} · {data?.progressModel||'evidence-backed progress model'}</div>
+ </section>;
 }
