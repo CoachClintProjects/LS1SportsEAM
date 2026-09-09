@@ -11,6 +11,11 @@ const command='components/hubs/admin/CommandCenter.tsx';
 const data='components/hubs/admin/AdminDataWorkspaces.tsx';
 const finance='components/hubs/admin/FinanceAccounting.tsx';
 const financeApi='app/api/admin-finance/route.ts';
+const teamActions='components/hubs/admin/AdminMasterDataActions.tsx';
+const teamWorkspaces='components/hubs/admin/AdminTeamDataWorkspaces.tsx';
+const teamApi='app/api/admin-team-master/route.ts';
+const registrar='components/hubs/admin/RegistrarValidation.tsx';
+const registrarApi='app/api/admin-registrar/route.ts';
 const competitionUi='components/hubs/admin/AdminCompetitionOperations.tsx';
 const assuranceUi='components/competition/CompetitionEntryAssurancePanel.tsx';
 const competitionApi='app/api/admin-competitions/route.ts';
@@ -26,12 +31,12 @@ const migrationCompetition='supabase/migrations/20260909084000_build_admin_compe
 const migrationDigest='supabase/migrations/20260909084500_surface_competitions_in_admin_daily_digest.sql';
 const migrationAssurance='supabase/migrations/20260909090000_build_competition_entry_assurance.sql';
 
-for(const rel of [workspace,command,data,finance,financeApi,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,operational,operationalApi,...operationalWrappers,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
+for(const rel of [workspace,command,data,finance,financeApi,teamActions,teamWorkspaces,teamApi,registrar,registrarApi,competitionUi,assuranceUi,competitionApi,assuranceApi,adminApi,relationship,records,operational,operationalApi,...operationalWrappers,globals,migrationCompetition,migrationDigest,migrationAssurance]) if(!exists(rel)) fail(`${rel}: required Admin regression-lock target is missing.`);
 
 if(exists(workspace)){
   const src=read(workspace);
   if(!src.includes('AdminCompetitionOperations')) fail(`${workspace}: competition operations workspace is not registered.`);
-  if(!src.includes('MembershipView')||!src.includes('TeamsView')) fail(`${workspace}: canonical Membership/Teams Admin workspaces are missing.`);
+  if(!src.includes("from './AdminTeamDataWorkspaces'")) fail(`${workspace}: governed Membership/Programs/Teams/Seasons workspaces are not wired.`);
 }
 if(exists(command)){
   const src=read(command);
@@ -51,8 +56,30 @@ if(exists(finance)){
 }
 if(exists(financeApi)){
   const src=read(financeApi);
-  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','create-invoice','record-payment','set-invoice-status','billing_accounts','balance_due']) if(!src.includes(marker)) fail(`${financeApi}: governed finance lifecycle ${marker} is missing.`);
+  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','create-customer','create-billing-account','create-invoice','record-payment','set-invoice-status','billing_accounts','balance_due']) if(!src.includes(marker)) fail(`${financeApi}: governed finance lifecycle ${marker} is missing.`);
   if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${financeApi}: Admin finance must remain caller-JWT/RLS authorized.`);
+}
+if(exists(teamActions)){
+  const src=read(teamActions);
+  for(const marker of ['/api/admin-team-master','Save & audit','create-program','create-team','create-season','create-membership']) if(!src.includes(marker)) fail(`${teamActions}: governed Team Engine action ${marker} is missing.`);
+}
+if(exists(teamWorkspaces)){
+  const src=read(teamWorkspaces);
+  for(const marker of ['AdminMasterDataActions','ProgramsDirectory','TeamsDirectory','SeasonsDirectory','MembershipDirectory']) if(!src.includes(marker)) fail(`${teamWorkspaces}: governed Team Engine workspace marker ${marker} is missing.`);
+}
+if(exists(teamApi)){
+  const src=read(teamApi);
+  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','create-program','create-season','set-season-status','create-team','set-team-status','create-membership','set-membership-status']) if(!src.includes(marker)) fail(`${teamApi}: governed Team Engine lifecycle ${marker} is missing.`);
+  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${teamApi}: Admin Team Engine master data must remain caller-JWT/RLS authorized.`);
+}
+if(exists(registrar)){
+  const src=read(registrar);
+  for(const marker of ['/api/admin-registrar','Approve','Reject','Decision reason']) if(!src.includes(marker)) fail(`${registrar}: operational Registrar marker ${marker} is missing.`);
+}
+if(exists(registrarApi)){
+  const src=read(registrarApi);
+  for(const marker of ['requireAdmin(request)','writeAdminAuditEvent','REGISTRATION_APPROVED','REGISTRATION_REJECTED','approved_at','admin_decision_reason']) if(!src.includes(marker)) fail(`${registrarApi}: governed Registrar lifecycle ${marker} is missing.`);
+  if(src.includes('SERVICE_ROLE')||src.includes('service_role')) fail(`${registrarApi}: Registrar must remain caller-JWT/RLS authorized.`);
 }
 if(exists(operational)){
   const src=read(operational);
