@@ -9,11 +9,15 @@ const checks=[
  ['app/api/coach/route.ts','requireCoach'],
  ['app/api/coach/route.ts','swim_time_standards'],
  ['app/api/coach/route.ts','coach_attention_items'],
+ ['app/api/coach/route.ts','travel_plans'],
+ ['app/api/coach/route.ts','staff_assignments'],
  ['app/api/coach/actions/route.ts','COACH_AGENT_PROPOSAL_REVIEWED'],
  ['app/api/coach/actions/route.ts','COACH_COMPETITION_CANDIDATE_REVIEWED'],
+ ['app/api/coach/overwatch/route.ts','refresh_coach_overwatch'],
  ['lib/server/requireCoach.ts','coach_access_assignments'],
  ['supabase/migrations/20260910103000_build_coach_operating_system.sql','autonomy_level'],
  ['supabase/migrations/20260910103000_build_coach_operating_system.sql','coach_decision_log'],
+ ['supabase/migrations/20260910104500_build_coach_overwatch_engine.sql','Attendance pattern needs review'],
 ];
 let failed=0;
 for(const [file,needle] of checks){
