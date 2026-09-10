@@ -1,6 +1,6 @@
 'use client';
 
-import {FormEvent,useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import {usePathname} from 'next/navigation';
 import {BookOpen,CheckCircle2,Flag,MessageSquareHeart,Send,ShieldAlert} from 'lucide-react';
 import {authenticatedFetch} from '@/lib/client/authenticatedFetch';
