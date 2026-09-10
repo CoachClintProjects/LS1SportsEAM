@@ -1,11 +1,5 @@
-﻿// =====================================================
-// LS1Sports Coach Route
-// =====================================================
-// SECTION: ROUTE CONTRACT
-// - Valid Next.js App Router module.
-// - Workspace will be mounted through HubEngine.
-// =====================================================
+import CoachOperatingSystem from '@/components/hubs/coach/CoachOperatingSystem';
 
-export default function CoachPage() {
-  return null;
+export default function CoachPage(){
+  return <CoachOperatingSystem/>;
 }
