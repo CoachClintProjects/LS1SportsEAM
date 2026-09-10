@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import CoachOperatingSystem from '@/components/hubs/coach/CoachOperatingSystem';
 
 export default function CoachPage(){
-  return <CoachOperatingSystem/>;
+  return <><div className="fixed bottom-5 right-5 z-50"><Link href="/coach/meet-day" className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400 px-5 py-3 text-xs font-black uppercase tracking-[.12em] text-black shadow-2xl shadow-emerald-950/40 transition hover:bg-emerald-300">Meet-Day Mode</Link></div><CoachOperatingSystem/></>;
 }
