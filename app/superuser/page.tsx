@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProjectCommand from '@/components/hubs/superuser/ProjectCommand';
+import SuperUserURWSCommand from '@/components/hubs/superuser/SuperUserURWSCommand';
 import SuperUserModuleWorkspace from '@/components/hubs/superuser/SuperUserModuleWorkspace';
 import SuperUserActions from '@/components/hubs/superuser/SuperUserActions';
 import SuperUserApiBoundary from '@/components/hubs/superuser/SuperUserApiBoundary';
@@ -37,6 +38,7 @@ function CommandCenter() {
   return (
     <div className="space-y-5">
       <ProjectCommand />
+      <SuperUserURWSCommand />
       <SuperUserActions />
       <SuperUserReferenceFinder />
       <SuperUserProjectControlActions />
