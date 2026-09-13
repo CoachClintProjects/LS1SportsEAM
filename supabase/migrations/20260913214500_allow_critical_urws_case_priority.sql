@@ -1,0 +1,2 @@
+alter table public.urws_cases drop constraint if exists platform_exception_cases_priority_check;
+alter table public.urws_cases add constraint platform_exception_cases_priority_check check(priority in ('low','normal','high','urgent','critical'));
