@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const must=(p,terms)=>{const s=read(p);for(const t of terms)if(!s.includes(t))throw new Error(`${p} missing ${t}`);return s};
+const decision=must('supabase/migrations/20260913204500_harden_legacy_urws_decision_against_second_approval_bypass.sql',['urws_matching_authority_rule','requires_second_approval','direct decision recording is prohibited']);
+const refund=must('supabase/migrations/20260913211500_repair_urws_canonical_refund_preparation_schema_alignment.sql',['urws_prepare_refund_from_request','insert into public.refunds(payment_id,invoice_id,amount,reason,status)','membership.refund.prepared']);
+if(refund.includes('currency_code')||refund.includes('reconciliation_status')||refund.includes('reconciliation_metadata'))throw new Error('Refund preparation references non-canonical refund columns.');
+const processor=must('supabase/migrations/20260913213000_harden_urws_event_processor_restricted_case_propagation.sql',['v_restricted','urws_restricted_case_links','safeguarding_case_id','restricted=excluded.restricted']);
+must('supabase/migrations/20260913214500_allow_critical_urws_case_priority.sql',["'critical'"]);
+const metrics=must('supabase/migrations/20260913210000_extend_superuser_urws_cross_domain_rollups.sql',['open_registration_cases','open_family_authority_cases','open_finance_cases','open_membership_cases','open_asset_cases','open_record_correction_cases','open_safeguarding_urws_cases','open_service_failure_cases']);
+const admin=read('app/api/admin-urws/route.ts');
+if(admin.includes('restricted_summary'))throw new Error('Generic Admin URWS API must not select restricted_summary.');
+if(!admin.includes('sensitivity=eq.standard'))throw new Error('Generic Admin URWS evidence must remain standard-only.');
+const superApi=read('app/api/superuser-urws/route.ts');
+if(!superApi.includes('v_superuser_urws_metrics'))throw new Error('SuperUser URWS must use canonical metrics view.');
+const superUi=must('components/hubs/superuser/SuperUserURWSCommand.tsx',['zero means zero','Registration exceptions','Guardian authority cases','Finance disputes','Asset incidents','Record corrections','Safeguarding URWS','Service failures']);
+if(/\b\d+(?:\.\d+)?%/.test(superUi))throw new Error('SuperUser URWS must not contain fabricated percentage literals.');
+console.log('URWS completion locks passed.');
