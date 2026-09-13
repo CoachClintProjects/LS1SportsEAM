@@ -1,0 +1,133 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
+
+type Row = Record<string, any>;
+type Payload = {
+  cases: Row[];
+  decisions: Row[];
+  proposals: Row[];
+  approvals: Row[];
+  canFinancialDecision: boolean;
+  error?: string;
+};
+
+const empty: Payload = { cases: [], decisions: [], proposals: [], approvals: [], canFinancialDecision: false };
+const money = (value: unknown, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency: currency || 'CAD' }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
+const when = (value: unknown) => value ? new Date(String(value)).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+function Status({ value }: { value: unknown }) {
+  const status = String(value || 'unknown').replaceAll('_', ' ');
+  return <span className="rounded-full border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-neutral-200">{status}</span>;
+}
+
+export function AdminURWSDecisionGovernanceWorkspace() {
+  const [data, setData] = useState<Payload>(empty);
+  const [selectedCaseId, setSelectedCaseId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [approvalNote, setApprovalNote] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await authenticatedFetch('/api/admin-urws', { cache: 'no-store' });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Unable to load governed URWS decisions.');
+      const next: Payload = { ...empty, ...json };
+      setData(next);
+      setSelectedCaseId(current => current && next.cases.some(c => c.id === current) ? current : (next.cases[0]?.id || ''));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load governed URWS decisions.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const selectedCase = useMemo(() => data.cases.find(c => c.id === selectedCaseId) || null, [data.cases, selectedCaseId]);
+  const proposals = useMemo(() => data.proposals.filter(p => p.case_id === selectedCaseId), [data.proposals, selectedCaseId]);
+  const decisions = useMemo(() => data.decisions.filter(d => d.case_id === selectedCaseId), [data.decisions, selectedCaseId]);
+  const latestProposal = proposals[0] || null;
+  const approvals = useMemo(() => latestProposal ? data.approvals.filter(a => a.proposal_id === latestProposal.id) : [], [data.approvals, latestProposal]);
+
+  async function act(body: Row, successMessage: string) {
+    setWorking(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await authenticatedFetch('/api/admin-urws', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Governed URWS decision action failed.');
+      setNotice(successMessage);
+      setApprovalNote('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Governed URWS decision action failed.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <main className="min-h-full bg-[#060707] p-5 text-white lg:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[.16em] text-[#FA4616]"><ShieldCheck className="h-5 w-5" />URWS Decision Governance</div>
+          <h1 className="mt-2 text-3xl font-black">Proposal → second approval → immutable decision</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-neutral-300">Consequential decisions cannot skip the governed proposal path. Authority rules decide whether a second authorized person is required, and the proposer cannot approve their own proposal.</p>
+        </div>
+        <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-neutral-700 px-4 py-3 text-sm font-black"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button>
+      </div>
+
+      {error && <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">{error}</div>}
+      {notice && <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100">{notice}</div>}
+
+      <div className="mt-6 grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className="overflow-hidden rounded-2xl border border-neutral-800 bg-[#0b0d0d]">
+          <div className="border-b border-neutral-800 p-4"><div className="font-black">Canonical cases</div><div className="mt-1 text-sm text-neutral-500">{data.cases.length} tracked</div></div>
+          <div className="divide-y divide-neutral-800">
+            {data.cases.map(c => <button key={c.id} onClick={() => setSelectedCaseId(c.id)} className={`w-full p-4 text-left hover:bg-neutral-900 ${selectedCaseId === c.id ? 'bg-[#FA4616]/10' : ''}`}><div className="font-black">{c.public_summary || c.case_type_code}</div><div className="mt-1 text-xs text-neutral-500">{String(c.status || 'open').replaceAll('_', ' ')} · {money(c.financial_impact, c.currency)}</div></button>)}
+            {!loading && !data.cases.length && <div className="p-6 text-sm text-neutral-500">No URWS cases exist. LS1 will not invent one.</div>}
+          </div>
+        </aside>
+
+        <section className="space-y-5">
+          {selectedCase ? <>
+            <section className="rounded-2xl border border-neutral-800 bg-[#0b0d0d] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-xs font-black uppercase tracking-wide text-neutral-500">Selected case</div><h2 className="mt-2 text-xl font-black">{selectedCase.public_summary || selectedCase.case_type_code}</h2><div className="mt-2 text-sm text-neutral-400">{String(selectedCase.case_type_code || '').replaceAll('_', ' ')} · opened {when(selectedCase.opened_at)}</div></div><Status value={selectedCase.status} /></div>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-800 bg-[#0b0d0d] p-5">
+              <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-black">Latest proposal</h3>{latestProposal && <Status value={latestProposal.status} />}</div>
+              {!latestProposal && <p className="mt-3 text-sm text-neutral-500">No governed decision proposal exists for this case yet. Create it from the URWS Cases workspace.</p>}
+              {latestProposal && <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-neutral-800 p-4"><div className="flex flex-wrap justify-between gap-3"><div><div className="font-black">{String(latestProposal.human_outcome || '').replaceAll('_', ' ')}</div><div className="mt-1 text-xs text-neutral-500">Proposed {when(latestProposal.proposed_at)} · {money(latestProposal.financial_impact, latestProposal.currency)}</div></div><div className="text-xs font-black uppercase text-neutral-500">{latestProposal.required_second_approval ? 'Second approval required' : 'Single-authority path'}</div></div><p className="mt-3 text-sm leading-6 text-neutral-300">{latestProposal.rationale}</p></div>
+
+                {latestProposal.status === 'pending_second_approval' && data.canFinancialDecision && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"><div className="font-black text-amber-100">Second approval required</div><p className="mt-1 text-sm text-amber-100/80">The database rejects self-approval. A different authorized person must approve or reject this proposal.</p><textarea value={approvalNote} onChange={e => setApprovalNote(e.target.value)} placeholder="Second-approver note" className="mt-3 min-h-20 w-full rounded-lg border border-neutral-700 bg-black p-3 text-sm" /><div className="mt-3 flex flex-wrap gap-2"><button disabled={working} onClick={() => void act({ action: 'approve-proposal', proposal_id: latestProposal.id, decision: 'approve', note: approvalNote }, 'Second approval recorded. Proposal is ready for authorized execution.')} className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-black text-emerald-100"><CheckCircle2 className="h-4 w-4" />Approve</button><button disabled={working} onClick={() => void act({ action: 'approve-proposal', proposal_id: latestProposal.id, decision: 'reject', note: approvalNote }, 'Decision proposal rejected.')} className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-black text-red-100"><XCircle className="h-4 w-4" />Reject</button></div></div>}
+
+                {latestProposal.status === 'ready' && data.canFinancialDecision && <button disabled={working} onClick={() => void act({ action: 'execute-proposal', proposal_id: latestProposal.id }, 'Authorized decision executed and written to the immutable URWS decision ledger.')} className="rounded-lg bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-40">Execute authorized decision</button>}
+
+                {!!approvals.length && <div className="rounded-xl border border-neutral-800 p-4"><div className="text-xs font-black uppercase tracking-wide text-neutral-500">Approval ledger</div><div className="mt-3 space-y-2">{approvals.map(a => <div key={a.id} className="flex flex-wrap justify-between gap-3 border-b border-neutral-800 pb-2 text-sm last:border-b-0"><span>{String(a.decision).replaceAll('_', ' ')}</span><span className="text-neutral-500">{when(a.decided_at)}</span></div>)}</div></div>}
+              </div>}
+            </section>
+
+            <section className="rounded-2xl border border-neutral-800 bg-[#0b0d0d] p-5"><h3 className="text-lg font-black">Immutable decisions</h3><div className="mt-4 space-y-3">{decisions.map(d => <div key={d.id} className="rounded-xl border border-neutral-800 p-4"><div className="flex flex-wrap justify-between gap-3"><div className="font-black">{String(d.human_outcome || d.policy_outcome || 'decision').replaceAll('_', ' ')}</div><span className="text-xs text-neutral-500">{when(d.decided_at)}</span></div><p className="mt-2 text-sm text-neutral-400">{d.rationale || 'No rationale shown.'}</p></div>)}{!decisions.length && <div className="text-sm text-neutral-500">No executed decision exists for this case.</div>}</div></section>
+          </> : <section className="rounded-2xl border border-neutral-800 bg-[#0b0d0d] p-10 text-center text-neutral-500">Select a URWS case.</section>}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+export default AdminURWSDecisionGovernanceWorkspace;
