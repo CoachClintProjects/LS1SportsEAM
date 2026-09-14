@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - superuser-release-candidate
+      - coach-engine-build-20260914
   workflow_dispatch:
 
 concurrency:
