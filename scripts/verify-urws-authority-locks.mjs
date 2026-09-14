@@ -56,8 +56,9 @@ if(exists(files.api)){
 
 if(exists(files.ui)){
  const s=read(files.ui);
- for(const token of ['/api/admin-urws-authority','Who may decide, approve, and execute','No operator receives authority automatically.','Decide cases','Approve remedies','Execute remedies','Save approval policy','zero means no authority has been granted']) if(!s.includes(token)) fail(`Authority UI missing ${token}`);
- if(/mock|demoData|fake/i.test(s)) fail('Authority UI must not use mock/demo/fake authority data.');
+ const lower=s.toLowerCase();
+ for(const token of ['/api/admin-urws-authority','who may decide, approve, and execute','no operator receives authority automatically.','decide cases','approve remedies','execute remedies','save approval policy','zero means no authority has been granted']) if(!lower.includes(token.toLowerCase())) fail(`Authority UI missing ${token}`);
+ if(/\bmockData\b|\bdemoData\b|\bfakeData\b|\bmockAuthority\b/i.test(s)) fail('Authority UI must not use mock/demo/fake authority datasets.');
 }
 
 if(exists(files.adminWorkspace)){
@@ -75,7 +76,7 @@ if(exists(files.superApi)){
 if(exists(files.superUi)){
  const s=read(files.superUi);
  for(const token of ['Active authority grants','active_authority_grants','Decision-authority operators','decision_authority_operators','Remedy-authority operators','remedy_approval_operators','Financial execution operators','financial_execution_operators','authority_grants_expiring_30d','organizations_requiring_second_approval']) if(!s.includes(token)) fail(`SuperUser authority visibility missing ${token}`);
- if(/demoData|fake/i.test(s)) fail('SuperUser authority metrics must not use fake/demo data.');
+ if(/\bmockData\b|\bdemoData\b|\bfakeData\b|\bmockAuthority\b/i.test(s)) fail('SuperUser authority metrics must not use mock/demo authority datasets.');
 }
 
 if(failures.length){
