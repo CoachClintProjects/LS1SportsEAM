@@ -1,11 +1,12 @@
-﻿// =====================================================
-// LS1Sports Coach Route
-// =====================================================
-// SECTION: ROUTE CONTRACT
-// - Valid Next.js App Router module.
-// - Workspace will be mounted through HubEngine.
-// =====================================================
+'use client';
+
+import { Suspense } from 'react';
+import CoachWorkspace from '@/components/hubs/coach/CoachWorkspace';
 
 export default function CoachPage() {
-  return null;
+  return (
+    <Suspense fallback={<div className="h-full bg-[#050807] p-6 text-sm text-white/60">Loading Coach Engine…</div>}>
+      <CoachWorkspace />
+    </Suspense>
+  );
 }
