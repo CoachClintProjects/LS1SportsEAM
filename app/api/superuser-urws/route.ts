@@ -9,10 +9,12 @@ async function rest<T>(actor:SuperUserIdentity,path:string):Promise<T>{const r=a
 export async function GET(request:NextRequest){
  try{
   const actor=await requireSuperUser(request);
-  const [metricsRows,capabilities]=await Promise.all([
+  const [metricsRows,authorityRows,capabilities]=await Promise.all([
    rest<Record<string,unknown>[]>(actor,'v_superuser_urws_metrics?select=*'),
-   rest<Record<string,unknown>[]>(actor,"platform_capability_registry?select=capability_key,capability_name,domain,criticality,status,description,build_evidence,last_verified_at&or=(capability_key.ilike.*urws*,capability_name.ilike.*Exception*,capability_name.ilike.*Policy*)&order=capability_name.asc")
+   rest<Record<string,unknown>[]>(actor,'v_superuser_urws_authority_metrics?select=*'),
+   rest<Record<string,unknown>[]>(actor,"platform_capability_registry?select=capability_key,capability_name,domain,criticality,status,description&or=(capability_key.ilike.*urws*,capability_name.ilike.*Exception*,capability_name.ilike.*Policy*)&order=capability_name.asc")
   ]);
-  return NextResponse.json({metrics:metricsRows?.[0]??{},capabilities:capabilities??[],generatedAt:new Date().toISOString(),source:'LS1SportsEAM Supabase'},{headers:{'Cache-Control':'no-store, max-age=0'}});
+  const metrics={...(metricsRows?.[0]??{}),...(authorityRows?.[0]??{})};
+  return NextResponse.json({metrics,capabilities:capabilities??[],generatedAt:new Date().toISOString(),source:'LS1SportsEAM Supabase'},{headers:{'Cache-Control':'no-store, max-age=0'}});
  }catch(e){if(e instanceof SuperUserAuthError)return NextResponse.json({error:e.message},{status:e.status});return NextResponse.json({metrics:{},capabilities:[],generatedAt:new Date().toISOString(),source:'LS1SportsEAM Supabase',error:e instanceof Error?e.message:'URWS metrics unavailable.'},{status:500});}
 }
