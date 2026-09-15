@@ -23,8 +23,11 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
  }
  const permissions=new Set<string>();
  if(roleIds.size){const ids=[...roleIds].join(',');const gr=await fetch(`${url}/rest/v1/permission_grants?select=effect,role_definition_id,permission_definitions(code,is_active)&role_definition_id=in.(${ids})`,{headers:h,cache:'no-store'});if(gr.ok){const rows=await gr.json() as any[];const denied=new Set<string>();for(const g of rows){const p=g.permission_definitions;if(!p?.is_active)continue;if(g.effect==='deny')denied.add(p.code);else if(g.effect==='allow')permissions.add(p.code);}for(const code of denied)permissions.delete(code);}}
- const hubs=new Set<string>(); if(isPlatformSuperUser)hubs.add('superuser'); for(const role of roles){const configured=Array.isArray(role.config?.hub_access)?role.config.hub_access as string[]:[];for(const hub of configured)hubs.add(hub);}
- const maxDelegablePrivilege=Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)));
+ const hubs=new Set<string>();
+ // Level 0 platform operators are the global operating authority. They can enter every engine
+ // without needing client-side role assignments or a tenant-bound people record.
+ if(isPlatformSuperUser){for(const hub of HUB_ORDER)hubs.add(hub);}else{for(const role of roles){const configured=Array.isArray(role.config?.hub_access)?role.config.hub_access as string[]:[];for(const hub of configured)hubs.add(hub);}}
+ const maxDelegablePrivilege=isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)));
  return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,roles,permissions:[...permissions].sort(),allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege};
 }
 
