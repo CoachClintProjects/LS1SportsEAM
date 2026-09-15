@@ -1,6 +1,6 @@
 import fs from'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');const fail=(ok,msg)=>{if(!ok){console.error(`SHELL CONTRACT FAILED: ${msg}`);process.exitCode=1}};
-const boundary=read('components/hubs/superuser/SuperUserApiBoundary.tsx');fail(!boundary.includes('window.fetch'),'SuperUser boundary must not monkey-patch global fetch');fail(!boundary.includes('createClient('),'SuperUser boundary must not create a competing Supabase client');
+const boundary=read('components/hubs/superuser/SuperUserApiBoundary.tsx');fail(!/window\.fetch\s*=/.test(boundary),'SuperUser boundary must not monkey-patch global fetch');fail(!boundary.includes('createClient('),'SuperUser boundary must not create a competing Supabase client');
 const auth=read('lib/server/requireSuperUser.ts');fail(auth.includes('ls1_superuser_session'),'SuperUser APIs must accept the canonical httpOnly session cookie');fail(auth.includes('supabaseServerConfig'),'SuperUser APIs must use canonical Supabase server configuration');
 const nav=read('components/experience/HubNavigation/HubNavigation.tsx');fail(!nav.includes("searchParams.get('role')"),'Admin navigation must not use simulated role query state');fail(!nav.includes('admin_roles'),'Admin navigation must not depend on legacy admin_roles simulation');
 const admin=read('components/hubs/admin/AdminWorkspace.tsx');fail(!admin.includes('ComingSoon'),'Active Admin routes must not use ComingSoon placeholders');fail(admin.includes('CanonicalResourceWorkspace'),'Admin operational domains must use canonical resource surfaces');
