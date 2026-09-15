@@ -1,14 +1,20 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, CalendarDays, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+let browserSupabase: SupabaseClient | null | undefined;
+
+function getSupabaseClient(): SupabaseClient | null {
+  if (browserSupabase !== undefined) return browserSupabase;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  browserSupabase = url && key ? createClient(url, key) : null;
+  return browserSupabase;
+}
 
 function safeNext(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/admin';
@@ -30,6 +36,14 @@ export function LoginGate() {
     setBusy(true);
     setError('');
     setMessage('');
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError('LS1Sports authentication is not configured for this deployment.');
+      setBusy(false);
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
@@ -119,14 +133,8 @@ export function LoginGate() {
 
             {mode === 'login' ? (
               <form onSubmit={handleLogin} className="mt-6 space-y-4">
-                <div>
-                  <label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Email</label>
-                  <input name="email" type="email" required autoComplete="email" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Password</label>
-                  <input name="password" type="password" required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" />
-                </div>
+                <div><label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Email</label><input name="email" type="email" required autoComplete="email" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" /></div>
+                <div><label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Password</label><input name="password" type="password" required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" /></div>
                 <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in to LS1Sports'}</button>
               </form>
             ) : (
