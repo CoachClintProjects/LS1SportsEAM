@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { ArrowLeft, CalendarDays, LogIn } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 let browserSupabase: SupabaseClient | null | undefined;
@@ -27,6 +27,7 @@ export function LoginGate() {
   const requestedNext = searchParams.get('next');
   const next = useMemo(() => safeNext(requestedNext), [requestedNext]);
   const [mode, setMode] = useState<'login' | 'demo'>('login');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,7 +135,15 @@ export function LoginGate() {
             {mode === 'login' ? (
               <form onSubmit={handleLogin} className="mt-6 space-y-4">
                 <div><label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Email</label><input name="email" type="email" required autoComplete="email" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" /></div>
-                <div><label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Password</label><input name="password" type="password" required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" /></div>
+                <div>
+                  <label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Password</label>
+                  <div className="relative">
+                    <input name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 pr-12 text-sm outline-none focus:border-[#FA4616]" />
+                    <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[#9CA49E] hover:text-white focus:outline-none focus:text-white">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
                 <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in to LS1Sports'}</button>
               </form>
             ) : (
