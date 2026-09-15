@@ -1,6 +1,4 @@
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 
 export type SuperUserIdentity = {
   userId: string;
@@ -22,17 +20,22 @@ export class SuperUserAuthError extends Error {
 }
 
 export async function requireSuperUser(request: Request): Promise<SuperUserIdentity> {
-  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
+  // All server auth paths must use the same Supabase URL/public-key selection as LoginGate,
+  // access-context and the SuperUser session endpoint. Do not independently pin the legacy
+  // anon key here: a valid browser session issued against the publishable key would then be
+  // rejected by SuperUser command APIs as "Invalid or expired session."
+  const { url: SUPABASE_URL, publicKey: PUBLIC_KEY, serviceKey: SERVICE_KEY } = supabaseServerConfig();
+  if (!SUPABASE_URL || !PUBLIC_KEY || !SERVICE_KEY) {
     throw new SuperUserAuthError('SuperUser authentication is not configured.', 500);
   }
 
   const header = request.headers.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const token = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
   if (!token) throw new SuperUserAuthError('Authentication required.', 401);
 
   const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
-      apikey: ANON_KEY,
+      apikey: PUBLIC_KEY,
       Authorization: `Bearer ${token}`,
     },
     cache: 'no-store',
