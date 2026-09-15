@@ -5,13 +5,22 @@
 // =============================================================================
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let browserSupabase: SupabaseClient | null | undefined;
+
+function getSupabase(): SupabaseClient | null {
+  if (browserSupabase !== undefined) return browserSupabase;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  browserSupabase = url && key ? createClient(url, key) : null;
+  return browserSupabase;
+}
 
 // =============================================================================
 // TYPES
@@ -124,12 +133,16 @@ export function TeamManager() {
     loadAthletes();
   }, []);
 
-  // =========================================================================
-  // FIXED: This is the corrected loadAthletes function
-  // =========================================================================
   const loadAthletes = async () => {
     setLoading(true);
     try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        console.error('Supabase browser configuration is unavailable.');
+        setAthletes([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('athletes')
         .select(`
@@ -148,7 +161,6 @@ export function TeamManager() {
 
       if (error) throw error;
 
-      // FIX: Map the data to match the Athlete type - people is returned as an array
       const mappedData: Athlete[] = (data || []).map((athlete: any) => ({
         id: athlete.id,
         person_id: athlete.person_id,
