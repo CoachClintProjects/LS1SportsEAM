@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "verify:shell": "node scripts/verify-shell-contract.mjs",
+    "prebuild": "npm run verify:shell",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -21,7 +22,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react-dom": "^20",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
