@@ -7,11 +7,26 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 let browserSupabase: SupabaseClient | null | undefined;
 
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  let projectRef = 'unknown';
+
+  if (url) {
+    try {
+      projectRef = new URL(url).hostname.split('.')[0] || 'unknown';
+    } catch {
+      projectRef = 'invalid-url';
+    }
+  }
+
+  return { url, key, projectRef };
+}
+
 function getSupabaseClient(): SupabaseClient | null {
   if (browserSupabase !== undefined) return browserSupabase;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { url, key } = getSupabaseConfig();
   browserSupabase = url && key ? createClient(url, key) : null;
   return browserSupabase;
 }
@@ -19,6 +34,14 @@ function getSupabaseClient(): SupabaseClient | null {
 function safeNext(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/admin';
   return value;
+}
+
+function authDiagnostic(error: unknown, projectRef: string) {
+  const authError = error as { message?: string; code?: string; status?: number } | null;
+  const code = authError?.code || 'unknown';
+  const status = authError?.status ? String(authError.status) : 'unknown';
+  const message = authError?.message || 'No authentication error message was returned.';
+  return `Authentication failed. Project: ${projectRef}. Code: ${code}. Status: ${status}. Message: ${message}`;
 }
 
 export function LoginGate() {
@@ -38,9 +61,10 @@ export function LoginGate() {
     setError('');
     setMessage('');
 
+    const { projectRef } = getSupabaseConfig();
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setError('LS1Sports authentication is not configured for this deployment.');
+      setError(`LS1Sports authentication is not configured for this deployment. Project: ${projectRef}.`);
       setBusy(false);
       return;
     }
@@ -49,32 +73,43 @@ export function LoginGate() {
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError || !data.session?.access_token) {
-      setError('Unable to sign in with those credentials.');
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setError(authDiagnostic(signInError, projectRef));
+        setBusy(false);
+        return;
+      }
+
+      if (!data.session?.access_token) {
+        setError(`Authentication failed. Project: ${projectRef}. Supabase returned no usable session.`);
+        setBusy(false);
+        return;
+      }
+
+      let destination = next;
+      const superUserResponse = await fetch('/api/superuser-auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: data.session.access_token }),
+      });
+
+      if (superUserResponse.ok) {
+        if (!requestedNext) destination = '/superuser';
+      } else if (next.startsWith('/superuser')) {
+        const result = await superUserResponse.json().catch(() => ({}));
+        await supabase.auth.signOut({ scope: 'local' });
+        setError(result.error || 'This account is not authorized for Super User access.');
+        setBusy(false);
+        return;
+      }
+
+      router.replace(destination);
+      router.refresh();
+    } catch (loginError) {
+      setError(authDiagnostic(loginError, projectRef));
       setBusy(false);
-      return;
     }
-
-    let destination = next;
-    const superUserResponse = await fetch('/api/superuser-auth/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessToken: data.session.access_token }),
-    });
-
-    if (superUserResponse.ok) {
-      if (!requestedNext) destination = '/superuser';
-    } else if (next.startsWith('/superuser')) {
-      const result = await superUserResponse.json().catch(() => ({}));
-      await supabase.auth.signOut({ scope: 'local' });
-      setError(result.error || 'This account is not authorized for Super User access.');
-      setBusy(false);
-      return;
-    }
-
-    router.replace(destination);
-    router.refresh();
   }
 
   async function handleDemo(event: FormEvent<HTMLFormElement>) {
