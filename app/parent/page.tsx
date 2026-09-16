@@ -1,4 +1,1 @@
-import React,{Suspense}from'react';
-import ParentWorkspace from '@/components/hubs/parent/ParentWorkspace';
-function Loading(){return <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-7"><div className="text-[9px] font-black uppercase tracking-[.25em] text-[#FA4616]">PARENT · FAMILY OS</div><h1 className="mt-2 text-3xl font-black text-white">Loading Family Operating System</h1><p className="mt-2 text-xs text-neutral-500">Loading family operational context…</p></section>}
-export default function ParentPage(){return <Suspense fallback={<Loading/>}><ParentWorkspace/></Suspense>}
+import{Suspense}from'react';import TeamEngineVisibility from'@/components/hubs/team-engine/TeamEngineVisibility';export default function ParentPage(){return <Suspense fallback={<div className="p-6 text-white">Loading Family Team Engine…</div>}><TeamEngineVisibility mode="parent"/></Suspense>}
