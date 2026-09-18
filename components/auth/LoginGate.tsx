@@ -112,6 +112,20 @@ export function LoginGate() {
     }
   }
 
+  async function handleForgotPassword() {
+    setBusy(true); setError(''); setMessage('');
+    const supabase = getSupabaseClient();
+    if (!supabase) { setError('LS1Sports authentication is not configured for this deployment.'); setBusy(false); return; }
+    const input = document.querySelector<HTMLInputElement>('input[name="email"]');
+    const email = input?.value.trim() || '';
+    if (!email) { setError('Enter your email address first.'); setBusy(false); return; }
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    setBusy(false);
+    if (resetError) { setError(resetError.message); return; }
+    setMessage('Password recovery email sent. Check your inbox for the secure reset link.');
+  }
+
   async function handleDemo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -179,6 +193,7 @@ export function LoginGate() {
                     </button>
                   </div>
                 </div>
+                <div className="flex justify-end"><button type="button" disabled={busy} onClick={() => void handleForgotPassword()} className="text-xs font-bold text-[#FA4616] hover:text-white disabled:opacity-60">Forgot password?</button></div>
                 <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in to LS1Sports'}</button>
               </form>
             ) : (
