@@ -18,6 +18,7 @@ export type NavigationSection = { id: string; label: string; items: NavigationIt
 export interface SwitcherOption { id: string; label: string; description?: string }
 export interface SwitcherConfig { type: 'age' | 'role' | 'official_role' | 'scout' | null; displayStyle: 'radio' | 'dropdown' | 'none'; options: SwitcherOption[]; defaultOption: string }
 type DbNavRow = { nav_id: string; label: string; path: string | null; icon: string | null; description: string | null; sort_order: number | null; parent_id: string | null; is_active?: boolean | null };
+const isUrwsInternal = (row: DbNavRow) => row.label.trim().toUpperCase().startsWith('URWS ');
 
 const ATHLETE_NAV_BY_AGE: Record<string, string[]> = {
   '5-8': ['Overview'], '9-11': ['Overview', 'Goals', 'Achievements'], '12-14': ['Overview', 'Development', 'Goals', 'Achievements'], '15-17': ['Overview', 'Performance', 'Development', 'Goals', 'Documents', 'Recruiting'], '18+': ['Overview', 'Passport', 'Performance', 'Development', 'Documents', 'Recruiting'],
@@ -73,6 +74,9 @@ export async function getNavigation(hubId: string, switcherValue = ''): Promise<
     const { data, error } = await supabase.from('hub_navigation').select('nav_id,label,path,icon,description,sort_order,parent_id,is_active').eq('hub_id', hubId).eq('is_active', true).order('sort_order', { ascending: true });
     if (error || !data?.length) return hubId === 'admin' ? adminFallback(switcherValue) : [];
     let rows = data as DbNavRow[];
+    // URWS is authorization/governance logic beneath the Admin OS, never user-facing navigation.
+    // The UAT role switcher remains intact and drives the effective role view through hub_role_navigation.
+    if (hubId === 'admin') rows = rows.filter(row => !isUrwsInternal(row));
     if (hubId === 'admin' && switcherValue) {
       const { data: role } = await supabase.from('admin_roles').select('role_id').eq('role_name', switcherValue).maybeSingle();
       if (role?.role_id) {
