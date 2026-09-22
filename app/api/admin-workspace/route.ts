@@ -1,0 +1,7 @@
+import { NextRequest,NextResponse } from 'next/server';
+import { resolveAccess } from '@/lib/server/accessControl';
+import { supabaseServerConfig } from '@/lib/server/superuserAuth';
+import { serviceHeaders } from '@/lib/server/accessControl';
+export const dynamic='force-dynamic'; export const revalidate=0;
+async function rest(path:string){const {url}=supabaseServerConfig();const h=serviceHeaders();if(!url||!h)throw new Error('Canonical store unavailable.');const r=await fetch(`${url}/rest/v1/${path}`,{headers:h,cache:'no-store'});if(!r.ok)throw new Error(`Canonical workspace returned ${r.status}`);return r.json();}
+export async function GET(request:NextRequest){try{const ctx=await resolveAccess(request);if(!ctx)return NextResponse.json({error:'Authentication required.'},{status:401});if(!ctx.allowedHubs.includes('admin'))return NextResponse.json({error:'Admin access denied.'},{status:403});const view=(request.nextUrl.searchParams.get('view')||'').trim();if(!view)return NextResponse.json({error:'View is required.'},{status:400});const rows=await rest(`hub_navigation?select=nav_id,label,component,path,is_active&hub_id=eq.admin&nav_id=eq.${encodeURIComponent(view)}&is_active=eq.true&limit=1`);if(!rows?.length)return NextResponse.json({error:'Admin view not found.'},{status:404});return NextResponse.json({view:rows[0]});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Workspace unavailable.'},{status:500});}}
