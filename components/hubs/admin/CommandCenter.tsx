@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 import {
   Activity,
   AlertTriangle,
@@ -50,7 +51,7 @@ export function CommandCenter() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/admin-command', { cache: 'no-store' });
+      const response = await authenticatedFetch('/api/admin-command', { cache: 'no-store' });
       const json = (await response.json()) as Payload;
       if (!response.ok) throw new Error(json.error || 'Unable to load Admin command data.');
       setData(json);
@@ -69,7 +70,7 @@ export function CommandCenter() {
     setSaving(true);
     setError('');
     try {
-      const response = await fetch('/api/admin-command', {
+      const response = await authenticatedFetch('/api/admin-command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
