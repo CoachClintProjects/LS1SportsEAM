@@ -6,31 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,cjs,mjs}\" --cache",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,cjs,mjs}\" --cache"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.5.0",
-    "@supabase/supabase-js": "^2.49.8",
-    "class-variance-authority": "^0.7.2",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.511.0",
-    "next": "^16.3.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.3.0"
+    "next": "14.2.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.15.21",
-    "@types/react": "^19.1.6",
-    "@types/react-dom": "^19.1.6",
-    "eslint": "^9.27.0",
-    "eslint-config-next": "^16.3.3",
-    "prettier": "^3.5.3",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.8.3"
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.4.0"
   }
 }
