@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { useState, useEffect } from 'react';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';\nimport { authenticatedFetch } from '@/lib/client/authenticatedFetch';
 
 let browserSupabase: SupabaseClient | null | undefined;
 
@@ -69,7 +69,7 @@ export function Imports() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/competition-import', {
+      const response = await authenticatedFetch('/api/competition-import', {
         method: 'POST',
         body: formData,
       });
