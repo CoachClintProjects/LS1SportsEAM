@@ -19,6 +19,7 @@ export interface SwitcherOption { id: string; label: string; description?: strin
 export interface SwitcherConfig { type: 'age' | 'role' | 'official_role' | 'scout' | null; displayStyle: 'radio' | 'dropdown' | 'none'; options: SwitcherOption[]; defaultOption: string }
 type DbNavRow = { nav_id: string; label: string; path: string | null; icon: string | null; description: string | null; sort_order: number | null; parent_id: string | null; is_active?: boolean | null };
 const isUrwsInternal = (row: DbNavRow) => row.label.trim().toUpperCase().startsWith('URWS ');
+const ADMIN_PATH_BY_LABEL: Record<string,string> = {'Command Center':'/admin','Organization':'/admin?view=organization','Hierarchy':'/admin?view=hierarchy','Registrar':'/admin?view=registrar','Rosters':'/admin?view=rosters','Membership':'/admin?view=membership','Programs':'/admin?view=programs','Teams':'/admin?view=teams','Seasons':'/admin?view=seasons','Competitions':'/admin?view=competitions','Financial Overview':'/admin?view=finance','Billing':'/admin?view=billing','Invoices':'/admin?view=invoices','Payments':'/admin?view=payments','Facilities':'/admin?view=facilities','Vendors':'/admin?view=vendors','External Organizations':'/admin?view=external-organizations','Payroll':'/admin?view=payroll','Imports':'/admin?view=imports','Reporting':'/admin?view=reporting','Compliance':'/admin?view=compliance'};
 
 const ATHLETE_NAV_BY_AGE: Record<string, string[]> = {
   '5-8': ['Overview'], '9-11': ['Overview', 'Goals', 'Achievements'], '12-14': ['Overview', 'Development', 'Goals', 'Achievements'], '15-17': ['Overview', 'Performance', 'Development', 'Goals', 'Documents', 'Recruiting'], '18+': ['Overview', 'Passport', 'Performance', 'Development', 'Documents', 'Recruiting'],
@@ -76,7 +77,7 @@ export async function getNavigation(hubId: string, switcherValue = ''): Promise<
     let rows = data as DbNavRow[];
     // URWS is authorization/governance logic beneath the Admin OS, never user-facing navigation.
     // The UAT role switcher remains intact and drives the effective role view through hub_role_navigation.
-    if (hubId === 'admin') rows = rows.filter(row => !isUrwsInternal(row));
+    if (hubId === 'admin') rows = rows.filter(row => !isUrwsInternal(row)).map(row=>ADMIN_PATH_BY_LABEL[row.label]?{...row,path:ADMIN_PATH_BY_LABEL[row.label]}:row);
     if (hubId === 'admin' && switcherValue) {
       const { data: role } = await supabase.from('admin_roles').select('role_id').eq('role_name', switcherValue).maybeSingle();
       if (role?.role_id) {
