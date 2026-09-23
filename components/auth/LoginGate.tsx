@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, CalendarDays, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -20,10 +20,52 @@ export function LoginGate() {
   const searchParams = useSearchParams();
   const requestedNext = searchParams.get('next');
   const next = useMemo(() => safeNext(requestedNext), [requestedNext]);
-  const [mode, setMode] = useState<'login' | 'demo'>('login');
+  const [mode, setMode] = useState<'login' | 'demo' | 'forgot' | 'reset'>('login');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('recovery') !== '1') return;
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (active && event === 'PASSWORD_RECOVERY') { setError(''); setMode('reset'); }
+    });
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active && data.session) { setError(''); setMode('reset'); }
+      else if (active) setError('This recovery link is invalid or expired. Request a new one.');
+    });
+    return () => { active = false; subscription.unsubscribe(); };
+  }, [searchParams]);
+
+  async function handleForgot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    const email = String(new FormData(event.currentTarget).get('email') || '').trim();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login?recovery=1`,
+    });
+    setBusy(false);
+    if (resetError) { setError('Unable to send a recovery email. Please try again later.'); return; }
+    setMessage('If an account exists for that email, a password reset link has been sent.');
+  }
+
+  async function handleReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get('password') || '');
+    if (password !== form.get('confirmPassword')) { setError('Passwords do not match.'); return; }
+    setBusy(true);
+    setError('');
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (updateError) { setError(updateError.message); return; }
+    await supabase.auth.signOut({ scope: 'local' });
+    window.history.replaceState(null, '', '/login');
+    setMode('login');
+    setMessage('Password updated. Sign in with your new password.');
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,6 +170,22 @@ export function LoginGate() {
                   <input name="password" type="password" required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" />
                 </div>
                 <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in to LS1Sports'}</button>
+                <button type="button" onClick={() => { setMode('forgot'); setError(''); setMessage(''); }} className="text-sm font-bold text-[#FA4616] hover:underline">Forgot password?</button>
+              </form>
+            ) : mode === 'forgot' ? (
+              <form onSubmit={handleForgot} className="mt-6 space-y-4">
+                <h2 className="text-xl font-black">Reset your password</h2>
+                <p className="text-sm text-[#9CA49E]">Enter your account email to receive a reset link.</p>
+                <label className="block text-sm">Email<input name="email" type="email" required autoComplete="email" className="mt-2 w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 outline-none focus:border-[#FA4616]" /></label>
+                <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Sending…' : 'Send reset link'}</button>
+                <button type="button" onClick={() => { setMode('login'); setError(''); }} className="text-sm font-bold text-[#FA4616] hover:underline">Back to sign in</button>
+              </form>
+            ) : mode === 'reset' ? (
+              <form onSubmit={handleReset} className="mt-6 space-y-4">
+                <h2 className="text-xl font-black">Choose a new password</h2>
+                <label className="block text-sm">New password<input name="password" type="password" required minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 outline-none focus:border-[#FA4616]" /></label>
+                <label className="block text-sm">Confirm password<input name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 outline-none focus:border-[#FA4616]" /></label>
+                <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Updating…' : 'Update password'}</button>
               </form>
             ) : (
               <form onSubmit={handleDemo} className="mt-6 grid gap-4 sm:grid-cols-2">
