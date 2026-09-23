@@ -28,4 +28,17 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
  return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,roles,permissions:[...permissions].sort(),allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
 }
 export const hasPermission=(ctx:AccessContext,code:string)=>ctx.isPlatformSuperUser||ctx.permissions.includes(code);
+export function hasRoleCode(ctx:AccessContext,...codes:string[]){const wanted=new Set(codes.map(code=>code.toUpperCase()));return ctx.roles.some(role=>wanted.has(role.code.toUpperCase()));}
+export function canUseAdminRoleContext(ctx:AccessContext,roleName:string){
+ if(ctx.isPlatformSuperUser)return true;
+ const normalized=roleName.trim().toLowerCase();
+ const aliases:Record<string,string[]>={
+  org_admin:['ORGANIZATION_ADMIN'],team_manager:['TEAM_MANAGER'],registrar:['REGISTRAR','RECORDS_ADMINISTRATOR'],
+  competition_manager:['COMPETITION_MANAGER'],treasurer:['TREASURER','FINANCE'],volunteer_coordinator:['VOLUNTEER_COORDINATOR','VOLUNTEER'],
+  communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],
+  facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']
+ };
+ if((aliases[normalized]||[normalized.toUpperCase()]).some(code=>hasRoleCode(ctx,code)))return true;
+ return hasRoleCode(ctx,'ORGANIZATION_ADMIN')&&ctx.maxDelegablePrivilege>0;
+}
 export function serviceHeaders(){const {serviceKey}=supabaseServerConfig();return serviceKey?serviceHeadersFor(serviceKey):null;}
