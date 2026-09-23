@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
+import { canUseAdminRoleContext,hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
 import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 export const dynamic='force-dynamic'; export const revalidate=0;
 
@@ -14,6 +14,7 @@ async function audit(ctx:AccessContext,tenant:string,action:string,entityType:st
 
 export async function GET(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
+  const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
   const canTasks=hasPermission(ctx,'admin_tasks.read'),canFinance=hasPermission(ctx,'finance.read'),canRoster=hasPermission(ctx,'rosters.read');
   const tenant=tenantId(ctx),orgs=organizationIds(ctx); if(!tenant)return deny(403,'Canonical tenant context required.');
   const teamQuery=canRoster&&orgs.length?`teams?select=id&organization_id=${inFilter(orgs)}&status=eq.active`:null;
@@ -28,10 +29,10 @@ export async function GET(request:NextRequest){
   const athleteCount=new Set((athletes||[]).map((r:any)=>r.athlete_id)).size;
   const arBalance=(invoices||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0),apBalance=(bills||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0);
   const pastDue=(invoices||[]).filter((r:any)=>r.due_date&&Number(r.balance_due||0)>0&&new Date(String(r.due_date)).getTime()<Date.now()).length;
-  const orgAdmin=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminSnapshot(ctx,tenant,orgs):null;
-  const controls=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminControls(tenant,orgs):null;
-  const enterprise=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminEnterprise(orgs):null;
-  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  const orgAdmin=roleName==='org_admin'?await orgAdminSnapshot(ctx,tenant,orgs):null;
+  const controls=await orgAdminControls(tenant,orgs);
+  const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs):null;
+  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
