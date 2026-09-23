@@ -1,75 +1,31 @@
-﻿'use client';
+'use client';
+import {useEffect,useMemo,useState} from 'react';
+import {authenticatedFetch} from '@/lib/client/authenticatedFetch';
 
-import { useState } from 'react';
-import { renderIconSync } from '@/lib/icons';
-
-interface Organization {
-  id: string;
-  name: string;
-  type: string;
-  location: string;
-  status: string;
+type Snapshot={organizations:any[];sites:any[];programs:any[];seasons:any[];teams:any[];people:any[];assignments:any[];roles:any[];audit:any[]};
+export function OrganizationArchitecture(){
+ const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState('');
+ async function load(){setError('');const r=await authenticatedFetch('/api/admin-command',{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Organization data unavailable.');setData(j.orgAdmin||null)}
+ useEffect(()=>{load().catch(e=>setError(e.message))},[]);
+ const names=useMemo(()=>new Map((data?.people||[]).map((p:any)=>[p.id,[p.preferred_name||p.first_name,p.last_name].filter(Boolean).join(' ')])),[data]);
+ const roles=useMemo(()=>new Map((data?.roles||[]).map((r:any)=>[r.id,r.name])),[data]);
+ async function mutate(body:any){setBusy(body.action);setError('');try{const r=await authenticatedFetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Action failed.');await load()}catch(e){setError(e instanceof Error?e.message:'Action failed.')}finally{setBusy('')}}
+ if(error&&!data)return <div className="p-6 text-white"><h1 className="text-2xl font-black">Organization Administration</h1><p className="mt-3 text-red-400">{error}</p></div>;
+ if(!data)return <div className="p-6 text-neutral-400">Loading canonical organization records…</div>;
+ const org=data.organizations[0];
+ return <div className="p-6 text-white space-y-6">
+  <div><div className="text-[10px] font-black uppercase tracking-[.24em] text-[#FA4616]">Organization Administrator</div><h1 className="mt-1 text-3xl font-black">{org?.name||'Organization'}</h1><p className="text-sm text-neutral-400">Governance execution, organizational structure, delegated authority and enterprise oversight.</p></div>
+  {error&&<div className="rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>}
+  <div className="grid gap-3 md:grid-cols-5">{[['Sites',data.sites.length],['Programs',data.programs.length],['Seasons',data.seasons.length],['Teams',data.teams.length],['People',data.people.length]].map(([k,v])=><div key={String(k)} className="rounded-xl border border-neutral-800 bg-[#090b0b] p-4"><div className="text-xs text-neutral-500">{k}</div><div className="text-2xl font-black">{v}</div></div>)}</div>
+  <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><h2 className="text-lg font-black">Organization record</h2><div className="mt-4 grid gap-4 md:grid-cols-4 text-sm"><div><span className="text-neutral-500">Code</span><div>{org?.code||'—'}</div></div><div><span className="text-neutral-500">Legal name</span><div>{org?.legal_name||'—'}</div></div><div><span className="text-neutral-500">Type</span><div>{org?.organization_type||'—'}</div></div><div><span className="text-neutral-500">Status</span><div>{org?.status||'—'}</div></div></div></section>
+  <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-black">Role delegation</h2><p className="text-sm text-neutral-500">Active organization-scoped authority assignments. Changes are server-authorized and audited.</p></div></div>
+   <div className="mt-4 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-neutral-500"><tr><th className="py-2">Person</th><th>Role</th><th>Scope</th><th>Status</th><th></th></tr></thead><tbody>{data.assignments.map((a:any)=><tr key={a.id} className="border-t border-neutral-800"><td className="py-3">{names.get(a.person_id)||a.person_id}</td><td>{roles.get(a.role_definition_id)||a.role_definition_id}</td><td>{a.team_id?'Team':a.site_id?'Site':a.program_id?'Program':'Organization'}</td><td>{a.status}</td><td className="text-right">{a.status==='active'&&<button disabled={!!busy} onClick={()=>mutate({action:'revoke-role',id:a.id})} className="rounded-lg border border-neutral-700 px-3 py-1.5 hover:border-red-500 disabled:opacity-40">Revoke</button>}</td></tr>)}</tbody></table>{!data.assignments.length&&<div className="py-6 text-sm text-neutral-500">No role assignments in this organization.</div>}</div>
+   <Assign people={data.people} roles={data.roles} organizationId={org?.id} busy={!!busy} onAssign={(personId:string,roleDefinitionId:string)=>mutate({action:'assign-role',personId,roleDefinitionId,organizationId:org.id})}/>
+  </section>
+  <section className="grid gap-4 lg:grid-cols-2"><RecordList title="Sites" rows={data.sites}/><RecordList title="Programs" rows={data.programs}/><RecordList title="Seasons" rows={data.seasons}/><RecordList title="Teams" rows={data.teams}/></section>
+  <section className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><h2 className="text-lg font-black">Audit history</h2><div className="mt-3 space-y-2">{data.audit.slice(0,20).map((a:any)=><div key={a.id} className="flex justify-between gap-4 border-t border-neutral-800 pt-2 text-sm"><span><b>{a.action}</b> · {a.entity_type}</span><span className="text-neutral-500">{new Date(a.created_at).toLocaleString()}</span></div>)}{!data.audit.length&&<p className="text-sm text-neutral-500">No authorized audit events available.</p>}</div></section>
+ </div>
 }
-
-export function OrganizationArchitecture() {
-  const [orgs] = useState<Organization[]>([
-    { id: 'ORG-001', name: 'Halifax Aquatics Club', type: 'Club', location: 'Halifax, NS', status: 'ACTIVE' },
-    { id: 'ORG-002', name: 'HPAC Senior Squad', type: 'Squad', location: 'Halifax, NS', status: 'ACTIVE' },
-    { id: 'ORG-003', name: 'HPAC Junior Squad', type: 'Squad', location: 'Halifax, NS', status: 'ACTIVE' },
-  ]);
-
-  const Building2Icon = renderIconSync('building2');
-  const UsersIcon = renderIconSync('users');
-  const MapPinIcon = renderIconSync('map-pin');
-  const PlusIcon = renderIconSync('plus');
-  const SearchIcon = renderIconSync('search');
-
-  return (
-    <div className="p-6 text-white">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.24em] text-[#FA4616]">🏢 Organization</div>
-          <h1 className="mt-1 text-2xl font-black text-white">Organization Architecture</h1>
-          <p className="text-sm text-neutral-400">Manage corporate hierarchy and structure</p>
-        </div>
-        <button className="flex items-center gap-2 rounded-xl bg-[#FA4616] px-4 py-2 text-sm font-bold text-black hover:bg-[#FA4616]/90 transition-colors">
-          {PlusIcon}
-          Add Organization
-        </button>
-      </div>
-
-      <div className="mb-6">
-        <div className="relative flex-1 max-w-sm">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">{SearchIcon}</span>
-          <input type="text" placeholder="Search organizations..." className="w-full rounded-xl border border-neutral-800 bg-[#090b0b] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 focus:border-[#FA4616] focus:outline-none" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {orgs.map((org) => (
-          <div key={org.id} className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6 hover:border-neutral-600 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-[#FA4616]/10 p-2.5 text-[#FA4616]">{Building2Icon}</div>
-                <div>
-                  <div className="font-bold text-white">{org.name}</div>
-                  <div className="flex items-center gap-1 text-xs text-neutral-500">{MapPinIcon} {org.location}</div>
-                </div>
-              </div>
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${org.status === 'ACTIVE' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>
-                {org.status}
-              </span>
-            </div>
-            <div className="mt-3 flex items-center gap-1 text-xs text-neutral-500">{UsersIcon} {org.type}</div>
-            <div className="mt-4 flex gap-2">
-              <button className="flex-1 rounded-lg border border-neutral-800 px-3 py-1.5 text-xs text-white hover:border-neutral-600 transition-colors">View</button>
-              <button className="flex-1 rounded-lg bg-[#FA4616] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#FA4616]/90 transition-colors">Edit</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
+function RecordList({title,rows}:{title:string;rows:any[]}){return <div className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-5"><h2 className="font-black">{title}</h2><div className="mt-3 space-y-2">{rows.slice(0,12).map(r=><div key={r.id} className="flex justify-between border-t border-neutral-800 pt-2 text-sm"><span>{r.name}</span><span className="text-neutral-500">{r.status||r.code}</span></div>)}{!rows.length&&<div className="text-sm text-neutral-500">No canonical {title.toLowerCase()} records.</div>}</div></div>}
+function Assign({people,roles,organizationId,busy,onAssign}:{people:any[];roles:any[];organizationId:string;busy:boolean;onAssign:(p:string,r:string)=>void}){const[p,setP]=useState(''),[r,setR]=useState('');return <div className="mt-5 grid gap-2 border-t border-neutral-800 pt-4 md:grid-cols-[1fr_1fr_auto]"><select value={p} onChange={e=>setP(e.target.value)} className="rounded-lg border border-neutral-700 bg-black p-2 text-sm"><option value="">Select person</option>{people.map(x=><option key={x.id} value={x.id}>{x.preferred_name||x.first_name} {x.last_name}</option>)}</select><select value={r} onChange={e=>setR(e.target.value)} className="rounded-lg border border-neutral-700 bg-black p-2 text-sm"><option value="">Select delegable role</option>{roles.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select><button disabled={busy||!p||!r||!organizationId} onClick={()=>onAssign(p,r)} className="rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-bold text-black disabled:opacity-40">Assign role</button></div>}
 export default OrganizationArchitecture;
