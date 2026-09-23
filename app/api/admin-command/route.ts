@@ -30,7 +30,8 @@ export async function GET(request:NextRequest){
   const pastDue=(invoices||[]).filter((r:any)=>r.due_date&&Number(r.balance_due||0)>0&&new Date(String(r.due_date)).getTime()<Date.now()).length;
   const orgAdmin=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminSnapshot(ctx,tenant,orgs):null;
   const controls=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminControls(tenant,orgs):null;
-  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  const enterprise=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminEnterprise(orgs):null;
+  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
@@ -66,6 +67,17 @@ async function orgAdminControls(tenant:string,orgs:string[]){
   rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
  ]);
  return {requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions};
+}
+
+async function orgAdminEnterprise(orgs:string[]){
+ const orgFilter=inFilter(orgs); if(!orgFilter)return {facilities:[],vendors:[],externalOrganizations:[],payrollRuns:[],imports:[]};
+ const [facilities,vendors,externalOrganizations,payrollRuns,imports]=await Promise.all([
+  rest(`facilities?select=*&organization_id=${orgFilter}&limit=200`),
+  rest('vendors?select=*&limit=200'),
+  rest(`organizations?select=id,parent_organization_id,code,name,legal_name,organization_type,status&id=not.${orgFilter}&limit=200`),
+  rest('payroll_runs?select=*&limit=100'),
+  rest('import_jobs?select=*&order=created_at.desc&limit=100')
+ ]);return {facilities,vendors,externalOrganizations,payrollRuns,imports};
 }
 
 export async function POST(request:NextRequest){
