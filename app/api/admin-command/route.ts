@@ -83,13 +83,14 @@ async function registrarSnapshot(orgs:string[]){
 
 async function orgAdminEnterprise(orgs:string[]){
  const orgFilter=inFilter(orgs); if(!orgFilter)return {facilities:[],vendors:[],externalOrganizations:[],payrollRuns:[],imports:[]};
- const [facilities,vendors,externalOrganizations,payrollRuns,imports]=await Promise.all([
+ const [facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings]=await Promise.all([
   rest(`facilities?select=*&organization_id=${orgFilter}&limit=200`),
   rest('vendors?select=*&limit=200'),
   rest(`organizations?select=id,parent_organization_id,code,name,legal_name,organization_type,status&id=not.${orgFilter}&limit=200`),
   rest('payroll_runs?select=*&limit=100'),
-  rest('import_jobs?select=*&order=created_at.desc&limit=100')
- ]);return {facilities,vendors,externalOrganizations,payrollRuns,imports};
+  rest('import_jobs?select=*&order=created_at.desc&limit=100'),
+  rest('facility_bookings?select=*&order=starts_at.desc&limit=500')
+ ]);return {facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings};
 }
 
 export async function POST(request:NextRequest){
