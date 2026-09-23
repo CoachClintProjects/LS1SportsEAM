@@ -29,7 +29,8 @@ export async function GET(request:NextRequest){
   const arBalance=(invoices||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0),apBalance=(bills||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0);
   const pastDue=(invoices||[]).filter((r:any)=>r.due_date&&Number(r.balance_due||0)>0&&new Date(String(r.due_date)).getTime()<Date.now()).length;
   const orgAdmin=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminSnapshot(ctx,tenant,orgs):null;
-  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  const controls=ctx.roles.some(r=>r.code==='ORGANIZATION_ADMIN')?await orgAdminControls(tenant,orgs):null;
+  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
@@ -48,6 +49,23 @@ async function orgAdminSnapshot(ctx:AccessContext,tenant:string,orgs:string[]){
   hasPermission(ctx,'audit.read')?rest(`audit_events?select=id,actor_person_id,action,entity_type,entity_id,created_at,correlation_id,reason&tenant_id=eq.${tenant}&order=created_at.desc&limit=100`):[]
  ]);
  return {organizations,sites,programs,seasons,teams,people,assignments,roles:(roles||[]).filter((r:any)=>!r.config?.platform_only&&Number(r.privilege_level)<=ctx.maxDelegablePrivilege),audit:auditRows};
+}
+
+async function orgAdminControls(tenant:string,orgs:string[]){
+ if(!orgs.length)return {requirements:[],credentials:[],backgroundChecks:[],safeSport:[],waivers:[],memberships:[],dataQualityIssues:[],duplicateCandidates:[],competitions:[]};
+ const orgFilter=inFilter(orgs);
+ const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
+  rest('compliance_requirements?select=id,code,name,applies_to_role,applies_to_minor,severity,validity_days,rule_definition&order=name.asc'),
+  rest('credentials?select=id,person_id,requirement_id,credential_type,issuer,issued_on,expires_on,status,verification_status,verified_at&limit=500'),
+  rest('background_checks?select=id,person_id,check_type,provider,submitted_at,completed_at,expires_on,status,result_classification&limit=500'),
+  rest('safesport_records?select=id,person_id,governing_body_id,certification_type,completed_on,expires_on,status,source,verified_at&limit=500'),
+  rest(`waivers?select=id,organization_id,code,name,version,required_for,effective_from,effective_to,status&organization_id=${orgFilter}&limit=500`),
+  rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=500`),
+  rest(`data_quality_issues?select=id,entity_type,entity_id,severity,status,detected_at,resolved_at,details&tenant_id=eq.${tenant}&status=neq.resolved&order=detected_at.desc&limit=200`),
+  rest(`duplicate_candidates?select=id,entity_type,left_entity_id,right_entity_id,confidence,match_reason,status,resolved_at&tenant_id=eq.${tenant}&status=neq.resolved&limit=200`),
+  rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
+ ]);
+ return {requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions};
 }
 
 export async function POST(request:NextRequest){
