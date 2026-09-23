@@ -32,7 +32,8 @@ export async function GET(request:NextRequest){
   const orgAdmin=roleName==='org_admin'?await orgAdminSnapshot(ctx,tenant,orgs):null;
   const controls=await orgAdminControls(tenant,orgs);
   const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs):null;
-  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  const registrar=await registrarSnapshot(orgs);
+  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
@@ -68,6 +69,16 @@ async function orgAdminControls(tenant:string,orgs:string[]){
   rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
  ]);
  return {requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions};
+}
+
+async function registrarSnapshot(orgs:string[]){
+ if(!orgs.length)return {registrations:[],memberships:[],teamMemberships:[],athletes:[]};const orgFilter=inFilter(orgs);
+ const registrations=await rest(`registrations?select=*&organization_id=${orgFilter}&order=submitted_at.desc&limit=500`);
+ const memberships=await rest(`memberships?select=*&organization_id=${orgFilter}&limit=500`);
+ const teamMemberships=await rest('team_memberships?select=*&limit=500');
+ const athleteIds=[...new Set([...registrations.map((x:any)=>x.athlete_id),...teamMemberships.map((x:any)=>x.athlete_id)].filter(Boolean))];
+ const athletes=athleteIds.length?await rest(`athletes?select=*&id=${inFilter(athleteIds)}&limit=500`):[];
+ return {registrations,memberships,teamMemberships,athletes};
 }
 
 async function orgAdminEnterprise(orgs:string[]){
