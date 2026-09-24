@@ -46,7 +46,7 @@ export async function GET(request:NextRequest){
   const controls=await orgAdminControls(tenant,orgs);
   const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs,tenant):null;
   const registrar=await registrarSnapshot(orgs);
-  return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  return NextResponse.json({viewer:{personId:ctx.person?.id||null,email:ctx.user.email,displayName:ctx.person?([...(orgAdmin?.people||[]).filter((p:any)=>p.id===ctx.person?.id).map((p:any)=>p.preferred_name||p.first_name).filter(Boolean)][0]||ctx.user.email.split('@')[0]):ctx.user.email.split('@')[0]},invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
