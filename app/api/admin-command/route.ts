@@ -75,7 +75,8 @@ async function registrarSnapshot(orgs:string[]){
  if(!orgs.length)return {registrations:[],memberships:[],teamMemberships:[],athletes:[]};const orgFilter=inFilter(orgs);
  const registrations=await rest(`registrations?select=*&organization_id=${orgFilter}&order=submitted_at.desc&limit=500`);
  const memberships=await rest(`memberships?select=*&organization_id=${orgFilter}&limit=500`);
- const teamMemberships=await rest('team_memberships?select=*&limit=500');
+ const teams=await rest(`teams?select=id&organization_id=${orgFilter}&limit=500`);const teamIds=teams.map((x:any)=>x.id);
+ const teamMemberships=teamIds.length?await rest(`team_memberships?select=*&team_id=${inFilter(teamIds)}&limit=500`):[];
  const athleteIds=[...new Set([...registrations.map((x:any)=>x.athlete_id),...teamMemberships.map((x:any)=>x.athlete_id)].filter(Boolean))];
  const athletes=athleteIds.length?await rest(`athletes?select=*&id=${inFilter(athleteIds)}&limit=500`):[];
  return {registrations,memberships,teamMemberships,athletes};
