@@ -36,7 +36,7 @@ export async function GET(request:NextRequest){
   const [invoices,bills,tasks,athletes]=await Promise.all([
    canFinance?rest('invoices?select=id,invoice_number,invoice_date,due_date,total,balance_due,status&order=invoice_date.desc&limit=50'):[],
    canFinance?rest('vendor_bills?select=id,bill_number,bill_date,due_date,total,balance_due,status&order=bill_date.desc&limit=50'):[],
-   canTasks?rest(`work_items?select=id,tenant_id,work_type,status,priority,payload&tenant_id=eq.${tenant}&status=neq.completed&order=id.desc&limit=50`):[],
+   canTasks?rest(`work_items?select=id,tenant_id,work_type,status,priority,payload&tenant_id=eq.${tenant}&order=id.desc&limit=100`):[],
    canRoster&&teamIds.length?rest(`team_memberships?select=athlete_id&team_id=${inFilter(teamIds)}&status=eq.active`):[],
   ]);
   const athleteCount=new Set((athletes||[]).map((r:any)=>r.athlete_id)).size;
