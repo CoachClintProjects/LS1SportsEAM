@@ -103,8 +103,9 @@ async function orgAdminEnterprise(orgs:string[],tenant:string){
 
 export async function POST(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
-  const body=await request.json();const action=String(body.action||''),tenant=tenantId(ctx);if(!tenant)return deny(403,'Canonical tenant context required.');const correlationId=crypto.randomUUID();
+  const body=await request.json();const action=String(body.action||''),roleName=String(body.role||'org_admin').trim(),tenant=tenantId(ctx);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');if(!tenant)return deny(403,'Canonical tenant context required.');const correlationId=crypto.randomUUID();
   if(action==='assign-role'){
+   if(roleName!=='org_admin')return deny(403,'Role assignment requires Organization Administrator context.');
    if(!hasPermission(ctx,'role_assignments.manage'))return deny(403,'Role assignment denied.');
    const personId=String(body.personId||''),roleDefinitionId=String(body.roleDefinitionId||''),organizationId=String(body.organizationId||'');
    if(!personId||!roleDefinitionId||!organizationId)return deny(400,'Person, role and organization are required.');
@@ -122,6 +123,7 @@ export async function POST(request:NextRequest){
    return NextResponse.json({ok:true,row:created,correlationId});
   }
   if(action==='revoke-role'){
+   if(roleName!=='org_admin')return deny(403,'Role revocation requires Organization Administrator context.');
    if(!hasPermission(ctx,'role_assignments.manage'))return deny(403,'Role revocation denied.');
    const id=String(body.id||'');if(!id)return deny(400,'Role assignment ID is required.');
    const existing=await rest(`role_assignments?select=*&id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&limit=1`);
