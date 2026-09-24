@@ -34,7 +34,7 @@ export async function GET(request:NextRequest){
   const teams=teamQuery?await rest(teamQuery):[];
   const teamIds=(teams||[]).map((r:any)=>r.id);
   const [invoices,bills,tasks,athletes,calendarEvents]=await Promise.all([
-   canFinance?rest('invoices?select=id,customer_id,invoice_number,invoice_date,due_date,currency,total,balance_due,status&order=invoice_date.desc&limit=200'):[],
+   canFinance?rest('invoices?select=id,customer_id,invoice_number,invoice_date,due_date,currency,total,balance_due,status,customers(id,person_id,display_name,customer_code,people(id,first_name,last_name,preferred_name,email))&order=invoice_date.desc&limit=200'):[],
    canFinance?rest('vendor_bills?select=id,bill_number,bill_date,due_date,total,balance_due,status&order=bill_date.desc&limit=50'):[],
    canTasks?rest(`work_items?select=id,tenant_id,work_type,status,priority,payload&tenant_id=eq.${tenant}&order=id.desc&limit=100`):[],
    canRoster&&teamIds.length?rest(`team_memberships?select=athlete_id&team_id=${inFilter(teamIds)}&status=eq.active`):[],
