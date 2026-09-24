@@ -31,7 +31,7 @@ export async function GET(request:NextRequest){
   const pastDue=(invoices||[]).filter((r:any)=>r.due_date&&Number(r.balance_due||0)>0&&new Date(String(r.due_date)).getTime()<Date.now()).length;
   const orgAdmin=roleName==='org_admin'?await orgAdminSnapshot(ctx,tenant,orgs):null;
   const controls=await orgAdminControls(tenant,orgs);
-  const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs):null;
+  const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs,tenant):null;
   const registrar=await registrarSnapshot(orgs);
   return NextResponse.json({invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
@@ -81,16 +81,23 @@ async function registrarSnapshot(orgs:string[]){
  return {registrations,memberships,teamMemberships,athletes};
 }
 
-async function orgAdminEnterprise(orgs:string[]){
- const orgFilter=inFilter(orgs); if(!orgFilter)return {facilities:[],vendors:[],externalOrganizations:[],payrollRuns:[],imports:[]};
- const [facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings]=await Promise.all([
-  rest(`facilities?select=*&organization_id=${orgFilter}&limit=200`),
-  rest('vendors?select=*&limit=200'),
-  rest(`organizations?select=id,parent_organization_id,code,name,legal_name,organization_type,status&id=not.${orgFilter}&limit=200`),
-  rest('payroll_runs?select=*&limit=100'),
-  rest('import_jobs?select=*&order=created_at.desc&limit=100'),
-  rest('facility_bookings?select=*&order=starts_at.desc&limit=500')
- ]);return {facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings};
+async function orgAdminEnterprise(orgs:string[],tenant:string){
+ const orgFilter=inFilter(orgs); if(!orgFilter)return {facilities:[],vendors:[],externalOrganizations:[],payrollRuns:[],imports:[],facilityBookings:[]};
+ const [sites,teams,legalEntities,vendors,externalOrganizations,imports]=await Promise.all([
+  rest(`sites?select=id&organization_id=${orgFilter}&limit=500`),
+  rest(`teams?select=id&organization_id=${orgFilter}&limit=500`),
+  rest(`legal_entities?select=id&organization_id=${orgFilter}&limit=100`),
+  rest(`vendors?select=*&organization_id=${orgFilter}&limit=200`),
+  rest(`organizations?select=id,parent_organization_id,code,name,legal_name,organization_type,status&tenant_id=eq.${tenant}&id=not.${orgFilter}&limit=200`),
+  rest(`import_jobs?select=*&tenant_id=eq.${tenant}&order=started_at.desc&limit=100`)
+ ]);
+ const siteIds=sites.map((x:any)=>x.id),teamIds=teams.map((x:any)=>x.id),legalEntityIds=legalEntities.map((x:any)=>x.id);
+ const facilities=siteIds.length?await rest(`facilities?select=*&site_id=${inFilter(siteIds)}&limit=200`):[];
+ const facilityIds=facilities.map((x:any)=>x.id);
+ const payrollRuns=legalEntityIds.length?await rest(`payroll_runs?select=*&legal_entity_id=${inFilter(legalEntityIds)}&limit=100`):[];
+ const bookingFilters=[] as string[];if(facilityIds.length)bookingFilters.push(`facility_id.${inFilter(facilityIds)}`);if(teamIds.length)bookingFilters.push(`team_id.${inFilter(teamIds)}`);
+ const facilityBookings=bookingFilters.length?await rest(`facility_bookings?select=*&or=(${bookingFilters.join(',')})&order=starts_at.desc&limit=500`):[];
+ return {facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings};
 }
 
 export async function POST(request:NextRequest){
