@@ -38,7 +38,11 @@ export function canUseAdminRoleContext(ctx:AccessContext,roleName:string){
   communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],
   facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']
  };
- if((aliases[normalized]||[normalized.toUpperCase()]).some(code=>hasRoleCode(ctx,code)))return true;
- return hasRoleCode(ctx,'ORGANIZATION_ADMIN')&&ctx.maxDelegablePrivilege>0;
+ const targetCodes=aliases[normalized];if(!targetCodes)return false;
+ if(targetCodes.some(code=>hasRoleCode(ctx,code)))return true;
+ if(!hasRoleCode(ctx,'ORGANIZATION_ADMIN'))return false;
+ const orgAdmin=ctx.roles.filter(r=>r.code.toUpperCase()==='ORGANIZATION_ADMIN');
+ if(!orgAdmin.length||ctx.maxDelegablePrivilege<=0)return false;
+ return orgAdmin.some(r=>r.scope.organization_id!==null);
 }
 export function serviceHeaders(){const {serviceKey}=supabaseServerConfig();return serviceKey?serviceHeadersFor(serviceKey):null;}
