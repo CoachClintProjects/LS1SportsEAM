@@ -11,10 +11,10 @@ const scopeLabel=(a:any)=>a.team_id?'Team':a.site_id?'Site':a.program_id?'Progra
 export function OrganizationArchitecture({role='org_admin'}:{role?:string}){
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(''),[domain,setDomain]=useState<Domain>('people'),[query,setQuery]=useState(''),[selected,setSelected]=useState<any|null>(null);
  async function load(){setError('');const r=await authenticatedFetch(`/api/admin-command?role=${encodeURIComponent(role)}`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Organization data unavailable.');setData(j.orgAdmin||null)}
- useEffect(()=>{load().catch(e=>setError(e.message))},[]);
+ useEffect(()=>{load().catch(e=>setError(e.message))},[role]);
  const names=useMemo(()=>new Map((data?.people||[]).map((p:any)=>[p.id,label(p)])),[data]);
  const roles=useMemo(()=>new Map((data?.roles||[]).map((r:any)=>[r.id,r.name])),[data]);
- async function mutate(body:any){setBusy(body.action);setError('');try{const r=await authenticatedFetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Action failed.');await load();setSelected(null)}catch(e){setError(e instanceof Error?e.message:'Action failed.')}finally{setBusy('')}}
+ async function mutate(body:any){setBusy(body.action);setError('');try{const r=await authenticatedFetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,role})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Action failed.');await load();setSelected(null)}catch(e){setError(e instanceof Error?e.message:'Action failed.')}finally{setBusy('')}}
  if(error&&!data)return <State title="Organization Administration" text={error}/>;
  if(!data)return <State title="Organization Administration" text="Loading canonical organization records…"/>;
  const org=data.organizations[0];
