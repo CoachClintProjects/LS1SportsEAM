@@ -62,6 +62,18 @@ export function LoginGate() {
     router.refresh();
   }
 
+  async function handleForgotPassword() {
+    const emailInput = document.querySelector<HTMLInputElement>('input[name="email"]');
+    const email = emailInput?.value.trim() || '';
+    if (!email) { setError('Enter your email address first.'); return; }
+    setBusy(true); setError(''); setMessage('');
+    const redirectTo = `${window.location.origin}/login?reset=1`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (resetError) setError('Unable to send the password reset email.');
+    else setMessage('Password reset email sent.');
+    setBusy(false);
+  }
+
   async function handleDemo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -127,6 +139,7 @@ export function LoginGate() {
                   <label className="mb-2 block text-[10px] font-black uppercase tracking-[.18em] text-[#9CA49E]">Password</label>
                   <input name="password" type="password" required autoComplete="current-password" className="w-full rounded-xl border border-[#242B26] bg-[#070A09] px-4 py-3 text-sm outline-none focus:border-[#FA4616]" />
                 </div>
+                <div className="flex justify-end"><button type="button" disabled={busy} onClick={handleForgotPassword} className="text-xs font-bold text-[#FA4616] hover:text-white disabled:opacity-60">Forgot password?</button></div>
                 <button disabled={busy} className="w-full rounded-xl bg-[#FA4616] px-4 py-3 text-sm font-black text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in to LS1Sports'}</button>
               </form>
             ) : (
