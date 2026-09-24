@@ -7,6 +7,19 @@ async function rest(path:string,init:RequestInit={}){const {url}=supabaseServerC
 const deny=(status:number,error:string)=>NextResponse.json({error},{status});
 const HPAC_TENANT='beb8f24e-fcd0-5dbe-ba1b-39c488ebaa4f';
 const HPAC_ORG='c9032ebb-0507-5004-b1ad-0bca7cf3cc53';
+const ROLE_PERMISSIONS:Record<string,Set<string>>={
+ org_admin:new Set(['*']),
+ team_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','rosters.read','rosters.update','teams.read','teams.update','registrations.read','competition_entries.read','communications.read','communications.send','record.read','record.update']),
+ registrar:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','registrations.read','registrations.approve','rosters.read','rosters.update','waivers.read','waivers.update','competition_entries.read','record.read','record.update','record.approve']),
+ competition_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','competition_entries.read','competition_entries.update','record.read','record.update','record.approve']),
+ treasurer:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','finance.read','record.read','record.update','record.approve','record.export']),
+ volunteer_coordinator:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','record.read','record.update','communications.read','communications.send']),
+ communications_media:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','communications.read','communications.send','record.read','record.update']),
+ fundraising_coordinator:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','finance.read','record.read','record.update','record.export']),
+ facilities_equipment_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','record.read','record.update'])
+};
+function roleHas(ctx:AccessContext,role:string,permission:string){if(!hasPermission(ctx,permission))return false;const p=ROLE_PERMISSIONS[role];return !!p&&(p.has('*')||p.has(permission));}
+
 function tenantId(ctx:AccessContext){return ctx.person?.tenant_id||(ctx.isPlatformSuperUser?HPAC_TENANT:null);}
 function organizationIds(ctx:AccessContext){if(ctx.isPlatformSuperUser)return [HPAC_ORG];return [...new Set(ctx.roles.map(r=>r.scope.organization_id).filter(Boolean))] as string[];}
 function inFilter(ids:string[]){return ids.length?`in.(${ids.map(encodeURIComponent).join(',')})`:'';}
@@ -15,7 +28,7 @@ async function audit(ctx:AccessContext,tenant:string,action:string,entityType:st
 export async function GET(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
   const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
-  const canTasks=hasPermission(ctx,'admin_tasks.read'),canFinance=hasPermission(ctx,'finance.read'),canRoster=hasPermission(ctx,'rosters.read');
+  const canTasks=roleHas(ctx,roleName,'admin_tasks.read'),canFinance=roleHas(ctx,roleName,'finance.read'),canRoster=roleHas(ctx,roleName,'rosters.read');
   const tenant=tenantId(ctx),orgs=organizationIds(ctx); if(!tenant)return deny(403,'Canonical tenant context required.');
   const teamQuery=canRoster&&orgs.length?`teams?select=id&organization_id=${inFilter(orgs)}&status=eq.active`:null;
   const teams=teamQuery?await rest(teamQuery):[];
@@ -106,7 +119,7 @@ export async function POST(request:NextRequest){
   const body=await request.json();const action=String(body.action||''),roleName=String(body.role||'org_admin').trim(),tenant=tenantId(ctx);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');if(!tenant)return deny(403,'Canonical tenant context required.');const correlationId=crypto.randomUUID();
   if(action==='assign-role'){
    if(roleName!=='org_admin')return deny(403,'Role assignment requires Organization Administrator context.');
-   if(!hasPermission(ctx,'role_assignments.manage'))return deny(403,'Role assignment denied.');
+   if(!roleHas(ctx,roleName,'role_assignments.manage'))return deny(403,'Role assignment denied.');
    const personId=String(body.personId||''),roleDefinitionId=String(body.roleDefinitionId||''),organizationId=String(body.organizationId||'');
    if(!personId||!roleDefinitionId||!organizationId)return deny(400,'Person, role and organization are required.');
    if(!organizationIds(ctx).includes(organizationId))return deny(403,'Organization scope denied.');
@@ -124,7 +137,7 @@ export async function POST(request:NextRequest){
   }
   if(action==='revoke-role'){
    if(roleName!=='org_admin')return deny(403,'Role revocation requires Organization Administrator context.');
-   if(!hasPermission(ctx,'role_assignments.manage'))return deny(403,'Role revocation denied.');
+   if(!roleHas(ctx,roleName,'role_assignments.manage'))return deny(403,'Role revocation denied.');
    const id=String(body.id||'');if(!id)return deny(400,'Role assignment ID is required.');
    const existing=await rest(`role_assignments?select=*&id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&limit=1`);
    if(!existing?.length)return deny(404,'Role assignment not found.');
@@ -136,8 +149,8 @@ export async function POST(request:NextRequest){
    await audit(ctx,tenant,'role_assignment.revoked','role_assignment',id,existing[0],row[0],correlationId);
    return NextResponse.json({ok:true,row:row[0],correlationId});
   }
-  if(action==='create-task'){if(!hasPermission(ctx,'admin_tasks.create'))return deny(403,'Task creation denied.');const title=String(body.title||'').trim();if(!title)return deny(400,'Task title is required.');const row=await rest('work_items',{method:'POST',body:JSON.stringify({tenant_id:tenant,work_type:'ADMIN_TASK',status:'open',priority:body.priority||'normal',payload:{title,description:body.description||null,created_from:'admin_command_center',created_by:ctx.user.id,correlation_id:correlationId}})});const created=row?.[0];if(!created)throw new Error('Canonical task creation returned no record.');await audit(ctx,tenant,'admin_task.created','work_item',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});}
-  if(action==='complete-task'){if(!hasPermission(ctx,'admin_tasks.update'))return deny(403,'Task update denied.');const id=String(body.id||'');if(!id)return deny(400,'Task ID is required.');const existing=await rest(`work_items?select=*&id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&limit=1`);if(!existing?.length)return deny(404,'Task not found in authorized scope.');if(existing[0].status==='completed')return NextResponse.json({ok:true,row:existing[0],correlationId,idempotent:true});const row=await rest(`work_items?id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&status=neq.completed`,{method:'PATCH',body:JSON.stringify({status:'completed'})});if(!row?.length)return deny(409,'Task changed before completion. Refresh and retry.');await audit(ctx,tenant,'admin_task.completed','work_item',id,existing[0],row[0],correlationId);return NextResponse.json({ok:true,row:row[0],correlationId});}
+  if(action==='create-task'){if(!roleHas(ctx,roleName,'admin_tasks.create'))return deny(403,'Task creation denied.');const title=String(body.title||'').trim();if(!title)return deny(400,'Task title is required.');const row=await rest('work_items',{method:'POST',body:JSON.stringify({tenant_id:tenant,work_type:'ADMIN_TASK',status:'open',priority:body.priority||'normal',payload:{title,description:body.description||null,created_from:'admin_command_center',created_by:ctx.user.id,correlation_id:correlationId}})});const created=row?.[0];if(!created)throw new Error('Canonical task creation returned no record.');await audit(ctx,tenant,'admin_task.created','work_item',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});}
+  if(action==='complete-task'){if(!roleHas(ctx,roleName,'admin_tasks.update'))return deny(403,'Task update denied.');const id=String(body.id||'');if(!id)return deny(400,'Task ID is required.');const existing=await rest(`work_items?select=*&id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&limit=1`);if(!existing?.length)return deny(404,'Task not found in authorized scope.');if(existing[0].status==='completed')return NextResponse.json({ok:true,row:existing[0],correlationId,idempotent:true});const row=await rest(`work_items?id=eq.${encodeURIComponent(id)}&tenant_id=eq.${tenant}&status=neq.completed`,{method:'PATCH',body:JSON.stringify({status:'completed'})});if(!row?.length)return deny(409,'Task changed before completion. Refresh and retry.');await audit(ctx,tenant,'admin_task.completed','work_item',id,existing[0],row[0],correlationId);return NextResponse.json({ok:true,row:row[0],correlationId});}
   return deny(400,'Unsupported Admin action.');
  }catch(error){return deny(400,error instanceof Error?error.message:'Admin action failed.');}
 }
