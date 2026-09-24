@@ -62,7 +62,7 @@ async function orgAdminSnapshot(ctx:AccessContext,tenant:string,orgs:string[]){
   rest(`people?select=id,first_name,last_name,preferred_name,email,phone,status,privacy_classification&tenant_id=eq.${tenant}&order=last_name.asc,first_name.asc&limit=500`),
   rest(`role_assignments?select=id,person_id,role_definition_id,organization_id,sport_id,site_id,team_id,program_id,competition_id,starts_at,ends_at,status,metadata,created_at&tenant_id=eq.${tenant}&organization_id=${orgFilter}&order=created_at.desc&limit=500`),
   rest('role_definitions?select=id,code,name,description,privilege_level,role_type,config,is_active&is_active=eq.true&order=privilege_level.desc'),
-  hasPermission(ctx,'audit.read')?rest(`audit_events?select=id,actor_person_id,action,entity_type,entity_id,created_at,correlation_id,reason&tenant_id=eq.${tenant}&order=created_at.desc&limit=100`):[]
+  hasPermission(ctx,'audit.read')?rest(`audit_events?select=id,actor_person_id,action,entity_type,entity_id,occurred_at,correlation_id,reason&tenant_id=eq.${tenant}&order=occurred_at.desc&limit=100`):[]
  ]);
  return {organizations,sites,programs,seasons,teams,people,assignments,roles:(roles||[]).filter((r:any)=>!r.config?.platform_only&&Number(r.privilege_level)<=ctx.maxDelegablePrivilege),audit:auditRows};
 }
