@@ -99,7 +99,7 @@ async function registrarSnapshot(orgs:string[]){
 async function orgAdminEnterprise(orgs:string[],tenant:string){
  const orgFilter=inFilter(orgs); if(!orgFilter)return {facilities:[],vendors:[],externalOrganizations:[],payrollRuns:[],imports:[],facilityBookings:[]};
  const [sites,teams,legalEntities,vendors,externalOrganizations,imports]=await Promise.all([
-  rest(`sites?select=id&organization_id=${orgFilter}&limit=500`),
+  rest(`sites?select=id,organization_id,code,name,timezone,status&organization_id=${orgFilter}&limit=500`),
   rest(`teams?select=id&organization_id=${orgFilter}&limit=500`),
   rest(`legal_entities?select=id&organization_id=${orgFilter}&limit=100`),
   rest(`vendors?select=*&organization_id=${orgFilter}&limit=200`),
@@ -112,7 +112,7 @@ async function orgAdminEnterprise(orgs:string[],tenant:string){
  const payrollRuns=legalEntityIds.length?await rest(`payroll_runs?select=*&legal_entity_id=${inFilter(legalEntityIds)}&limit=100`):[];
  const bookingFilters=[] as string[];if(facilityIds.length)bookingFilters.push(`facility_id.${inFilter(facilityIds)}`);if(teamIds.length)bookingFilters.push(`team_id.${inFilter(teamIds)}`);
  const facilityBookings=bookingFilters.length?await rest(`facility_bookings?select=*&or=(${bookingFilters.join(',')})&order=starts_at.desc&limit=500`):[];
- return {facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings};
+ return {sites,facilities,vendors,externalOrganizations,payrollRuns,imports,facilityBookings};
 }
 
 export async function POST(request:NextRequest){
@@ -169,6 +169,16 @@ export async function POST(request:NextRequest){
    if(!row?.length)return deny(409,'Role assignment changed before revocation.');
    await audit(ctx,tenant,'role_assignment.revoked','role_assignment',id,existing[0],row[0],correlationId);
    return NextResponse.json({ok:true,row:row[0],correlationId});
+  }
+  if(action==='create-facility'){
+   if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.create'))return deny(403,'Facility creation denied.');
+   const siteId=String(body.siteId||''),code=String(body.code||'').trim(),name=String(body.name||'').trim();if(!siteId||!code||!name)return deny(400,'Site, facility code and name are required.');
+   const orgFilter=inFilter(organizationIds(ctx));if(!orgFilter)return deny(403,'Organization scope required.');
+   const sites=await rest(`sites?select=id,organization_id,timezone&id=eq.${encodeURIComponent(siteId)}&organization_id=${orgFilter}&limit=1`);if(!sites?.length)return deny(403,'Site is outside authorized organization scope.');
+   const row=await rest('facilities',{method:'POST',body:JSON.stringify({site_id:siteId,code,name,facility_type:body.facilityType||null,capacity:body.capacity?Number(body.capacity):null,timezone:body.timezone||sites[0].timezone||null,status:'active'})});const created=row?.[0];if(!created)throw new Error('Facility creation returned no record.');await audit(ctx,tenant,'facility.created','facility',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});
+  }
+  if(action==='update-facility'){
+   if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.update'))return deny(403,'Facility update denied.');const id=String(body.id||'');if(!id)return deny(400,'Facility ID is required.');const orgFilter=inFilter(organizationIds(ctx));const sites=orgFilter?await rest(`sites?select=id&organization_id=${orgFilter}&limit=500`):[];const siteFilter=inFilter(sites.map((s:any)=>s.id));if(!siteFilter)return deny(403,'Organization scope required.');const existing=await rest(`facilities?select=*&id=eq.${encodeURIComponent(id)}&site_id=${siteFilter}&limit=1`);if(!existing?.length)return deny(404,'Facility not found in authorized scope.');const allowed=Object.fromEntries(Object.entries(body.changes||{}).filter(([k])=>['name','facility_type','capacity','timezone','status'].includes(k)));if(!Object.keys(allowed).length)return deny(400,'No supported facility changes supplied.');const row=await rest(`facilities?id=eq.${encodeURIComponent(id)}&site_id=${siteFilter}`,{method:'PATCH',body:JSON.stringify(allowed)});if(!row?.length)return deny(409,'Facility changed before update.');await audit(ctx,tenant,'facility.updated','facility',id,existing[0],row[0],correlationId);return NextResponse.json({ok:true,row:row[0],correlationId});
   }
   if(action==='create-event'){if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.update'))return deny(403,'Event creation denied.');const name=String(body.name||'').trim(),startsAt=String(body.startsAt||''),endsAt=body.endsAt?String(body.endsAt):startsAt;if(!name||!startsAt||Number.isNaN(Date.parse(startsAt)))return deny(400,'Event name and valid start time are required.');const org=organizationIds(ctx)[0];if(!org)return deny(403,'Organization scope required.');const row=await rest('calendar_events',{method:'POST',body:JSON.stringify({tenant_id:tenant,organization_id:org,title:name,event_type:String(body.eventType||'meeting'),starts_at:startsAt,ends_at:endsAt,timezone:'America/Edmonton',status:'scheduled',metadata:{created_from:'organization_admin_home'}})});const created=row?.[0];if(!created)throw new Error('Event creation returned no record.');await audit(ctx,tenant,'calendar_event.created','calendar_event',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});}
   if(action==='create-task'){if(!roleHas(ctx,roleName,'admin_tasks.create'))return deny(403,'Task creation denied.');const title=String(body.title||'').trim();if(!title)return deny(400,'Task title is required.');const row=await rest('work_items',{method:'POST',body:JSON.stringify({tenant_id:tenant,work_type:'ADMIN_TASK',status:'open',priority:body.priority||'normal',payload:{title,description:body.description||null,created_from:'admin_command_center',created_by:ctx.user.id,correlation_id:correlationId}})});const created=row?.[0];if(!created)throw new Error('Canonical task creation returned no record.');await audit(ctx,tenant,'admin_task.created','work_item',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});}
