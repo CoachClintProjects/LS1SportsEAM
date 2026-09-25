@@ -7,19 +7,7 @@ async function rest(path:string,init:RequestInit={}){const {url}=supabaseServerC
 const deny=(status:number,error:string)=>NextResponse.json({error},{status});
 const HPAC_TENANT='beb8f24e-fcd0-5dbe-ba1b-39c488ebaa4f';
 const HPAC_ORG='c9032ebb-0507-5004-b1ad-0bca7cf3cc53';
-const ROLE_PERMISSIONS:Record<string,Set<string>>={
- org_admin:new Set(['*']),
- team_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','rosters.read','rosters.update','teams.read','teams.update','registrations.read','competition_entries.read','communications.read','communications.send','record.read','record.update']),
- registrar:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','registrations.read','registrations.approve','rosters.read','rosters.update','waivers.read','waivers.update','competition_entries.read','record.read','record.update','record.approve']),
- competition_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','competition_entries.read','competition_entries.update','record.read','record.update','record.approve']),
- treasurer:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','finance.read','record.read','record.update','record.approve','record.export']),
- volunteer_coordinator:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','record.read','record.update','communications.read','communications.send']),
- communications_media:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','communications.read','communications.send','record.read','record.update']),
- fundraising_coordinator:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','finance.read','record.read','record.update','record.export']),
- facilities_equipment_manager:new Set(['admin_tasks.read','admin_tasks.create','admin_tasks.update','record.read','record.update'])
-};
-function roleHas(ctx:AccessContext,role:string,permission:string){if(!hasPermission(ctx,permission))return false;const p=ROLE_PERMISSIONS[role];return !!p&&(p.has('*')||p.has(permission));}
-
+function roleHas(ctx:AccessContext,_role:string,permission:string){return hasPermission(ctx,permission);}
 function tenantId(ctx:AccessContext){return ctx.person?.tenant_id||(ctx.isPlatformSuperUser?HPAC_TENANT:null);}
 function organizationIds(ctx:AccessContext){if(ctx.isPlatformSuperUser)return [HPAC_ORG];return [...new Set(ctx.roles.map(r=>r.scope.organization_id).filter(Boolean))] as string[];}
 function inFilter(ids:string[]){return ids.length?`in.(${ids.map(encodeURIComponent).join(',')})`:'';}
