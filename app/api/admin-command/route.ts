@@ -156,6 +156,20 @@ export async function POST(request:NextRequest){
    await audit(ctx,tenant,'role_assignment.revoked','role_assignment',id,existing[0],row[0],correlationId);
    return NextResponse.json({ok:true,row:row[0],correlationId});
   }
+  if(action==='create-competition'){
+   if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.create'))return deny(403,'Competition creation denied.');
+   const name=String(body.name||'').trim(),orgs=organizationIds(ctx);if(!name||!orgs.length)return deny(400,'Competition name and organization scope are required.');
+   const organizationId=body.organizationId?String(body.organizationId):orgs.length===1?orgs[0]:'';if(!organizationId||!orgs.includes(organizationId))return deny(403,'Authorized organization selection is required.');
+   const payload:any={tenant_id:tenant,organization_id:organizationId,name};
+   for(const [source,target] of [['competitionType','competition_type'],['startsAt','starts_at'],['endsAt','ends_at'],['timezone','timezone'],['city','city'],['region','region'],['countryCode','country_code'],['sanctionNumber','sanction_number']] as const){if(body[source]!==undefined&&body[source]!==null&&String(body[source]).trim()!=='')payload[target]=body[source];}
+   const row=await rest('competitions',{method:'POST',body:JSON.stringify(payload)});const created=row?.[0];if(!created)throw new Error('Competition creation returned no record.');await audit(ctx,tenant,'competition.created','competition',created.id,null,created,correlationId);return NextResponse.json({ok:true,row:created,correlationId});
+  }
+  if(action==='update-competition'){
+   if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.update'))return deny(403,'Competition update denied.');const id=String(body.id||''),orgs=organizationIds(ctx);if(!id||!orgs.length)return deny(400,'Competition ID and organization scope are required.');
+   const existing=await rest(`competitions?select=*&id=eq.${encodeURIComponent(id)}&organization_id=${inFilter(orgs)}&limit=1`);if(!existing?.length)return deny(404,'Competition not found in authorized scope.');
+   const allowed=Object.fromEntries(Object.entries(body.changes||{}).filter(([k])=>['name','competition_type','starts_at','ends_at','timezone','city','region','country_code','status','sanction_number','venue_facility_id'].includes(k)));if(!Object.keys(allowed).length)return deny(400,'No supported competition changes supplied.');
+   const row=await rest(`competitions?id=eq.${encodeURIComponent(id)}&organization_id=${inFilter(orgs)}`,{method:'PATCH',body:JSON.stringify(allowed)});if(!row?.length)return deny(409,'Competition changed before update.');await audit(ctx,tenant,'competition.updated','competition',id,existing[0],row[0],correlationId);return NextResponse.json({ok:true,row:row[0],correlationId});
+  }
   if(action==='create-facility'){
    if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.create'))return deny(403,'Facility creation denied.');
    const siteId=String(body.siteId||''),code=String(body.code||'').trim(),name=String(body.name||'').trim();if(!siteId||!code||!name)return deny(400,'Site, facility code and name are required.');
