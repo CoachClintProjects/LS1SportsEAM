@@ -19,9 +19,11 @@ export async function GET(request:NextRequest){
   const teamQuery=canRoster&&orgs.length?`teams?select=id&organization_id=${inFilter(orgs)}&status=eq.active`:null;
   const teams=teamQuery?await rest(teamQuery):[];
   const teamIds=(teams||[]).map((r:any)=>r.id);
+  const [financeCustomers,financeEntities]=canFinance&&orgs.length?await Promise.all([rest(`customers?select=id&organization_id=${inFilter(orgs)}&limit=1000`),rest(`legal_entities?select=id&organization_id=${inFilter(orgs)}&limit=200`)]):[[],[]];
+  const customerIds=(financeCustomers||[]).map((r:any)=>r.id),legalEntityIds=(financeEntities||[]).map((r:any)=>r.id);
   const [invoices,bills,tasks,athletes,calendarEvents]=await Promise.all([
-   canFinance?rest('invoices?select=id,customer_id,invoice_number,invoice_date,due_date,currency,total,balance_due,status,customers(id,person_id,display_name,customer_code,people(id,first_name,last_name,preferred_name,email))&order=invoice_date.desc&limit=200'):[],
-   canFinance?rest('vendor_bills?select=id,bill_number,bill_date,due_date,total,balance_due,status&order=bill_date.desc&limit=50'):[],
+   canFinance&&customerIds.length?rest(`invoices?select=id,customer_id,invoice_number,invoice_date,due_date,currency,total,balance_due,status,customers(id,person_id,display_name,customer_code,people(id,first_name,last_name,preferred_name,email))&customer_id=${inFilter(customerIds)}&order=invoice_date.desc&limit=200`):[],
+   canFinance&&legalEntityIds.length?rest(`vendor_bills?select=id,bill_number,bill_date,due_date,currency,total,balance_due,status&legal_entity_id=${inFilter(legalEntityIds)}&order=bill_date.desc&limit=50`):[],
    canTasks?rest(`work_items?select=id,tenant_id,work_type,status,priority,payload&tenant_id=eq.${tenant}&order=id.desc&limit=100`):[],
    canRoster&&teamIds.length?rest(`team_memberships?select=athlete_id&team_id=${inFilter(teamIds)}&status=eq.active`):[],
    orgs.length?rest(`calendar_events?select=id,organization_id,title,event_type,starts_at,ends_at,timezone,status,metadata&organization_id=${inFilter(orgs)}&order=starts_at.asc&limit=500`):[],
