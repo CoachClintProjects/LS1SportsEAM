@@ -39,7 +39,20 @@ export async function GET(request:NextRequest){
   const controls=await orgAdminControls(tenant,orgs);
   const enterprise=roleName==='org_admin'?await orgAdminEnterprise(orgs,tenant):null;
   const registrar=await registrarSnapshot(orgs);
-  return NextResponse.json({calendarEvents,approvals,workflowTasks,workflowDefinitions,athletes:registrar?.athletes||[],financeContext:{customers:financeCustomers,legalEntities:financeEntities,billingAccounts,currency:(financeEntities||[]).map((x:any)=>String(x.base_currency||'').trim()).find(Boolean)||null},invoiceLines,payments,paymentAllocations,viewer:{personId:ctx.person?.id||null,email:ctx.user.email,displayName:ctx.person?([...(orgAdmin?.people||[]).filter((p:any)=>p.id===ctx.person?.id).map((p:any)=>p.preferred_name||p.first_name).filter(Boolean)][0]||ctx.user.email.split('@')[0]):ctx.user.email.split('@')[0]},invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
+  const athleteIds=(registrar?.athletes||[]).map((x:any)=>x.id),athletePersonIds=(registrar?.athletes||[]).map((x:any)=>x.person_id).filter(Boolean);
+  const athletePeople=athletePersonIds.length?await rest(`people?select=id,first_name,last_name,preferred_name,email&tenant_id=eq.${tenant}&id=${inFilter(athletePersonIds)}&limit=2000`):[];
+  const eligibility=athleteIds.length?await rest(`eligibility_records?select=id,athlete_id,competition_id,status,evaluated_at,reason,expires_at&athlete_id=${inFilter(athleteIds)}&order=evaluated_at.desc&limit=3000`):[];
+  const competitionIds=(controls?.competitions||[]).map((x:any)=>x.id);
+  const competitionEvents=(controls?.competitionEvents||[]),eventIds=competitionEvents.map((x:any)=>x.id);
+  const competitionEntries=(controls?.competitionEntries||[]);
+  const competitionReadiness=(controls?.competitions||[]).map((competition:any)=>{
+   const events=competitionEvents.filter((e:any)=>e.competition_id===competition.id),ids=new Set(events.map((e:any)=>e.id)),entries=competitionEntries.filter((e:any)=>ids.has(e.competition_event_id));
+   const enteredAthletes=new Set(entries.filter((e:any)=>e.scratch_status!=='scratched').map((e:any)=>e.athlete_id).filter(Boolean));
+   const blocked=new Set(entries.filter((e:any)=>['ineligible','blocked'].includes(String(e.eligibility_status||'').toLowerCase())).map((e:any)=>e.athlete_id).filter(Boolean));
+   const deadlines=(controls?.deadlines||[]).filter((d:any)=>d.competition_id===competition.id);
+   return {competition_id:competition.id,eligible_count:Math.max(0,(registrar?.athletes||[]).length-blocked.size),entered_count:enteredAthletes.size,blocked_count:blocked.size,event_count:events.length,entry_count:entries.length,deadlines};
+  });
+  return NextResponse.json({calendarEvents,approvals,workflowTasks,workflowDefinitions,athletes:registrar?.athletes||[],athletePeople,eligibility,competitionReadiness,financeContext:{customers:financeCustomers,legalEntities:financeEntities,billingAccounts,currency:(financeEntities||[]).map((x:any)=>String(x.base_currency||'').trim()).find(Boolean)||null},invoiceLines,payments,paymentAllocations,viewer:{personId:ctx.person?.id||null,email:ctx.user.email,displayName:ctx.person?([...(orgAdmin?.people||[]).filter((p:any)=>p.id===ctx.person?.id).map((p:any)=>p.preferred_name||p.first_name).filter(Boolean)][0]||ctx.user.email.split('@')[0]):ctx.user.email.split('@')[0]},invoices,vendorBills:bills,tasks,orgAdmin,controls,enterprise,registrar,metrics:{arBalance,apBalance,openInvoices:(invoices||[]).filter((r:any)=>Number(r.balance_due||0)>0).length,pastDue,activeAthletes:athleteCount,activeTeams:(teams||[]).length},generatedAt:new Date().toISOString(),source:'LS1SportsEAM canonical store',context:{tenantId:tenant,organizationIds:orgs,role:roleName},authorization:{finance:canFinance,tasks:canTasks,roster:canRoster}});
  }catch(error){return deny(500,error instanceof Error?error.message:'Admin command data unavailable.');}
 }
 
