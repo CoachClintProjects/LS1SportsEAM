@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { adminRoleCodes,canUseAdminRoleContext,hasAdminContextPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
+import { canUseAdminRoleContext,hasAdminContextPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
 import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 export const dynamic='force-dynamic'; export const revalidate=0;
 
@@ -8,7 +8,7 @@ async function userRest(request:NextRequest,path:string,init:RequestInit={}){con
 const deny=(status:number,error:string)=>NextResponse.json({error},{status});
 function roleHas(ctx:AccessContext,role:string,permission:string){return hasAdminContextPermission(ctx,role,permission);}
 function tenantId(ctx:AccessContext){return ctx.person?.tenant_id||null;}
-function organizationIds(ctx:AccessContext,roleName:string){const codes=new Set(adminRoleCodes(roleName).map(x=>x.toUpperCase())),direct=ctx.roles.filter(r=>codes.has(r.code.toUpperCase())),source=direct.length?direct:ctx.roles.filter(r=>r.code.toUpperCase()==='ORGANIZATION_ADMIN');return [...new Set(source.map(r=>r.scope.organization_id).filter(Boolean))] as string[];}
+function organizationIds(ctx:AccessContext,_roleName?:string){return [...new Set(ctx.roles.map(r=>r.scope.organization_id).filter(Boolean))] as string[];}
 function inFilter(ids:string[]){return ids.length?`in.(${ids.map(encodeURIComponent).join(',')})`:'';}
 async function audit(ctx:AccessContext,tenant:string,action:string,entityType:string,entityId:string,beforeData:unknown,afterData:unknown,correlationId:string){await rest('audit_events',{method:'POST',body:JSON.stringify({tenant_id:tenant,actor_user_id:ctx.user.id,actor_person_id:ctx.person?.id||null,action,entity_type:entityType,entity_id:entityId,before_data:beforeData||null,after_data:afterData||null,correlation_id:correlationId,reason:'Admin operational action',privileged:ctx.isPlatformSuperUser})});}
 
@@ -39,7 +39,7 @@ export async function GET(request:NextRequest){
   const orgAdmin=roleName==='org_admin'?await orgAdminSnapshot(ctx,tenant,orgs):null;
   const controls=await orgAdminControls(tenant,orgs);
   const enterprise=roleHas(ctx,roleName,'record.read')?await orgAdminEnterprise(orgs,tenant):null;
-  const registrar=await registrarSnapshot(orgs);const scopedOrganizations=orgs.length?await rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}&order=name.asc`):[];const financePersonIds:string[]=[...new Set<string>([...(registrar?.memberships||[]).map((x:any)=>String(x.person_id||'')),...(registrar?.athletes||[]).map((x:any)=>String(x.person_id||''))].filter(Boolean))];const scopedPeople=canFinance&&financePersonIds.length?await rest(`people?select=id,first_name,last_name,preferred_name,email,status&tenant_id=eq.${tenant}&id=${inFilter(financePersonIds)}&order=last_name.asc,first_name.asc&limit=2000`):[];
+  const registrar=await registrarSnapshot(orgs);const scopedOrganizations=orgs.length?await rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}&order=name.asc`):[];const scopedPeople=canFinance?await rest(`people?select=id,first_name,last_name,preferred_name,email,status&tenant_id=eq.${tenant}&order=last_name.asc,first_name.asc&limit=2000`):[];
   const athleteIds=(registrar?.athletes||[]).map((x:any)=>x.id),athletePersonIds=(registrar?.athletes||[]).map((x:any)=>x.person_id).filter(Boolean);
   const athletePeople=athletePersonIds.length?await rest(`people?select=id,first_name,last_name,preferred_name,email&tenant_id=eq.${tenant}&id=${inFilter(athletePersonIds)}&limit=2000`):[];
   const eligibility=athleteIds.length?await rest(`eligibility_records?select=id,athlete_id,competition_id,status,evaluated_at,reason,expires_at&athlete_id=${inFilter(athleteIds)}&order=evaluated_at.desc&limit=3000`):[];
@@ -77,14 +77,13 @@ async function orgAdminSnapshot(ctx:AccessContext,tenant:string,orgs:string[]){
 
 async function orgAdminControls(tenant:string,orgs:string[]){
  if(!orgs.length)return {requirements:[],credentials:[],backgroundChecks:[],safeSport:[],waivers:[],memberships:[],dataQualityIssues:[],duplicateCandidates:[],competitions:[]};
- const orgFilter=inFilter(orgs);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`),orgMemberships=await rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=2000`),teamIds=teams.map((x:any)=>x.id),teamMemberships=teamIds.length?await rest(`team_memberships?select=athlete_id&team_id=${inFilter(teamIds)}&limit=3000`):[],athleteIds=[...new Set(teamMemberships.map((x:any)=>x.athlete_id).filter(Boolean))],athleteRows=athleteIds.length?await rest(`athletes?select=id,person_id&id=${inFilter(athleteIds)}&limit=3000`):[],personIds:string[]=[...new Set<string>([...orgMemberships.map((x:any)=>String(x.person_id||'')),...athleteRows.map((x:any)=>String(x.person_id||''))].filter(Boolean))],personFilter=inFilter(personIds);
- const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
+ const orgFilter=inFilter(orgs);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`); const scopedPeople=await rest(`people?select=id&tenant_id=eq.${tenant}&limit=2000`),personIds=(scopedPeople||[]).map((p:any)=>p.id),personFilter=inFilter(personIds); const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
   rest('compliance_requirements?select=id,code,name,applies_to_role,applies_to_minor,severity,validity_days,rule_definition&order=name.asc'),
   personIds.length?rest(`credentials?select=id,person_id,requirement_id,credential_type,issuer,issued_on,expires_on,status,verification_status,verified_at&person_id=${personFilter}&limit=500`):[],
   personIds.length?rest(`background_checks?select=id,person_id,check_type,provider,submitted_at,completed_at,expires_on,status,result_classification&person_id=${personFilter}&limit=500`):[],
   personIds.length?rest(`safesport_records?select=id,person_id,governing_body_id,certification_type,completed_on,expires_on,status,source,verified_at&person_id=${personFilter}&limit=500`):[],
   rest(`waivers?select=id,organization_id,code,name,version,required_for,effective_from,effective_to,status&organization_id=${orgFilter}&limit=500`),
-  Promise.resolve(orgMemberships),
+  rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=500`),
   rest(`data_quality_issues?select=id,entity_type,entity_id,severity,status,detected_at,resolved_at,details&tenant_id=eq.${tenant}&status=neq.resolved&order=detected_at.desc&limit=200`),
   rest(`duplicate_candidates?select=id,entity_type,left_entity_id,right_entity_id,confidence,match_reason,status,resolved_at&tenant_id=eq.${tenant}&status=neq.resolved&limit=200`),
   rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
