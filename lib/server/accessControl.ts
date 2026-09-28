@@ -3,7 +3,7 @@ import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 
 export type Scope={organization_id:string|null;sport_id:string|null;site_id:string|null;team_id:string|null;program_id:string|null;competition_id:string|null};
 export type EffectiveRole={id:string;code:string;name:string;privilege_level:number;role_type:string;config:Record<string,unknown>;scope:Scope};
-export type AccessContext={user:{id:string;email:string};person:{id:string;tenant_id:string}|null;roles:EffectiveRole[];permissions:string[];allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
+export type AccessContext={user:{id:string;email:string};person:{id:string;tenant_id:string}|null;roles:EffectiveRole[];permissions:string[];rolePermissions:Record<string,string[]>;allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
 const HUB_ORDER=['superuser','admin','coach','athlete','parent','official','scout'];
 const serviceHeadersFor=(key:string)=>({apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'});
 
@@ -24,21 +24,20 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
  }
  const permissions=new Set<string>();
  if(roleIds.size){const ids=[...roleIds].join(',');const gr=await fetch(`${url}/rest/v1/permission_grants?select=effect,role_definition_id,permission_definitions(code,is_active)&role_definition_id=in.(${ids})`,{headers:h,cache:'no-store'});if(gr.ok){const rows=await gr.json() as any[];const denied=new Set<string>();for(const g of rows){const p=g.permission_definitions;if(!p?.is_active)continue;if(g.effect==='deny')denied.add(p.code);else if(g.effect==='allow')permissions.add(p.code);}for(const code of denied)permissions.delete(code);}}
+ const rolePermissions:Record<string,string[]>={};
+ const rr=await fetch(`${url}/rest/v1/role_definitions?select=id,code&is_active=eq.true`,{headers:h,cache:'no-store'});
+ if(rr.ok){const defs=await rr.json() as Array<{id:string;code:string}>;const ids=defs.map(x=>x.id);if(ids.length){const gr=await fetch(`${url}/rest/v1/permission_grants?select=effect,role_definition_id,permission_definitions(code,is_active)&role_definition_id=in.(${ids.join(',')})`,{headers:h,cache:'no-store'});if(gr.ok){const rows=await gr.json() as any[];const byId=new Map(defs.map(d=>[d.id,d.code.toUpperCase()]));const denied=new Map<string,Set<string>>();for(const g of rows){const code=byId.get(g.role_definition_id),p=g.permission_definitions;if(!code||!p?.is_active)continue;(rolePermissions[code]??=[]);if(g.effect==='deny'){(denied.get(code)||denied.set(code,new Set()).get(code)!).add(p.code)}else rolePermissions[code].push(p.code)}for(const [code,set] of denied)rolePermissions[code]=[...new Set(rolePermissions[code])].filter(p=>!set.has(p));for(const code of Object.keys(rolePermissions))rolePermissions[code]=[...new Set(rolePermissions[code])].sort();}}}
  const hubs=new Set<string>(); if(isPlatformSuperUser){for(const hub of HUB_ORDER)hubs.add(hub);}else{for(const role of roles){const configured=Array.isArray(role.config?.hub_access)?role.config.hub_access as string[]:[];for(const hub of configured)hubs.add(hub);}}
- return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,roles,permissions:[...permissions].sort(),allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
+ return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,roles,permissions:[...permissions].sort(),rolePermissions,allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
 }
 export const hasPermission=(ctx:AccessContext,code:string)=>ctx.isPlatformSuperUser||ctx.permissions.includes(code);
 export function hasRoleCode(ctx:AccessContext,...codes:string[]){const wanted=new Set(codes.map(code=>code.toUpperCase()));return ctx.roles.some(role=>wanted.has(role.code.toUpperCase()));}
+export function adminRoleCodes(roleName:string){const normalized=roleName.trim().toLowerCase();const aliases:Record<string,string[]>={org_admin:['ORGANIZATION_ADMIN'],team_manager:['TEAM_MANAGER'],registrar:['REGISTRAR','RECORDS_ADMINISTRATOR'],competition_manager:['COMPETITION_MANAGER'],treasurer:['TREASURER','FINANCE'],volunteer_coordinator:['VOLUNTEER_COORDINATOR','VOLUNTEER'],communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']};return aliases[normalized]||[];}
+export function hasAdminContextPermission(ctx:AccessContext,roleName:string,permission:string){if(ctx.isPlatformSuperUser)return true;return adminRoleCodes(roleName).some(code=>(ctx.rolePermissions[code]||[]).includes(permission));}
 export function canUseAdminRoleContext(ctx:AccessContext,roleName:string){
  if(ctx.isPlatformSuperUser)return true;
  const normalized=roleName.trim().toLowerCase();
- const aliases:Record<string,string[]>={
-  org_admin:['ORGANIZATION_ADMIN'],team_manager:['TEAM_MANAGER'],registrar:['REGISTRAR','RECORDS_ADMINISTRATOR'],
-  competition_manager:['COMPETITION_MANAGER'],treasurer:['TREASURER','FINANCE'],volunteer_coordinator:['VOLUNTEER_COORDINATOR','VOLUNTEER'],
-  communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],
-  facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']
- };
- const targetCodes=aliases[normalized];if(!targetCodes)return false;
+ const targetCodes=adminRoleCodes(normalized);if(!targetCodes.length)return false;
  if(targetCodes.some(code=>hasRoleCode(ctx,code)))return true;
  if(!hasRoleCode(ctx,'ORGANIZATION_ADMIN'))return false;
  const orgAdmin=ctx.roles.filter(r=>r.code.toUpperCase()==='ORGANIZATION_ADMIN');
