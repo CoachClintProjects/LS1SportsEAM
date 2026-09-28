@@ -170,6 +170,7 @@ export async function POST(request:NextRequest){
    await audit(ctx,tenant,'role_assignment.revoked','role_assignment',id,existing[0],row[0],correlationId);
    return NextResponse.json({ok:true,row:row[0],correlationId});
   }
+  if(action==='revoke-waiver-acceptance'){if(roleName!=='org_admin'||!roleHas(ctx,roleName,'waivers.update'))return deny(403,'Waiver remediation denied.');const id=String(body.id||''),orgs=organizationIds(ctx);const rows=await rest(`waiver_acceptances?select=*,waivers!inner(organization_id)&id=eq.${encodeURIComponent(id)}&waivers.organization_id=${inFilter(orgs)}&limit=1`);if(!rows?.length)return deny(404,'Waiver acceptance not found in authorized organization scope.');if(rows[0].revoked_at)return NextResponse.json({ok:true,row:rows[0],idempotent:true,correlationId});const row=await rest(`waiver_acceptances?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({revoked_at:new Date().toISOString()})});await audit(ctx,tenant,'waiver_acceptance.revoked','waiver_acceptance',id,rows[0],row[0],correlationId);return NextResponse.json({ok:true,row:row[0],correlationId});}
   if(action==='update-compliance-record'){
    if(roleName!=='org_admin'||!roleHas(ctx,roleName,'record.update'))return deny(403,'Compliance update denied.');
    const domain=String(body.domain||''),id=String(body.id||''),changes=body.changes&&typeof body.changes==='object'?body.changes:{};if(!id)return deny(400,'Compliance record ID is required.');
