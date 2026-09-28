@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { adminRoleCodes,canUseAdminRoleContext,hasAdminContextPermission,hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
+import { adminRoleCodes,canUseAdminRoleContext,hasAdminContextPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
 import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 export const dynamic='force-dynamic'; export const revalidate=0;
 
