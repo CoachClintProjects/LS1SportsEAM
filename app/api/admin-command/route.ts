@@ -1,11 +1,11 @@
 import { NextRequest,NextResponse } from 'next/server';
-import { canUseAdminRoleContext,hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
+import { canUseAdminRoleContext,hasAdminContextPermission,hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
 import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 export const dynamic='force-dynamic'; export const revalidate=0;
 
 async function rest(path:string,init:RequestInit={}){const {url}=supabaseServerConfig();const h=serviceHeaders();if(!url||!h)throw new Error('Supabase service credentials are not configured.');const response=await fetch(`${url}/rest/v1/${path}`,{...init,headers:{...h,Prefer:'return=representation',...(init.headers||{})},cache:'no-store'});const text=await response.text();if(!response.ok)throw new Error(`Canonical store returned ${response.status}: ${text.slice(0,300)}`);return text?JSON.parse(text):null;}
 const deny=(status:number,error:string)=>NextResponse.json({error},{status});
-function roleHas(ctx:AccessContext,_role:string,permission:string){return hasPermission(ctx,permission);}
+function roleHas(ctx:AccessContext,role:string,permission:string){return hasAdminContextPermission(ctx,role,permission);}
 function tenantId(ctx:AccessContext){return ctx.person?.tenant_id||null;}
 function organizationIds(ctx:AccessContext){return [...new Set(ctx.roles.map(r=>r.scope.organization_id).filter(Boolean))] as string[];}
 function inFilter(ids:string[]){return ids.length?`in.(${ids.map(encodeURIComponent).join(',')})`:'';}
