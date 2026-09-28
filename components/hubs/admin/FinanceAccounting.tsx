@@ -1,7 +1,7 @@
 'use client';
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {authenticatedFetch} from '@/lib/client/authenticatedFetch';
-type Row=Record<string,any>; type Payload={invoices:Row[];vendorBills:Row[];metrics:any;authorization:any;generatedAt:string;financeContext?:{customers:Row[];legalEntities:Row[];billingAccounts:Row[];currency:string|null};error?:string};
+type Row=Record<string,any>; type Payload={invoices:Row[];vendorBills:Row[];metrics:any;authorization:any;generatedAt:string;financeContext?:{customers:Row[];legalEntities:Row[];billingAccounts:Row[];currency:string|null};orgAdmin?:any;error?:string};
 const money=(v:any,currency?:string)=>currency?new Intl.NumberFormat(undefined,{style:'currency',currency}).format(Number(v||0)):Number(v||0).toLocaleString();
 export function FinanceAccounting({role='org_admin'}:{role?:string}){const[data,setData]=useState<Payload|null>(null),[error,setError]=useState(''),[query,setQuery]=useState(''),[tab,setTab]=useState<'receivables'|'payables'>('receivables'),[selected,setSelected]=useState<Row|null>(null),[creating,setCreating]=useState(false),[setup,setSetup]=useState(false),[busy,setBusy]=useState(false);const currency=String((data as any)?.financeContext?.currency||data?.invoices?.[0]?.currency||data?.vendorBills?.[0]?.currency||'').trim();
 const act=async(body:any)=>{setBusy(true);setError('');try{const r=await authenticatedFetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,role})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Financial operation failed.');setSelected(null);setCreating(false);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
