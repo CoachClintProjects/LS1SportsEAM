@@ -73,8 +73,9 @@ async function orgAdminControls(tenant:string,orgs:string[]){
   rest(`duplicate_candidates?select=id,entity_type,left_entity_id,right_entity_id,confidence,match_reason,status,resolved_at&tenant_id=eq.${tenant}&status=neq.resolved&limit=200`),
   rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
  ]);
+ const waiverIds=(waivers||[]).map((x:any)=>x.id);const waiverAcceptances=waiverIds.length?await rest(`waiver_acceptances?select=id,waiver_id,person_id,accepted_at,revoked_at,accepted_by,document_id&waiver_id=${inFilter(waiverIds)}&limit=1000`):[];
  const competitionIds=(competitions||[]).map((x:any)=>x.id);const scopedDeadlines=competitionIds.length?await rest(`competition_deadlines?select=id,competition_id,deadline_type,name,due_at,status,rules&competition_id=${inFilter(competitionIds)}&order=due_at.asc&limit=500`):[];const competitionEvents=competitionIds.length?await rest(`competition_events?select=id,competition_id,code,name,sequence_no,event_definition&competition_id=${inFilter(competitionIds)}&order=sequence_no.asc&limit=1000`):[];const eventIds=competitionEvents.map((x:any)=>x.id),entries=eventIds.length?await rest(`competition_entries?select=id,competition_event_id,athlete_id,team_id,seed_value,seed_unit,entry_status,eligibility_status,scratch_status&competition_event_id=${inFilter(eventIds)}&limit=2000`):[];
- return {requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions,deadlines:scopedDeadlines,competitionEvents,competitionEntries:entries};
+ return {requirements,credentials,backgroundChecks,safeSport,waivers,waiverAcceptances,memberships,dataQualityIssues,duplicateCandidates,competitions,deadlines:scopedDeadlines,competitionEvents,competitionEntries:entries};
 }
 
 async function registrarSnapshot(orgs:string[]){
