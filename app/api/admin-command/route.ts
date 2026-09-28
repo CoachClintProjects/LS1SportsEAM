@@ -76,15 +76,14 @@ async function orgAdminSnapshot(ctx:AccessContext,tenant:string,orgs:string[]){
 
 async function orgAdminControls(tenant:string,orgs:string[]){
  if(!orgs.length)return {requirements:[],credentials:[],backgroundChecks:[],safeSport:[],waivers:[],memberships:[],dataQualityIssues:[],duplicateCandidates:[],competitions:[]};
- const orgFilter=inFilter(orgs);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`);
- const scopedPeople=await rest(`people?select=id&tenant_id=eq.${tenant}&limit=2000`),personIds=(scopedPeople||[]).map((p:any)=>p.id),personFilter=inFilter(personIds);
+ const orgFilter=inFilter(orgs);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`),orgMemberships=await rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=2000`),teamIds=teams.map((x:any)=>x.id),teamMemberships=teamIds.length?await rest(`team_memberships?select=athlete_id&team_id=${inFilter(teamIds)}&limit=3000`):[],athleteIds=[...new Set(teamMemberships.map((x:any)=>x.athlete_id).filter(Boolean))],athleteRows=athleteIds.length?await rest(`athletes?select=id,person_id&id=${inFilter(athleteIds)}&limit=3000`):[],personIds=[...new Set([...orgMemberships.map((x:any)=>x.person_id),...athleteRows.map((x:any)=>x.person_id)].filter(Boolean))],personFilter=inFilter(personIds);
  const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
   rest('compliance_requirements?select=id,code,name,applies_to_role,applies_to_minor,severity,validity_days,rule_definition&order=name.asc'),
   personIds.length?rest(`credentials?select=id,person_id,requirement_id,credential_type,issuer,issued_on,expires_on,status,verification_status,verified_at&person_id=${personFilter}&limit=500`):[],
   personIds.length?rest(`background_checks?select=id,person_id,check_type,provider,submitted_at,completed_at,expires_on,status,result_classification&person_id=${personFilter}&limit=500`):[],
   personIds.length?rest(`safesport_records?select=id,person_id,governing_body_id,certification_type,completed_on,expires_on,status,source,verified_at&person_id=${personFilter}&limit=500`):[],
   rest(`waivers?select=id,organization_id,code,name,version,required_for,effective_from,effective_to,status&organization_id=${orgFilter}&limit=500`),
-  rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=500`),
+  Promise.resolve(orgMemberships),
   rest(`data_quality_issues?select=id,entity_type,entity_id,severity,status,detected_at,resolved_at,details&tenant_id=eq.${tenant}&status=neq.resolved&order=detected_at.desc&limit=200`),
   rest(`duplicate_candidates?select=id,entity_type,left_entity_id,right_entity_id,confidence,match_reason,status,resolved_at&tenant_id=eq.${tenant}&status=neq.resolved&limit=200`),
   rest(`competitions?select=id,organization_id,name,competition_type,starts_at,ends_at,timezone,city,region,country_code,status,sanction_number,venue_facility_id&organization_id=${orgFilter}&order=starts_at.desc&limit=200`)
