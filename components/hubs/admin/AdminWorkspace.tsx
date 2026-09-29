@@ -14,8 +14,9 @@ export function AdminWorkspace(){
   const response=await authenticatedFetch('/api/admin-context',{cache:'no-store'}),body=await response.json();
   if(!response.ok)throw new Error(body.error||'Admin context unavailable.');
   const options=(body.organizations||[]) as OrganizationOption[],stored=sessionStorage.getItem(`ls1-admin-organization:${body.userId}`)||'';
-  const selected=options.some(x=>x.id===stored)?stored:'';
-  if(stored&&!selected)sessionStorage.removeItem(`ls1-admin-organization:${body.userId}`);
+  const selected=options.length===1?options[0].id:options.some(x=>x.id===stored)?stored:'';
+  if(selected)sessionStorage.setItem(`ls1-admin-organization:${body.userId}`,selected);
+  else if(stored)sessionStorage.removeItem(`ls1-admin-organization:${body.userId}`);
   if(!cancelled){setUserId(body.userId);setOrganizations(options);setSelectionRequired(body.selectionRequired);setSelectedOrganization(selected);setContextLoaded(true);}
  }catch(e){if(!cancelled){setError(e instanceof Error?e.message:'Admin context unavailable.');setContextLoaded(true);setLoading(false);}}}void loadContext();return()=>{cancelled=true}},[]);
  useEffect(()=>{if(!contextLoaded||selectionRequired&&!selectedOrganization)return;let cancelled=false;async function load(){setLoading(true);setError('');try{

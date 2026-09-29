@@ -15,5 +15,6 @@ export async function GET(request: NextRequest) {
   const response = await fetch(`${url}/rest/v1/organizations?select=id,tenant_id,name,code,status&order=name.asc&limit=1000`, { headers, cache: 'no-store' });
   if (!response.ok) return NextResponse.json({ error: 'Canonical organizations unavailable.' }, { status: 502 });
   const organizations = await response.json() as Array<{ id: string; tenant_id: string; name: string; code: string; status: string }>;
-  return NextResponse.json({ selectionRequired: true, organizations: organizations.filter(org => org.tenant_id), userId: context.user.id });
+  const available = organizations.filter(org => org.tenant_id);
+  return NextResponse.json({ selectionRequired: available.length !== 1, organizations: available, userId: context.user.id });
 }
