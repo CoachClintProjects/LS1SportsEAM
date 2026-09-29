@@ -16,6 +16,16 @@ export async function GET(request:NextRequest){
   const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
   const canTasks=roleHas(ctx,roleName,'admin_tasks.read'),canFinance=roleHas(ctx,roleName,'finance.read'),canRoster=roleHas(ctx,roleName,'rosters.read');
   const tenant=tenantId(ctx),orgs=organizationIds(ctx); if(!tenant)return deny(403,'Canonical tenant context required.');if(!orgs.length)return deny(403,'Canonical organization context required.');
+  const section=request.nextUrl.searchParams.get('section');
+  if(section==='organization'){
+   if(roleName!=='org_admin')return deny(403,'Organization records require Organization Administrator context.');
+   return NextResponse.json({orgAdmin:await orgAdminSnapshot(ctx,tenant,orgs)});
+  }
+  if(section==='roster'){
+   if(!canRoster)return deny(403,'Roster read denied.');
+   const [registrar,organizations,teams]=await Promise.all([registrarSnapshot(orgs),rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}`),rest(`teams?select=id,organization_id,code,name,status&organization_id=${inFilter(orgs)}`)]);
+   return NextResponse.json({registrar,controls:{organizations,teams}});
+  }
   const teamQuery=canRoster&&orgs.length?`teams?select=id&organization_id=${inFilter(orgs)}&status=eq.active`:null;
   const teams=teamQuery?await rest(teamQuery):[];
   const teamIds=(teams||[]).map((r:any)=>r.id);

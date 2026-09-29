@@ -24,9 +24,9 @@ export function AdminWorkspace(){
   if(!nav.ok)throw new Error('Admin navigation unavailable.');const j=await nav.json();if(!cancelled)setRoleLabel((j.switcher||[]).find((x:{role_name:string;display_name:string})=>x.role_name===role)?.display_name||role.replaceAll('_',' '));
   if(!view)view=(j.rows||[]).find((x:any)=>x.label==='Command Center')?.nav_id||'';
   if(!view)throw new Error('No authorized Admin workspace is available.');
-  const response=await authenticatedFetch(`/api/admin-workspace?view=${encodeURIComponent(view)}&role=${encodeURIComponent(role)}`,{cache:'no-store'});
-  const json=await response.json();if(!response.ok)throw new Error(json.error||'Admin workspace unavailable.');
-  const name=json.view?.component||'',C=registry[name];if(!C)throw new Error(`Operational component "${name||json.view?.label||view}" is not implemented.`);
+  const selected=(j.rows||[]).find((x:{nav_id:string;path?:string;component?:string})=>x.component&&x.path&&(x.nav_id===view||new URL(x.path,window.location.origin).searchParams.get('view')===view));
+  if(!selected)throw new Error('Admin view is not authorized for this role context.');
+  const name=selected.component||'',C=registry[name];if(!C)throw new Error(`Operational component "${name||selected.label||view}" is not implemented.`);
   if(!cancelled)setComponent(()=>C);
  }catch(e){if(!cancelled){setComponent(null);setError(e instanceof Error?e.message:'Admin workspace unavailable.')}}finally{if(!cancelled)setLoading(false)}}void load();return()=>{cancelled=true}},[searchParams,role,contextLoaded,selectionRequired,selectedOrganization]);
  if(!contextLoaded||loading&&(!selectionRequired||selectedOrganization))return <div className="flex h-full items-center justify-center p-12 text-sm text-[#627188]">Loading authorized workspace…</div>;

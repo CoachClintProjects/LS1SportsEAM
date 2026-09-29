@@ -11,7 +11,7 @@ const scopeLabel=(a:any)=>a.team_id?'Team':a.site_id?'Site':a.program_id?'Progra
 
 export function OrganizationArchitecture({role='org_admin'}:{role?:string}){
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(''),[domain,setDomain]=useState<Domain>('people'),[query,setQuery]=useState(''),[selected,setSelected]=useState<any|null>(null),[creating,setCreating]=useState(false),[creatingOrg,setCreatingOrg]=useState(false);
- async function load(){setError('');const r=await authenticatedFetch(`/api/admin-command?role=${encodeURIComponent(role)}`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Organization data unavailable.');setData(j.orgAdmin||null)}
+ async function load(){setError('');const r=await authenticatedFetch(`/api/admin-command?role=${encodeURIComponent(role)}&section=organization`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Organization data unavailable.');setData(j.orgAdmin||null)}
  useEffect(()=>{load().catch(e=>setError(e.message))},[role]);
  const names=useMemo(()=>new Map((data?.people||[]).map((p:any)=>[p.id,label(p)])),[data]);
  const roles=useMemo(()=>new Map((data?.roles||[]).map((r:any)=>[r.id,r.name])),[data]);
@@ -23,11 +23,11 @@ export function OrganizationArchitecture({role='org_admin'}:{role?:string}){
  const filtered=domainRows.filter((r:any)=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase()));
  const activeAssignments=data.assignments.filter((a:any)=>a.status==='active');
  const entityForDomain:Record<Domain,string>={people:'person',sites:'site',programs:'program',seasons:'season',teams:'team'};
- const tabs:[Domain,string,any][]=[['people','People & authority',Users],['sites','Sites',Building2],['programs','Programs',Layers3],['seasons','Seasons',CalendarDays],['teams','Teams',Network]];
+ const tabs:[Domain,string,any][]=[['people','People records',Users],['sites','Sites',Building2],['programs','Programs',Layers3],['seasons','Seasons',CalendarDays],['teams','Teams',Network]];
  return <main className="org-admin-architecture min-h-full p-5 lg:p-7">
   <header className="flex flex-wrap items-end justify-between gap-5 border-b border-neutral-800 pb-5">
-   <div><div className="text-[10px] font-black uppercase tracking-[.24em] text-[#FA4616]">Organization Administrator · Live EAM workspace</div><h1 className="mt-1 text-3xl font-black">{org?.name||'Organization'}</h1><p className="mt-2 max-w-3xl text-sm text-neutral-400">Operate canonical organization structure, workforce authority and delegated access. Select a live record to inspect its properties, activity and associations.</p></div>
-   <div className="text-right text-xs text-neutral-500"><button onClick={()=>setCreatingOrg(true)} className="mb-2 rounded border border-neutral-700 px-3 py-2 font-bold text-white">+ Child organization</button><div>{org?.code||'No organization code'}</div><div>{org?.status||'Unknown status'}</div></div>
+   <div><div className="text-[10px] font-black uppercase tracking-[.24em] text-[#FA4616]">Organization Administrator · Live EAM workspace</div><h1 className="mt-1 text-3xl font-black">{org?.name||'Organization'}</h1><p className="mt-2 max-w-3xl text-sm text-neutral-400">Organization records and delegated authority for HPAC. The counts below open record lists; People records include all tenant people, not just athletes on a roster.</p></div>
+   <div className="text-right text-xs text-neutral-500"><button onClick={()=>setCreatingOrg(true)} className="mb-2 rounded border border-neutral-700 px-3 py-2 font-bold text-white">+ Child organization</button><div className="mb-2 max-w-44">Optional operating unit beneath HPAC</div><div>{org?.code||'No organization code'}</div><div>{org?.status||'Unknown status'}</div></div>
   </header>
   {error&&<div className="mt-4 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">{error}</div>}
   <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{tabs.map(([key,name,Icon])=><button key={key} onClick={()=>{setDomain(key);setSelected(null)}} className={`rounded-xl border p-4 text-left transition ${domain===key?'border-[#FA4616] bg-[#FA4616]/5':'border-neutral-800 bg-[#090b0b] hover:border-neutral-600'}`}><div className="flex items-center justify-between"><Icon className="h-4 w-4 text-[#FA4616]"/><span className="text-2xl font-black">{((data as any)[key]||[]).length}</span></div><div className="mt-3 text-xs font-bold">{name}</div></button>)}</section>
