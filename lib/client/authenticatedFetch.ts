@@ -15,6 +15,11 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
 
   const headers = new Headers(init.headers || {});
   headers.set('Authorization', `Bearer ${data.session.access_token}`);
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+  if (url.startsWith('/api/admin-') && url !== '/api/admin-context') {
+    const selected = sessionStorage.getItem(`ls1-admin-organization:${data.session.user.id}`);
+    if (selected) headers.set('x-ls1-admin-organization', selected);
+  }
 
   return fetch(input, {
     ...init,

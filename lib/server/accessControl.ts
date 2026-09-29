@@ -3,7 +3,7 @@ import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 
 export type Scope={organization_id:string|null;sport_id:string|null;site_id:string|null;team_id:string|null;program_id:string|null;competition_id:string|null};
 export type EffectiveRole={id:string;code:string;name:string;privilege_level:number;role_type:string;config:Record<string,unknown>;scope:Scope};
-export type AccessContext={user:{id:string;email:string};person:{id:string;tenant_id:string}|null;roles:EffectiveRole[];permissions:string[];rolePermissions:Record<string,string[]>;allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
+export type AccessContext={user:{id:string;email:string};person:{id:string;tenant_id:string}|null;adminScope:{tenantId:string;organizationId:string}|null;roles:EffectiveRole[];permissions:string[];rolePermissions:Record<string,string[]>;allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
 const HUB_ORDER=['superuser','admin','coach','athlete','parent','official','scout'];
 const serviceHeadersFor=(key:string)=>({apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'});
 
@@ -15,6 +15,12 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
  const h=serviceHeadersFor(serviceKey);
  const op=await fetch(`${url}/rest/v1/platform_superuser_operators?select=email&active=eq.true&email=ilike.${encodeURIComponent(email)}&limit=1`,{headers:h,cache:'no-store'});
  const isPlatformSuperUser=op.ok&&((await op.json()) as unknown[]).length>0;
+ let adminScope:AccessContext['adminScope']=null;
+ const selectedOrganization=request.headers.get('x-ls1-admin-organization');
+ if(isPlatformSuperUser&&selectedOrganization&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedOrganization)){
+  const selected=await fetch(`${url}/rest/v1/organizations?select=id,tenant_id&id=eq.${selectedOrganization}&limit=1`,{headers:h,cache:'no-store'});
+  if(selected.ok){const rows=await selected.json() as Array<{id:string;tenant_id:string}>;if(rows[0]?.tenant_id)adminScope={tenantId:rows[0].tenant_id,organizationId:rows[0].id};}
+ }
  const pr=await fetch(`${url}/rest/v1/people?select=id,tenant_id,email&email=ilike.${encodeURIComponent(email)}&limit=1`,{headers:h,cache:'no-store'});
  const people=pr.ok?await pr.json() as Array<{id:string;tenant_id:string|null}>:[]; const person=people[0]||null;
  const roles:EffectiveRole[]=[]; const roleIds=new Set<string>();
@@ -28,7 +34,7 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
  const rr=await fetch(`${url}/rest/v1/role_definitions?select=id,code&is_active=eq.true`,{headers:h,cache:'no-store'});
  if(rr.ok){const defs=await rr.json() as Array<{id:string;code:string}>;const ids=defs.map(x=>x.id);if(ids.length){const gr=await fetch(`${url}/rest/v1/permission_grants?select=effect,role_definition_id,permission_definitions(code,is_active)&role_definition_id=in.(${ids.join(',')})`,{headers:h,cache:'no-store'});if(gr.ok){const rows=await gr.json() as any[];const byId=new Map(defs.map(d=>[d.id,d.code.toUpperCase()]));const denied=new Map<string,Set<string>>();for(const g of rows){const code=byId.get(g.role_definition_id),p=g.permission_definitions;if(!code||!p?.is_active)continue;(rolePermissions[code]??=[]);if(g.effect==='deny'){let set=denied.get(code);if(!set){set=new Set<string>();denied.set(code,set)}set.add(p.code)}else rolePermissions[code].push(p.code)}for(const [code,set] of denied)rolePermissions[code]=[...new Set(rolePermissions[code])].filter(p=>!set.has(p));for(const code of Object.keys(rolePermissions))rolePermissions[code]=[...new Set(rolePermissions[code])].sort();}}}
  const hubs=new Set<string>(); if(isPlatformSuperUser){for(const hub of HUB_ORDER)hubs.add(hub);}else{for(const role of roles){const configured=Array.isArray(role.config?.hub_access)?role.config.hub_access as string[]:[];for(const hub of configured)hubs.add(hub);}}
- return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,roles,permissions:[...permissions].sort(),rolePermissions,allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
+ return {user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,adminScope,roles,permissions:[...permissions].sort(),rolePermissions,allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
 }
 export const hasPermission=(ctx:AccessContext,code:string)=>ctx.isPlatformSuperUser||ctx.permissions.includes(code);
 export function hasRoleCode(ctx:AccessContext,...codes:string[]){const wanted=new Set(codes.map(code=>code.toUpperCase()));return ctx.roles.some(role=>wanted.has(role.code.toUpperCase()));}
