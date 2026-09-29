@@ -111,7 +111,7 @@ export function HubNavigation() {
       setSwitcherConfig(config);
 
       const queryKey = getQueryKey(activeHubId);
-      const urlValue = searchParams.get(queryKey);
+      const urlValue = new URLSearchParams(window.location.search).get(queryKey);
       const nextValue =
         urlValue && config.options.some((option) => option.id === urlValue)
           ? urlValue
@@ -125,7 +125,14 @@ export function HubNavigation() {
     return () => {
       cancelled = true;
     };
-  }, [activeHubId, fallback, searchParams]);
+  }, [activeHubId, fallback]);
+
+  useEffect(() => {
+    const urlValue = searchParams.get(getQueryKey(activeHubId));
+    if (urlValue && switcherConfig.options.some(option => option.id === urlValue)) {
+      setSwitcherValue(urlValue);
+    }
+  }, [activeHubId, searchParams, switcherConfig]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +169,7 @@ export function HubNavigation() {
     if (activeHubId === 'athlete' || activeHubId === 'admin') {
       query.delete('switcher');
     }
+    if (activeHubId === 'admin') query.delete('view');
 
     const href = `${pathname}?${query.toString()}`;
     window.dispatchEvent(
