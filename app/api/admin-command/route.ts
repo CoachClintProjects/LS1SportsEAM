@@ -46,10 +46,14 @@ export async function GET(request:NextRequest){
   const athleteCount=new Set((athletes||[]).map((r:any)=>r.athlete_id)).size;
   const arBalance=(invoices||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0),apBalance=(bills||[]).reduce((s:number,r:any)=>s+Number(r.balance_due||0),0);
   const pastDue=(invoices||[]).filter((r:any)=>r.due_date&&Number(r.balance_due||0)>0&&new Date(String(r.due_date)).getTime()<Date.now()).length;
-  const orgAdmin=roleName==='org_admin'?await orgAdminSnapshot(ctx,tenant,orgs):null;
-  const controls=await orgAdminControls(tenant,orgs);
-  const enterprise=roleHas(ctx,roleName,'record.read')?await orgAdminEnterprise(orgs,tenant):null;
-  const registrar=await registrarSnapshot(orgs);const scopedOrganizations=orgs.length?await rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}&order=name.asc`):[];const scopedPeople=canFinance?await rest(`people?select=id,first_name,last_name,preferred_name,email,status&tenant_id=eq.${tenant}&order=last_name.asc,first_name.asc&limit=2000`):[];
+  const [orgAdmin,controls,enterprise,registrar,scopedOrganizations,scopedPeople]=await Promise.all([
+   roleName==='org_admin'?orgAdminSnapshot(ctx,tenant,orgs):null,
+   orgAdminControls(tenant,orgs),
+   roleHas(ctx,roleName,'record.read')?orgAdminEnterprise(orgs,tenant):null,
+   registrarSnapshot(orgs),
+   rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}&order=name.asc`),
+   canFinance?rest(`people?select=id,first_name,last_name,preferred_name,email,status&tenant_id=eq.${tenant}&order=last_name.asc,first_name.asc&limit=2000`):[]
+  ]);
   const athleteIds=(registrar?.athletes||[]).map((x:any)=>x.id),athletePersonIds=(registrar?.athletes||[]).map((x:any)=>x.person_id).filter(Boolean);
   const athletePeople=athletePersonIds.length?await rest(`people?select=id,first_name,last_name,preferred_name,email&tenant_id=eq.${tenant}&id=${inFilter(athletePersonIds)}&limit=2000`):[];
   const eligibility=athleteIds.length?await rest(`eligibility_records?select=id,athlete_id,competition_id,status,evaluated_at,reason,expires_at&athlete_id=${inFilter(athleteIds)}&order=evaluated_at.desc.nullslast&limit=3000`):[];
