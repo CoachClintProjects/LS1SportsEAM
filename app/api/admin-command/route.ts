@@ -81,7 +81,7 @@ async function orgAdminSnapshot(ctx:AccessContext,tenant:string,orgs:string[]){
 
 async function orgAdminControls(tenant:string,orgs:string[]){
  if(!orgs.length)return {requirements:[],credentials:[],backgroundChecks:[],safeSport:[],waivers:[],memberships:[],dataQualityIssues:[],duplicateCandidates:[],competitions:[]};
- const orgFilter=inFilter(orgs);const organizations=await rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${orgFilter}&order=name.asc`);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`);
+ const orgFilter=inFilter(orgs);const organizations=await rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${orgFilter}&order=name.asc`),programs=await rest(`programs?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`),seasons=await rest(`seasons?select=id,organization_id,code,name,starts_on,ends_on,status&organization_id=${orgFilter}&order=starts_on.desc&limit=1000`);const teams=await rest(`teams?select=id,organization_id,code,name,status&organization_id=${orgFilter}&order=name.asc&limit=1000`);
  const scopedPeople=await rest(`people?select=id&tenant_id=eq.${tenant}&limit=2000`),personIds=(scopedPeople||[]).map((p:any)=>p.id),personFilter=inFilter(personIds);
  const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
   rest('compliance_requirements?select=id,code,name,applies_to_role,applies_to_minor,severity,validity_days,rule_definition&order=name.asc'),
@@ -96,7 +96,7 @@ async function orgAdminControls(tenant:string,orgs:string[]){
  ]);
  const waiverIds=(waivers||[]).map((x:any)=>x.id);const waiverAcceptances=waiverIds.length?await rest(`waiver_acceptances?select=id,waiver_id,person_id,accepted_at,revoked_at,accepted_by,document_id&waiver_id=${inFilter(waiverIds)}&limit=1000`):[];
  const competitionIds=(competitions||[]).map((x:any)=>x.id);const scopedDeadlines=competitionIds.length?await rest(`competition_deadlines?select=id,competition_id,deadline_type,name,due_at,status,rules&competition_id=${inFilter(competitionIds)}&order=due_at.asc&limit=500`):[];const competitionEvents=competitionIds.length?await rest(`competition_events?select=id,competition_id,code,name,sequence_no,event_definition&competition_id=${inFilter(competitionIds)}&order=sequence_no.asc&limit=1000`):[];const eventIds=competitionEvents.map((x:any)=>x.id),entries=eventIds.length?await rest(`competition_entries?select=id,competition_event_id,athlete_id,team_id,seed_value,seed_unit,entry_status,eligibility_status,scratch_status&competition_event_id=${inFilter(eventIds)}&limit=2000`):[];
- return {organizations,teams,requirements,credentials,backgroundChecks,safeSport,waivers,waiverAcceptances,memberships,dataQualityIssues,duplicateCandidates,competitions,deadlines:scopedDeadlines,competitionEvents,competitionEntries:entries};
+ return {organizations,programs,seasons,teams,requirements,credentials,backgroundChecks,safeSport,waivers,waiverAcceptances,memberships,dataQualityIssues,duplicateCandidates,competitions,deadlines:scopedDeadlines,competitionEvents,competitionEntries:entries};
 }
 
 async function registrarSnapshot(orgs:string[]){
