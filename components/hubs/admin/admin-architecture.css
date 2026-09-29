@@ -1,0 +1,28 @@
+.org-admin-architecture { background: #f3f4f6; color: #17263c; }
+.org-admin-architecture > header,
+.org-admin-architecture > section { max-width: 1440px; margin-left: auto; margin-right: auto; }
+.org-admin-architecture > section { background: #fff; border-color: #d8dde4; border-radius: 6px; }
+.org-admin-architecture > section:first-of-type { background: transparent; border: 0; }
+.org-admin-architecture > section:first-of-type button { background: #fff; border-color: #d8dde4; border-radius: 6px; }
+.org-admin-architecture > section:first-of-type button:hover { border-color: #1772b8; }
+.org-admin-architecture [class*="border-neutral-800"],
+.org-record-workspace [class*="border-neutral-800"] { border-color: #d8dde4; }
+.org-admin-architecture [class*="border-neutral-700"],
+.org-record-workspace [class*="border-neutral-700"] { border-color: #cbd3dd; }
+.org-admin-architecture [class*="text-neutral-400"],
+.org-record-workspace [class*="text-neutral-400"] { color: #526176; }
+.org-admin-architecture [class*="text-neutral-500"],
+.org-record-workspace [class*="text-neutral-500"] { color: #627188; }
+.org-admin-architecture [class*="text-neutral-600"],
+.org-record-workspace [class*="text-neutral-600"] { color: #708097; }
+.org-admin-architecture [class*="bg-[#090b0b]"],
+.org-record-workspace [class*="bg-[#070909]"],
+.org-record-workspace [class*="bg-black"] { background: #fff; }
+.org-admin-architecture input,
+.org-record-workspace input { color: #17263c; background: #fff; }
+.org-admin-architecture tr:hover { background: #f5f8fb; }
+.org-record-workspace > header { background: #fff; border-color: #d8dde4; }
+.org-record-workspace > div > section { min-height: calc(100vh - 110px); padding: 24px; background: #fff; border: 1px solid #d8dde4; border-radius: 6px; }
+.org-record-workspace > div > section:first-child [class*="rounded-lg"] { background: #fff; border-color: #e3e7ec; }
+.org-record-workspace button:focus-visible,
+.org-admin-architecture button:focus-visible { outline: 2px solid #1772b8; outline-offset: 2px; }

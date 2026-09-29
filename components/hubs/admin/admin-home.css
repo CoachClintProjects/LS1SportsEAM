@@ -1,0 +1,39 @@
+.org-admin-home {
+  width: min(100%, 780px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 36px 40px 72px;
+  background: #fff;
+  color: #17263c;
+}
+
+.org-admin-home header { padding-bottom: 14px; }
+.org-admin-home header h1 { font-size: 30px; line-height: 1.22; letter-spacing: -.025em; font-weight: 750; }
+.org-admin-home section { margin-top: 32px; }
+.org-admin-home section h2 { font-size: 14px; font-weight: 700; }
+.org-admin-home section > div[class*="rounded-xl"],
+.org-admin-home section > div[class*="rounded-2xl"] {
+  background: #fff;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgb(17 35 56 / 4%);
+}
+.org-admin-home [class*="border-neutral-800"] { border-color: #d9dee5; }
+.org-admin-home [class*="border-neutral-700"] { border-color: #cbd4df; }
+.org-admin-home [class*="text-neutral-500"] { color: #627188; }
+.org-admin-home [class*="text-neutral-400"] { color: #53647a; }
+.org-admin-home [class*="text-neutral-600"] { color: #708097; }
+.org-admin-home [class*="bg-[#090b0b]"] { background: #fff; }
+.org-admin-home [class*="bg-[#0b0d0d]"],
+.org-admin-home [class*="bg-[#080909]"] { background: #fff; color: #17263c; }
+.org-admin-home [class*="hover:bg-white"]:hover { background: #f3f7fb; }
+.org-admin-home .fixed input,
+.org-admin-home .fixed textarea { background: #fff; color: #17263c; border-color: #cbd4df; }
+.org-admin-home .fixed > div,
+.org-admin-home .fixed > aside { color: #17263c; }
+.org-admin-home .fixed [class*="text-white"] { color: #17263c; }
+.org-admin-home button:focus-visible { outline: 2px solid #1772b8; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .org-admin-home { padding: 24px 18px 48px; }
+}

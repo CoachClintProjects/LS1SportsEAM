@@ -89,6 +89,7 @@ export function HubNavigation() {
   const search = searchParams.toString();
   const router = useRouter();
   const { activeHubId, currentHub } = useHub();
+  const isAdmin = activeHubId === 'admin';
 
   const fallback = useMemo(
     () => FALLBACKS[activeHubId] || [{ id: `${activeHubId}-main`, label: activeHubId.toUpperCase(), items: [] }],
@@ -208,12 +209,12 @@ export function HubNavigation() {
           : 'Select option';
 
   return (
-    <nav className="flex h-full w-full flex-col bg-[#080909]">
-      <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
+    <nav className={`flex h-full w-full flex-col ${isAdmin ? 'bg-white text-[#17263c]' : 'bg-[#080909]'}`}>
+      <div className={`shrink-0 border-b px-5 py-5 ${isAdmin ? 'border-[#d7dce3]' : 'border-neutral-800/80'}`}>
         <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">
           {currentHub.codeLane}
         </div>
-        <div className="mt-1.5 truncate text-[15px] font-black text-white">
+        <div className={`mt-1.5 truncate text-[15px] font-black ${isAdmin ? 'text-[#17263c]' : 'text-white'}`}>
           {currentHub.name}
         </div>
         <div className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-neutral-600">
@@ -221,7 +222,7 @@ export function HubNavigation() {
         </div>
 
         {showSwitcher && (
-          <div className="mt-5 rounded-xl border border-neutral-800 bg-[#0d1010] p-3">
+          <div className={`mt-5 rounded-lg border p-3 ${isAdmin ? 'border-[#d7dce3] bg-[#f7f9fb]' : 'border-neutral-800 bg-[#0d1010]'}`}>
             <div className="mb-2 flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
               <span>{switcherLabel}</span>
               {refreshing && <span className="text-neutral-700">updating</span>}
@@ -232,8 +233,8 @@ export function HubNavigation() {
                   key={option.id}
                   className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] ${
                     switcherValue === option.id
-                      ? 'bg-[#FA4616]/10 text-white'
-                      : 'text-neutral-500 hover:text-neutral-300'
+                      ? isAdmin ? 'bg-[#e8f3fc] text-[#145b91]' : 'bg-[#FA4616]/10 text-white'
+                      : isAdmin ? 'text-[#526176] hover:text-[#17263c]' : 'text-neutral-500 hover:text-neutral-300'
                   }`}
                 >
                   <input
@@ -274,8 +275,8 @@ export function HubNavigation() {
                     }
                     className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors ${
                       activeItem === item.id
-                        ? 'bg-[#FA4616]/10 text-[#FA4616]'
-                        : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                        ? isAdmin ? 'bg-[#e8f3fc] text-[#145b91]' : 'bg-[#FA4616]/10 text-[#FA4616]'
+                        : isAdmin ? 'text-[#44546a] hover:bg-[#f1f5f9] hover:text-[#17263c]' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
                     }`}
                   >
                     <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
