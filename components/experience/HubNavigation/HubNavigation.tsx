@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import SubmitTicket from '@/components/support/SubmitTicket';
+import WorkspaceCatalog from './WorkspaceCatalog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useHub } from '@/components/hubs/HubContext';
 import {
@@ -296,9 +298,10 @@ export function HubNavigation() {
             </div>
           </div>
         ))}
+        {['admin','coach'].includes(activeHubId)&&<WorkspaceCatalog hub={activeHubId} role={switcherValue||'org_admin'}/>}
       </div>
 
-      <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3">
+      <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3"><SubmitTicket/>
         <div className="flex items-center justify-between">
           <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-neutral-700">
             LS1SPORTS OS

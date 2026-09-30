@@ -228,3 +228,7 @@
 "SIGNOFF-004","UAT Sign-Off","All Critical findings resolved/retested","All Admin","Release gate","14","REQUIRED","NOT RUN",""
 "SIGNOFF-005","UAT Sign-Off","All sample/fake Admin surfaces removed or explicitly excluded","All Admin","Release gate","14","REQUIRED","NOT RUN",""
 "SIGNOFF-006","UAT Sign-Off","Sarah can perform intended Admin job without SuperUser","All Admin","Release gate","14","REQUIRED","NOT RUN",""
+"REC-20260929-01","Product owner 2026-09-29","Dark contextual athlete drawer and section edits","Organization Admin","roster","Record workspace","IMPLEMENTED UNVERIFIED","SIGNED-IN UAT PENDING","docs/admin/RECORD_WORKSPACE_UAT.md"
+"REC-20260929-02","Product owner 2026-09-29","External operating contacts and associations","Organization Admin","contacts","Record workspace","IMPLEMENTED UNVERIFIED","SIGNED-IN UAT PENDING","docs/admin/RECORD_WORKSPACE_UAT.md"
+"REC-20260929-03","Product owner 2026-09-29","Global durable ticket submission","Organization Admin","support","Record workspace","IMPLEMENTED UNVERIFIED","SIGNED-IN UAT PENDING","docs/admin/RECORD_WORKSPACE_UAT.md"
+"REC-20260929-04","Product owner 2026-09-29","Home Roster and scoped catalog navigation","Organization Admin","navigation","Record workspace","IMPLEMENTED UNVERIFIED","SIGNED-IN UAT PENDING","docs/admin/RECORD_WORKSPACE_UAT.md"

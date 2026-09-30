@@ -24,7 +24,9 @@ export async function GET(request:NextRequest){
   if(section==='roster'){
    if(!canRoster)return deny(403,'Roster read denied.');
    const [registrar,organizations,teams]=await Promise.all([registrarSnapshot(orgs),rest(`organizations?select=id,code,name,status&tenant_id=eq.${tenant}&id=${inFilter(orgs)}`),rest(`teams?select=id,organization_id,code,name,status&organization_id=${inFilter(orgs)}`)]);
-   return NextResponse.json({registrar,controls:{organizations,teams}});
+   const personIds=registrar.athletes.map((a:any)=>a.person_id).filter(Boolean);
+   const people=personIds.length?await rest(`people?select=id,first_name,last_name,preferred_name,email,phone&tenant_id=eq.${tenant}&id=${inFilter(personIds)}`):[];
+   return NextResponse.json({registrar:{...registrar,athletes:registrar.athletes.map((a:any)=>({...a,person:people.find((p:any)=>p.id===a.person_id)}))},controls:{organizations,teams}});
   }
   const teamQuery=canRoster&&orgs.length?`teams?select=id&organization_id=${inFilter(orgs)}&status=eq.active`:null;
   const teams=teamQuery?await rest(teamQuery):[];
