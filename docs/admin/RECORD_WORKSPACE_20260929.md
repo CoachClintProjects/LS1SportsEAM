@@ -61,3 +61,13 @@ Still unfinished from the broader scope:
 - External-contact linking to an already existing person and organization backfill for legacy external contacts.
 - Server-side roster pagination beyond the current snapshot limits.
 - Workflow builder, integration installation and ticket email delivery.
+
+## 30 September preview release checkpoint
+
+Added record task actions; private document upload and signed access; address and preferred contact method edits; guardian contact, squad membership and coach assignment changes; athlete activation/deactivation; registration submission and controlled decisions with required-check enforcement. These use canonical records and service-only database transactions with audit history. SQL definitions in this directory were applied to the connected database.
+
+Fixed missing roster pagination controls (25 per page), header sorting, refresh after record edits, single-organization onboarding selection, and sidebar state when navigating backwards. Drawer tabs fetch only their required supplementary data. Existing document types are used; uploads do not imply document verification. Guardian contact links do not grant custody or account authority; coach changes require role-assignment permission and apply to the squad.
+
+Checks: TypeScript passes; both admin-person-record and admin-record-actions technical regression scripts pass. These are controlled authorization tests, not signed-in UAT. Athlete lifecycle SQL was executed against an existing record in a rolled-back transaction; no business change persisted from that check.
+
+This checkpoint supersedes the earlier unfinished list for the features named above only. Deployment readiness and signed-in workflow acceptance must be recorded separately. Full Admin completion, facilities/contract workflow reconciliation, accounting acceptance, exact typography and the other role engines are not claimed complete.

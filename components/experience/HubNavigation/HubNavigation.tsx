@@ -119,7 +119,6 @@ export function HubNavigation() {
           : config.defaultOption || config.options[0]?.id || '';
 
       setSwitcherValue(nextValue);
-      setSections(fallback);
     }
 
     void initializeHub();
@@ -130,9 +129,10 @@ export function HubNavigation() {
 
   useEffect(() => {
     const urlValue = searchParams.get(getQueryKey(activeHubId));
-    if (urlValue && switcherConfig.options.some(option => option.id === urlValue)) {
-      setSwitcherValue(urlValue);
-    }
+    if (!switcherConfig.options.length) return;
+    const nextValue = urlValue && switcherConfig.options.some(option => option.id === urlValue)
+      ? urlValue : switcherConfig.defaultOption || switcherConfig.options[0]?.id || '';
+    setSwitcherValue(nextValue);
   }, [activeHubId, searchParams, switcherConfig]);
 
   useEffect(() => {

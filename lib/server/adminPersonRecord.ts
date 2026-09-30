@@ -27,7 +27,7 @@ export async function personRecordScope(
   )
     throw new PersonRecordError(403, "Roster access denied.");
   const people = await rest(
-    `people?select=id,first_name,last_name,preferred_name,birth_date,email,phone,status,updated_at&tenant_id=eq.${tenant}&id=eq.${personId}`,
+    `people?select=id,first_name,last_name,preferred_name,birth_date,email,phone,address_line1,address_line2,city,region,postal_code,country_code,preferred_contact_method,status,updated_at&tenant_id=eq.${tenant}&id=eq.${personId}`,
   );
   if (!people.length) throw new PersonRecordError(404, "Person not found.");
   const [athletes, teams, assignments] = await Promise.all([
@@ -69,7 +69,12 @@ export async function personRecordScope(
     registrations,
     memberships,
     teams: teams.filter((t: any) =>
-      memberships.some((m: any) => m.team_id === t.id),
+      memberships.some(
+        (m: any) =>
+          m.team_id === t.id &&
+          m.status === "active" &&
+          (!m.ends_on || m.ends_on >= new Date().toISOString().slice(0, 10)),
+      ),
     ),
   };
 }

@@ -160,7 +160,17 @@ export async function POST(request: NextRequest) {
           "reviewed_on",
         ]
       : body.section === "contact"
-        ? ["email", "phone"]
+        ? [
+            "email",
+            "phone",
+            "address_line1",
+            "address_line2",
+            "city",
+            "region",
+            "postal_code",
+            "country_code",
+            "preferred_contact_method",
+          ]
         : body.section === "identity"
           ? ["first_name", "last_name", "preferred_name", "birth_date"]
           : [
@@ -170,6 +180,13 @@ export async function POST(request: NextRequest) {
               "birth_date",
               "email",
               "phone",
+              "address_line1",
+              "address_line2",
+              "city",
+              "region",
+              "postal_code",
+              "country_code",
+              "preferred_contact_method",
             ];
     const changes: Record<string, string | null> = {};
     for (const [key, value] of Object.entries(body.changes)) {

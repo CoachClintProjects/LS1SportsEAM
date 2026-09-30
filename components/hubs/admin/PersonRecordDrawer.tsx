@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import RecordWorkPanel from "./RecordWorkPanel";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -47,6 +48,13 @@ const fields: Record<string, [string, string, string?][]> = {
   contact: [
     ["email", "Email address", "email"],
     ["phone", "Telephone", "tel"],
+    ["address_line1", "Street address"],
+    ["address_line2", "Address line 2"],
+    ["city", "City"],
+    ["region", "Province / state"],
+    ["postal_code", "Postal code"],
+    ["country_code", "Country code"],
+    ["preferred_contact_method", "Preferred contact method"],
   ],
   medical: [
     ["allergies", "Allergies"],
@@ -260,7 +268,9 @@ export default function PersonRecordDrawer({
     a = data?.athlete;
   const tabs = [
     "Overview",
-    "Activity",
+    "Activity & Tasks",
+    "Documents",
+    "Relationships",
     "Registration",
     "Competitions",
     ...(data?.authorization.finance ? ["Fees"] : []),
@@ -394,6 +404,32 @@ export default function PersonRecordDrawer({
                           </a>
                         ) : null
                       }
+                    />
+                  </dl>
+                  <dl className="mt-3">
+                    <Field
+                      label="Address"
+                      value={[
+                        p.address_line1,
+                        p.address_line2,
+                        p.city,
+                        p.region,
+                        p.postal_code,
+                        p.country_code,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    />
+                    <Field
+                      label="Preferred contact method"
+                      value={p.preferred_contact_method}
+                    />
+                    <Field
+                      label="Primary guardian contact"
+                      value={data.guardians
+                        .filter((g: any) => g.is_primary_guardian)
+                        .map((g: any) => name(g.person))
+                        .join(", ")}
                     />
                   </dl>
                   <div className="mt-4 flex gap-2">
@@ -544,21 +580,30 @@ export default function PersonRecordDrawer({
                     </Card>
                     <Card title="Needs attention">
                       {!data.registrations.length && a && (
-                        <p className="mb-2 text-sm text-amber-200">
-                          No registration linked to this athlete.
-                        </p>
+                        <button
+                          onClick={() => setTab("Registration")}
+                          className="mb-2 block text-left text-sm text-amber-200 underline"
+                        >
+                          No registration linked — review registration
+                        </button>
                       )}
                       {!data.guardians.length &&
                         !data.authorities.length &&
                         a && (
-                          <p className="mb-2 text-sm text-amber-200">
-                            No parent or guardian relationship recorded.
-                          </p>
+                          <button
+                            onClick={() => setTab("Relationships")}
+                            className="mb-2 block text-left text-sm text-amber-200 underline"
+                          >
+                            No guardian recorded — manage relationships
+                          </button>
                         )}
                       {!data.emergency.length && a && (
-                        <p className="mb-2 text-sm text-amber-200">
-                          No emergency contact recorded.
-                        </p>
+                        <button
+                          onClick={() => begin("emergency")}
+                          className="mb-2 block text-left text-sm text-amber-200 underline"
+                        >
+                          No emergency contact — add contact
+                        </button>
                       )}
                       {data.invoices.length > 0 && (
                         <button
@@ -588,7 +633,24 @@ export default function PersonRecordDrawer({
                     </Card>
                   </>
                 )}
-                {tab === "Activity" && (
+                {[
+                  "Activity & Tasks",
+                  "Documents",
+                  "Relationships",
+                  "Registration",
+                  "Competitions",
+                ].includes(tab) && (
+                  <RecordWorkPanel
+                    tab={tab}
+                    record={data}
+                    role={role}
+                    onChanged={() => {
+                      load().catch((e) => setError(e.message));
+                      onSaved?.();
+                    }}
+                  />
+                )}
+                {tab === "Activity & Tasks" && (
                   <Card title="Record activity">
                     {data.activity.map((x: any) => (
                       <div
@@ -761,7 +823,14 @@ export default function PersonRecordDrawer({
                 )}
               </div>
               <div className="space-y-4">
-                <Card title="Parents & guardians">
+                <Card
+                  title="Parents & guardians"
+                  edit={
+                    data.authorization.edit
+                      ? () => setTab("Relationships")
+                      : undefined
+                  }
+                >
                   {[
                     ...data.authorities,
                     ...data.guardians.filter(
@@ -844,7 +913,14 @@ export default function PersonRecordDrawer({
                     <Empty>No emergency contacts recorded.</Empty>
                   )}
                 </Card>
-                <Card title="Squad & coach">
+                <Card
+                  title="Squad & coach"
+                  edit={
+                    data.authorization.edit
+                      ? () => setTab("Relationships")
+                      : undefined
+                  }
+                >
                   {data.teams.map((t: any) => (
                     <div key={t.id} className="mb-3">
                       <p className="flex items-center gap-2 text-sm font-semibold">
