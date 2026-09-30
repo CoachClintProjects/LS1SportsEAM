@@ -69,7 +69,20 @@ export async function GET(request: NextRequest) {
     const body = await response.text();
     if (!response.ok) throw new Error(`Supabase SuperUser RPC returned ${response.status}: ${body.slice(0, 400)}`);
     const payload = JSON.parse(body);
-    const units = Array.isArray(payload?.units) ? payload.units.map(deriveUnitMeasurement) : [];
+    const storedUnits: Unit[] = Array.isArray(payload?.units) ? payload.units : [];
+    const inventory = Array.isArray(payload?.inventory) ? payload.inventory : [];
+    const adminMilestone = (payload?.milestones || []).find((m: {code:string}) => m.code === 'M09');
+    // Read implementation evidence into the same matrix/action plan on every
+    // refresh. Runtime and acceptance remain gated by explicit evidence.
+    const represented = new Set(storedUnits.map(u => String(u.unit_key)));
+    const inventoryUnits = inventory.filter((i: {area:string;artifact_key:string}) => i.area === 'Admin' && !represented.has(i.artifact_key)).map((i: {id:string;artifact_key:string;artifact_type:string;status:string;repository_path?:string;commit_sha?:string;evidence?:Evidence;verified_at?:string}) => ({
+      id: `inventory-${i.id}`, milestone_id: adminMilestone?.id || null,
+      unit_key: i.artifact_key, unit_type: i.artifact_type, status: i.status,
+      evidence_source: 'platform_implementation_inventory',
+      evidence_ref: i.commit_sha && i.repository_path ? `${i.commit_sha}:${i.repository_path}` : null,
+      evidence: i.evidence || {}, verified_at: i.verified_at || null,
+    }));
+    const units = [...storedUnits, ...inventoryUnits].map(deriveUnitMeasurement);
     return NextResponse.json({
       ...payload,
       units,

@@ -71,3 +71,17 @@ Fixed missing roster pagination controls (25 per page), header sorting, refresh 
 Checks: TypeScript passes; both admin-person-record and admin-record-actions technical regression scripts pass. These are controlled authorization tests, not signed-in UAT. Athlete lifecycle SQL was executed against an existing record in a rolled-back transaction; no business change persisted from that check.
 
 This checkpoint supersedes the earlier unfinished list for the features named above only. Deployment readiness and signed-in workflow acceptance must be recorded separately. Full Admin completion, facilities/contract workflow reconciliation, accounting acceptance, exact typography and the other role engines are not claimed complete.
+
+### Roster navigation correction — 30 September
+
+User reported Roster missing after the preview release. Live inspection found the existing RostersView navigation row had is_active=false while Org Admin's can_view grant was true. The API filters inactive rows before label normalization, so the implementation existed but no menu item or authorized workspace route was returned. Restored the existing row to active, label Roster, top-level placement. Preserved existing role grants and route ID. Verified the live active-row/Org Admin grant join returns Roster and its existing route. This configuration fix applies without another application build; signed-in visual confirmation remains separate. Reproducible SQL and a live release assertion are in restore-roster-navigation.sql.
+
+### Shared workspace correction batch — 30 September
+
+Restored both Superuser CSV exports (milestone matrix and incomplete unit action plan), including CSV quoting and spreadsheet-formula protection. Empty/unloaded unit lists cannot claim completion. Admin implementation inventory is merged into the M09 matrix/action-plan read model each refresh; runtime and acceptance remain evidence-gated.
+
+Role workspace remounts on role changes. Home ignores superseded responses, clears selected records on role changes, excludes cancelled tasks and labels the active role. Sidebar clears previous-role links during loading and reports navigation failures instead of silently substituting a generic Admin menu. Assigned work filtering now precedes the database row limit. Added source-derived volunteer capacity, communications draft and fundraising prospect queues; registrar includes expiring compliance.
+
+Home requests skip unrelated communication/family/volunteer/fundraising and invoice-detail loads unless needed by the selected role. Competition detail fetches the full dataset on demand. This reduces queries; no measured signed-in latency claim is made. Added explicit action colors on Home. Sidebar uses build-hosted Lexend Deca, based on HubSpot's published September 2026 UI-font guidance; exact sizing/visual parity remains unverified.
+
+Technical checks: TypeScript and focused lint passed; existing record authorization regressions passed. Full role scope and signed-in acceptance remain unfinished. Athlete drawer layout unchanged.

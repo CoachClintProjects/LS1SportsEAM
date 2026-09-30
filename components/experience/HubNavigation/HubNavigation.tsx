@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Lexend_Deca } from 'next/font/google';
+const sidebarFont=Lexend_Deca({subsets:['latin'],weight:['400','500','600','700'],display:'swap'});
 import SubmitTicket from '@/components/support/SubmitTicket';
 import WorkspaceCatalog from './WorkspaceCatalog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -101,6 +103,8 @@ export function HubNavigation() {
   const [switcherConfig, setSwitcherConfig] = useState<SwitcherConfig>(EMPTY_SWITCHER);
   const [switcherValue, setSwitcherValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [navigationError,setNavigationError]=useState('');
+  const [retry,setRetry]=useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,13 +144,15 @@ export function HubNavigation() {
 
     async function loadNavigation() {
       setRefreshing(true);
+      setSections([]);
+      setNavigationError('');
       try {
         const result = await getNavigation(activeHubId, switcherValue);
         if (!cancelled && result.length) setSections(result);
-        if (!cancelled && !result.length) setSections(fallback);
+        if (!cancelled && !result.length) {setSections(activeHubId==='admin'?[]:fallback);if(activeHubId==='admin')setNavigationError('No navigation returned for this role.');}
       } catch (error) {
         console.error('[HubNavigation] navigation load failed', { activeHubId, error });
-        if (!cancelled) setSections(fallback);
+        if (!cancelled) {setSections(activeHubId==='admin'?[]:fallback);setNavigationError('Unable to load role navigation.');}
       } finally {
         if (!cancelled) setRefreshing(false);
       }
@@ -156,9 +162,10 @@ export function HubNavigation() {
     return () => {
       cancelled = true;
     };
-  }, [activeHubId, fallback, switcherValue]);
+  }, [activeHubId, fallback, switcherValue, retry]);
 
   function handleSwitch(value: string) {
+    setSections([]);
     setSwitcherValue(value);
 
     if (typeof window === 'undefined') return;
@@ -218,7 +225,7 @@ export function HubNavigation() {
           : 'Select option';
 
   return (
-    <nav className="flex h-full w-full flex-col bg-[#080909] text-white">
+    <nav className={`${sidebarFont.className} flex h-full w-full flex-col bg-[#080909] text-white`}>
       <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
         <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">
           {currentHub.codeLane}
@@ -230,6 +237,7 @@ export function HubNavigation() {
           {currentHub.description}
         </div>
 
+        {navigationError&&<div role="alert" className="mt-3 text-xs text-red-300">{navigationError}<button onClick={()=>setRetry(x=>x+1)} className="ml-2 rounded bg-blue-700 px-2 py-1 text-white">Retry</button></div>}
         {showSwitcher && (
           <div className="mt-5 rounded-lg border border-neutral-800 bg-[#0d1010] p-3">
             <div className="mb-2 flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
