@@ -6,6 +6,11 @@ import {
 } from "@/lib/server/accessControl";
 import { supabaseServerConfig } from "@/lib/server/superuserAuth";
 import { PersonRecordError } from "@/lib/server/adminPersonRecord";
+import {
+  canReadRecordDocuments,
+  documentTypeFilter,
+  registrarDocumentCodes,
+} from "@/lib/server/adminDocumentPolicy";
 export const dynamic = "force-dynamic";
 const fail = (e: unknown) =>
   NextResponse.json(
@@ -18,13 +23,13 @@ export async function GET(request: NextRequest) {
       role = q.get("role") || "org_admin",
       personId = q.get("personId") || "",
       { ctx, tenant } = await recordAccess(request, role, personId);
-    if (role !== "org_admin" || !can(ctx, role, "record.read"))
+    if (!canReadRecordDocuments(ctx, role))
       throw new PersonRecordError(403, "Restricted document access denied.");
     const docId = q.get("id") || "";
     if (!/^[0-9a-f-]{36}$/i.test(docId))
       throw new PersonRecordError(400, "Document ID required.");
     const [doc] = await recordRest(
-      `documents?select=id,title,storage_path&tenant_id=eq.${tenant}&owner_person_id=eq.${personId}&id=eq.${docId}`,
+      `documents?select=id,title,storage_path,document_types!inner(code)&tenant_id=eq.${tenant}&owner_person_id=eq.${personId}&id=eq.${docId}${documentTypeFilter(role)}`,
     );
     if (!doc) throw new PersonRecordError(404, "Document not found.");
     if (!doc.storage_path?.startsWith(`athlete-records/${tenant}/${personId}/`))
@@ -49,11 +54,49 @@ export async function GET(request: NextRequest) {
 }
 export async function POST(request: NextRequest) {
   try {
+    if (request.headers.get("content-type")?.includes("application/json")) {
+      const b = await request.json(),
+        role = String(b.role || "org_admin"),
+        personId = String(b.personId || "");
+      const { ctx, tenant } = await recordAccess(request, role, personId);
+      if (
+        !canReadRecordDocuments(ctx, role) ||
+        !can(ctx, role, "record.update")
+      )
+        throw new PersonRecordError(403, "Document review denied.");
+      if (
+        !/^[0-9a-f-]{36}$/i.test(b.id || "") ||
+        !Number.isInteger(b.expectedVersion) ||
+        !["verified", "rejected", "pending"].includes(b.status) ||
+        !String(b.reason || "").trim()
+      )
+        throw new PersonRecordError(
+          400,
+          "Document, version, decision and reason are required.",
+        );
+      return NextResponse.json(
+        await recordRest("rpc/admin_review_person_document", {
+          method: "POST",
+          body: JSON.stringify({
+            p_tenant: tenant,
+            p_person: personId,
+            p_document: b.id,
+            p_actor_user: ctx.user.id,
+            p_actor_person: ctx.person?.id || null,
+            p_role: role,
+            p_expected_version: b.expectedVersion,
+            p_expected_status: b.expectedStatus ?? null,
+            p_status: b.status,
+            p_reason: String(b.reason).trim(),
+          }),
+        }),
+      );
+    }
     const form = await request.formData(),
       role = String(form.get("role") || "org_admin"),
       personId = String(form.get("personId") || ""),
       { ctx, tenant } = await recordAccess(request, role, personId);
-    if (role !== "org_admin" || !can(ctx, role, "record.create"))
+    if (!canReadRecordDocuments(ctx, role) || !can(ctx, role, "record.create"))
       throw new PersonRecordError(403, "Document upload denied.");
     const file = form.get("file"),
       title = String(form.get("title") || "").trim(),
@@ -74,9 +117,16 @@ export async function POST(request: NextRequest) {
       );
     if (!/^[0-9a-f-]{36}$/i.test(type))
       throw new PersonRecordError(400, "Select a document type.");
-    const types = await recordRest(`document_types?select=id&id=eq.${type}`);
+    const types = await recordRest(
+      `document_types?select=id,code&id=eq.${type}`,
+    );
     if (!types.length)
       throw new PersonRecordError(400, "Document type unavailable.");
+    if (role === "registrar" && !registrarDocumentCodes.includes(types[0].code))
+      throw new PersonRecordError(
+        403,
+        "Document type outside Registrar authority.",
+      );
     const documentId = crypto.randomUUID(),
       objectPath = `${tenant}/${personId}/${documentId}`,
       storagePath = `athlete-records/${objectPath}`,

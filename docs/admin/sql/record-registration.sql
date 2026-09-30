@@ -18,6 +18,11 @@ begin
  target:=p_values->>'status';
  if not ((old_row.status in ('submitted','pending','under_review') and target in ('approved','rejected','cancelled')) or (old_row.status='approved' and target='cancelled') or (old_row.status in ('rejected','cancelled') and target='submitted')) then raise exception 'Registration transition not allowed';end if;
  if nullif(trim(p_values->>'reason'),'') is null then raise exception 'Decision reason required';end if;
+ -- Lock linked evidence while deciding so a concurrent review cannot invalidate it mid-decision.
+ if target='approved' then
+ perform d.id from documents d join registration_requirement_status rs on rs.evidence_document_id=d.id
+ where rs.registration_id=old_row.id order by d.id for share of d;
+ end if;
  if target='approved' and exists (
    select 1 from registration_requirements req
    where req.organization_id=p_org and req.required
@@ -27,7 +32,12 @@ begin
      and (req.valid_until is null or req.valid_until>=current_date)
      and not exists (select 1 from registration_requirement_status rs
        where rs.registration_id=old_row.id and rs.requirement_id=req.id
-         and rs.satisfied_at is not null and rs.status in ('satisfied','verified','approved','waived'))
+         and rs.satisfied_at is not null and rs.status in ('satisfied','verified','approved','waived')
+         and (rs.evidence_document_id is null or exists (
+           select 1 from documents d join athletes a on a.person_id=d.owner_person_id
+           where d.id=rs.evidence_document_id and d.tenant_id=p_tenant and a.id=p_athlete
+             and d.verification_status='verified' and (d.expires_at is null or d.expires_at>now())
+         )))
  ) then raise exception 'Required registration checks are incomplete';end if;
  update registrations set status=target,approved_at=case when target='approved' then now() else null end,metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('decision_reason',p_values->>'reason','decided_by',p_actor_person,'decided_at',now()) where id=old_row.id returning * into saved;
  end if;

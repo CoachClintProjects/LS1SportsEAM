@@ -111,16 +111,18 @@ export default function PersonRecordDrawer({
   role,
   onClose,
   onSaved,
+  initialTab = "Overview",
 }: {
   personId: string;
   role: string;
   onClose: () => void;
   onSaved?: () => void;
+  initialTab?: "Overview" | "Registration" | "Documents";
 }) {
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
-    [tab, setTab] = useState("Overview"),
+    [tab, setTab] = useState<string>(initialTab),
     [editing, setEditing] = useState<string | null>(null),
     [draft, setDraft] = useState<Record<string, string>>({}),
     [busy, setBusy] = useState(false),

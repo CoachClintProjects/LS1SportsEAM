@@ -30,3 +30,31 @@ Use existing authorized HPAC records and legitimate data corrections only. Do no
 - Stale profile timestamp: save rejected.
 - `athlete_medical_profiles`: RLS enabled; anon/authenticated SELECT grants absent.
 - Local Next build: compilation/type validation passed; full build blocked at existing icons route by absent runtime credentials.
+
+## 2026-09-30 registration and Home checkpoint
+
+Implemented, awaiting signed-in verification:
+
+- Registrar document access for identity, registration, Safe Sport, background checks, waivers and media releases. Medical documents remain outside Registrar authority.
+- Document decisions record reviewer/reason/version and reject stale or expired evidence.
+- Registration requirement review links current verified evidence to a scoped requirement, with reason and stale-review protection.
+- Both registration entry points use the same transaction for creation and decisions. Approval rechecks linked evidence and locks it during the decision.
+- Registrar queue shows person names and opens the athlete drawer at Registration; single-organization registration creation preselects the organization and requires program/season.
+- Home uses a dedicated role-specific query path, excluding full invoice, relationship, document, payroll and contract-version detail loads. Competition details load on opening with feedback.
+- Registration reviews appear in Org Admin/Registrar tasks and open the athlete drawer. Workflow Home reads are constrained through the tenant's definitions and instances.
+
+Technical checks: TypeScript pass; focused ESLint no errors; controlled permission/scope tests pass; all Home projection columns checked against live schema; all three registration/document transaction functions deny execution to anon/authenticated and allow service_role. No signed-in or deployment-speed claim follows from these checks.
+
+Additional acceptance cases (all Pending):
+
+| Case | Expected evidence | Result |
+|---|---|---|
+| Registrar evidence | Upload/open allowed evidence; medical type denied for listing, signing, upload and review | Pending |
+| Document decision | Verify/reject with reason; reviewer audit; stale status/version rejected | Pending |
+| Requirement review | Current evidence from the correct person/tenant; configured type enforced; stale repeat rejected | Pending |
+| Approval parity | Both screens reject missing checks, expired/rejected linked evidence, stale status and missing reason | Pending |
+| Registration queue | Athlete names, scoped program/season, automatic sole organization, errors stay visible | Pending |
+| Home performance | Measure signed-in load/role transitions before and after; no stale role data; no full-workspace detail reads | Pending |
+| Home workflow scope | Another tenant's unassigned workflow task never appears | Pending |
+
+Open role-scope gaps remain open. This checkpoint does not implement Registrar transfer/remapping or governing-body ID workflows, full Org Admin governance, full accounting, or the complete other-role scopes. Document review alone does not establish competition eligibility or retroactively revoke earlier approval decisions.

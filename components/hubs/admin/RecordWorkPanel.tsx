@@ -92,6 +92,42 @@ export default function RecordWorkPanel({
       setBusy(false);
     }
   }
+  async function reviewDocument(
+    e: React.FormEvent<HTMLFormElement>,
+    document: any,
+  ) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const r = await authenticatedFetch("/api/admin-record-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role,
+          personId,
+          id: document.id,
+          expectedVersion: document.current_version,
+          expectedStatus: document.verification_status,
+          status: form.get("status"),
+          reason: form.get("reason"),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      await load();
+      onChanged();
+      setNotice(
+        "Document review saved. Registration approval remains a separate decision.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Review failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function upload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -276,7 +312,8 @@ export default function RecordWorkPanel({
           <h3 className="font-semibold">Documents</h3>
           {!data.authorization.documents ? (
             <p className="text-sm text-neutral-400">
-              Restricted documents require Organization Administrator access.
+              Document access is restricted to authorized Organization
+              Administrator and Registrar roles.
             </p>
           ) : (
             <>
@@ -287,6 +324,32 @@ export default function RecordWorkPanel({
                 >
                   <div>
                     <p className="text-sm">{d.title}</p>
+                    {data.authorization.reviewDocuments && (
+                      <form
+                        className="mt-3 space-y-2"
+                        onSubmit={(e) => reviewDocument(e, d)}
+                      >
+                        <label className="block text-xs">
+                          Review decision
+                          <select name="status" required className={input}>
+                            <option value="">Select decision</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="pending">Return for review</option>
+                          </select>
+                        </label>
+                        <label className="block text-xs">
+                          Review evidence / reason
+                          <textarea name="reason" required className={input} />
+                        </label>
+                        <button
+                          disabled={busy}
+                          className="rounded bg-emerald-700 px-3 py-2 text-xs text-white"
+                        >
+                          Save review
+                        </button>
+                      </form>
+                    )}
                     <p className="text-xs text-neutral-400">
                       {d.verification_status || "Not verified"}
                       {d.expires_at
@@ -448,6 +511,102 @@ export default function RecordWorkPanel({
               </button>
             </form>
           )}
+          {data.authorization.reviewRequirements &&
+            record.registrations
+              .filter((r: any) =>
+                ["submitted", "pending", "under_review"].includes(r.status),
+              )
+              .map((r: any) => (
+                <div
+                  key={`checks-${r.id}`}
+                  className="space-y-3 border-t border-neutral-600 pt-3"
+                >
+                  <h4 className="text-sm font-semibold">
+                    Registration checks ·{" "}
+                    {
+                      data.programOptions.find(
+                        (p: any) => p.id === r.program_id,
+                      )?.name
+                    }
+                  </h4>
+                  {data.requirements
+                    .filter(
+                      (q: any) =>
+                        (!q.program_id || q.program_id === r.program_id) &&
+                        (!q.season_id || q.season_id === r.season_id) &&
+                        (!q.valid_from ||
+                          q.valid_from <=
+                            new Date().toISOString().slice(0, 10)) &&
+                        (!q.valid_until ||
+                          q.valid_until >=
+                            new Date().toISOString().slice(0, 10)),
+                    )
+                    .map((q: any) => {
+                      const status = data.requirementStatus.find(
+                        (x: any) =>
+                          x.registration_id === r.id &&
+                          x.requirement_id === q.id,
+                      );
+                      return (
+                        <form
+                          key={q.id}
+                          className="space-y-2 rounded border border-neutral-600 p-3"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const f = new FormData(e.currentTarget);
+                            action("requirement", "review", {
+                              registration_id: r.id,
+                              requirement_id: q.id,
+                              expected_status: status?.status ?? null,
+                              expected_satisfied_at:
+                                status?.satisfied_at ?? null,
+                              document_id: f.get("document"),
+                              reason: f.get("reason"),
+                            });
+                          }}
+                        >
+                          <p className="text-sm">
+                            {q.name} · {q.required ? "Required" : "Optional"} ·{" "}
+                            {status?.status || "Not reviewed"}
+                          </p>
+                          <label className="block text-xs">
+                            Verified evidence
+                            <select required name="document" className={input}>
+                              <option value="">Select evidence</option>
+                              {data.documents
+                                .filter(
+                                  (d: any) =>
+                                    d.verification_status === "verified" &&
+                                    (!d.expires_at ||
+                                      new Date(d.expires_at).getTime() >
+                                        Date.now()),
+                                )
+                                .map((d: any) => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.title}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <label className="block text-xs">
+                            Review reason
+                            <textarea
+                              required
+                              name="reason"
+                              className={input}
+                            />
+                          </label>
+                          <button
+                            disabled={busy}
+                            className="rounded bg-emerald-700 px-3 py-2 text-xs"
+                          >
+                            Confirm requirement met
+                          </button>
+                        </form>
+                      );
+                    })}
+                </div>
+              ))}
           {data.authorization.decideRegistration &&
             record.registrations.map((r: any) => {
               const transitions = [

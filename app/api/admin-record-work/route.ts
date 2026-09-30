@@ -5,6 +5,11 @@ import {
 } from "@/lib/server/adminRecordAccess";
 import { hasAdminContextPermission as can } from "@/lib/server/accessControl";
 import { PersonRecordError } from "@/lib/server/adminPersonRecord";
+import {
+  canReadRecordDocuments,
+  documentTypeFilter,
+  registrarDocumentCodes,
+} from "@/lib/server/adminDocumentPolicy";
 export const dynamic = "force-dynamic";
 const fail = (e: unknown) =>
   NextResponse.json(
@@ -23,8 +28,7 @@ export async function GET(request: NextRequest) {
     const wantsCompetitions =
       section === "Competitions" || section === "Overview";
     const wantsDocuments = section === "Documents";
-    const documentAccess =
-      role === "org_admin" && can(ctx, role, "record.read");
+    const documentAccess = canReadRecordDocuments(ctx, role);
     const [
       tasks,
       documents,
@@ -42,13 +46,15 @@ export async function GET(request: NextRequest) {
             `work_items?select=id,status,priority,payload&tenant_id=eq.${tenant}&entity_type=eq.person&entity_id=eq.${personId}&work_type=eq.ADMIN_TASK`,
           )
         : [],
-      wantsDocuments && documentAccess
+      (wantsDocuments || wantsRegistrations) && documentAccess
         ? rest(
-            `documents?select=id,title,mime_type,expires_at,verification_status,created_at&tenant_id=eq.${tenant}&owner_person_id=eq.${personId}&order=created_at.desc`,
+            `documents?select=id,title,mime_type,expires_at,verification_status,current_version,created_at,document_types!inner(code)&tenant_id=eq.${tenant}&owner_person_id=eq.${personId}&order=created_at.desc${documentTypeFilter(role)}`,
           )
         : [],
-      wantsDocuments && documentAccess
-        ? rest("document_types?select=id,name&order=name.asc")
+      (wantsDocuments || wantsRegistrations) && documentAccess
+        ? rest(
+            `document_types?select=id,name&order=name.asc${role === "registrar" ? `&code=in.(${registrarDocumentCodes.join(",")})` : ""}`,
+          )
         : [],
       wantsCompetitions
         ? rest(
@@ -88,6 +94,19 @@ export async function GET(request: NextRequest) {
           )
         : [],
     ]);
+    const registrationIds = base.registrations.map((r: any) => r.id);
+    const [requirements, requirementStatus] = wantsRegistrations
+      ? await Promise.all([
+          rest(
+            `registration_requirements?select=id,name,required,program_id,season_id,valid_from,valid_until&organization_id=in.(${orgs.join(",")})`,
+          ),
+          registrationIds.length
+            ? rest(
+                `registration_requirement_status?select=id,registration_id,requirement_id,status,satisfied_at,evidence_document_id,notes&registration_id=in.(${registrationIds.join(",")})`,
+              )
+            : [],
+        ])
+      : [[], []];
     const compIds = competitions.map((c: any) => c.id);
     const eligibility =
       base.athlete && compIds.length
@@ -101,6 +120,8 @@ export async function GET(request: NextRequest) {
         )
       : [];
     return NextResponse.json({
+      requirements,
+      requirementStatus,
       tasks: tasks.filter(
         (t: any) => role === "org_admin" || t.payload?.assigned_role === role,
       ),
@@ -130,6 +151,9 @@ export async function GET(request: NextRequest) {
         createTask: can(ctx, role, "admin_tasks.create"),
         updateTask: can(ctx, role, "admin_tasks.update"),
         documents: documentAccess,
+        reviewRequirements:
+          documentAccess && can(ctx, role, "registrations.approve"),
+        reviewDocuments: documentAccess && can(ctx, role, "record.update"),
         upload: documentAccess && can(ctx, role, "record.create"),
         coaches:
           role === "org_admin" &&
@@ -180,6 +204,31 @@ export async function POST(request: NextRequest) {
             p_role: role,
             p_id: b.id,
             p_operation: b.operation,
+            p_values: b.values || {},
+          }),
+        }),
+      );
+    }
+    if (b.kind === "requirement") {
+      if (b.operation !== "review")
+        throw new PersonRecordError(400, "Unsupported requirement action.");
+      if (
+        !base.athlete ||
+        orgs.length !== 1 ||
+        !canReadRecordDocuments(ctx, role) ||
+        !can(ctx, role, "registrations.approve")
+      )
+        throw new PersonRecordError(403, "Requirement review denied.");
+      return NextResponse.json(
+        await rest("rpc/admin_record_requirement_review", {
+          method: "POST",
+          body: JSON.stringify({
+            p_tenant: tenant,
+            p_org: orgs[0],
+            p_athlete: base.athlete.id,
+            p_actor_user: ctx.user.id,
+            p_actor_person: ctx.person?.id || null,
+            p_role: role,
             p_values: b.values || {},
           }),
         }),
