@@ -3,10 +3,14 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import "./admin-home.css";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 const PersonRecordDrawer = dynamic(() => import("./PersonRecordDrawer"));
 
 import { CalendarDays, Settings } from "lucide-react";
 import { CompetitionHomeDrawer } from "./CompetitionHomeDrawer";
+const GovernanceRecordDrawer = dynamic(() =>
+  import("./GovernanceWorkspace").then((m) => m.GovernanceRecordDrawer),
+);
 type Row = Record<string, any>;
 type Task = {
   key: string;
@@ -23,6 +27,7 @@ export function CommandCenter({
   role?: string;
   roleLabel?: string;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
@@ -40,6 +45,7 @@ export function CommandCenter({
     [eventTimezone, setEventTimezone] = useState(""),
     [customize, setCustomize] = useState(false),
     [selectedActivity, setSelectedActivity] = useState<Row | null>(null);
+  const [governanceId, setGovernanceId] = useState<string | null>(null);
   const [recordPersonId, setRecordPersonId] = useState<string | null>(null);
   const [competitionData, setCompetitionData] = useState<any>(null),
     [openingCompetition, setOpeningCompetition] = useState(false);
@@ -320,6 +326,31 @@ export function CommandCenter({
         count: pendingRegistrations.length,
         rows: pendingRegistrations,
       });
+    const governance = (data.governanceTasks || []).filter(
+      (w: Row) =>
+        w.payload?.record_status !== "active" ||
+        (w.payload?.due_on && Date.parse(w.payload.due_on) <= horizon),
+    );
+    if (governance.length)
+      out.push({
+        key: "governance",
+        category: "GOVERNANCE & RISK",
+        title: `${governance.length} governance records need attention`,
+        instruction:
+          "Review the source record and complete its authorized decision or follow-up.",
+        count: governance.length,
+        rows: governance,
+      });
+    if (data.budgetTasks?.length)
+      out.push({
+        key: "budget-review",
+        category: "BUDGET AUTHORITY",
+        title: `${data.budgetTasks.length} budgets need preparation or approval`,
+        instruction:
+          "Open the budget to prepare allocations or record the authorized decision.",
+        count: data.budgetTasks.length,
+        rows: data.budgetTasks,
+      });
     const byRole: Record<string, string[]> = {
       team_manager: [
         "competition-deadlines",
@@ -333,7 +364,7 @@ export function CommandCenter({
         "registration-review",
       ],
       competition_manager: ["competition-deadlines"],
-      treasurer: ["finance"],
+      treasurer: ["finance", "budget-review"],
       volunteer_coordinator: ["volunteer-vacancies"],
       communications_media: ["communication-drafts"],
       fundraising_coordinator: ["fundraising-prospects"],
@@ -514,6 +545,16 @@ export function CommandCenter({
     data.orgAdmin?.organizations?.[0] || data.controls?.organizations?.[0];
   return (
     <main className="org-admin-home">
+      {governanceId && (
+        <GovernanceRecordDrawer
+          role={role}
+          id={governanceId}
+          onClose={() => setGovernanceId(null)}
+          onSaved={() => {
+            void load().catch((e) => setError(e.message));
+          }}
+        />
+      )}
       {recordPersonId && (
         <PersonRecordDrawer
           personId={recordPersonId}
@@ -1002,7 +1043,55 @@ export function CommandCenter({
                   {error}
                 </p>
               )}
-              {selected.key === "registration-review" ? (
+              {selected.key === "budget-review" ? (
+                <div className="space-y-3">
+                  {selected.rows.map((r: Row) => (
+                    <div
+                      key={r.id}
+                      className="rounded border border-neutral-600 p-4"
+                    >
+                      <h3 className="font-semibold">{r.payload?.title}</h3>
+                      <p className="mt-1 text-sm text-neutral-400">
+                        {r.payload?.budget_status}
+                      </p>
+                      <button
+                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
+                        onClick={() =>
+                          router.push(
+                            `/admin?${new URLSearchParams({ view: "budgets", role, record: r.entity_id })}`,
+                          )
+                        }
+                      >
+                        Open budget
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : selected.key === "governance" ? (
+                <div className="space-y-3">
+                  {selected.rows.map((r: Row) => (
+                    <div
+                      key={r.id}
+                      className="rounded border border-neutral-600 p-4"
+                    >
+                      <h3 className="font-semibold">{r.payload?.title}</h3>
+                      <p className="mt-1 text-sm text-neutral-400">
+                        {r.payload?.kind} · {r.payload?.record_status}{" "}
+                        {r.payload?.due_on ? `· Due ${r.payload.due_on}` : ""}
+                      </p>
+                      <button
+                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
+                        onClick={() => {
+                          setSelected(null);
+                          setGovernanceId(r.entity_id);
+                        }}
+                      >
+                        Open governance record
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : selected.key === "registration-review" ? (
                 <div className="space-y-3">
                   {selected.rows.map((r: Row) => (
                     <div

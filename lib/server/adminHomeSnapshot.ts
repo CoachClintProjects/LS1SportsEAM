@@ -50,6 +50,8 @@ export async function adminHomeSnapshot(
     audit,
     approvals,
     workflowDefinitions,
+    governanceTasks,
+    budgetTasks,
   ] = await Promise.all([
     rest(
       `organizations?select=id,name,code,status&tenant_id=eq.${tenant}&id=${orgFilter}`,
@@ -120,6 +122,16 @@ export async function adminHomeSnapshot(
       : [],
     can(ctx, role, "workflow.execute")
       ? rest(`workflow_definitions?select=id&tenant_id=eq.${tenant}&limit=500`)
+      : [],
+    executive && can(ctx, role, "record.read")
+      ? rest(
+          `work_items?select=id,entity_id,status,priority,payload&tenant_id=eq.${tenant}&work_type=eq.GOVERNANCE_REVIEW&payload->>organization_id=${orgFilter}&status=eq.open&limit=500`,
+        )
+      : [],
+    finance
+      ? rest(
+          `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.BUDGET_REVIEW&payload->>organization_id=${orgFilter}&status=eq.open${executive ? "" : `&payload->>assigned_role=eq.${role}`}&limit=500`,
+        )
       : [],
   ]);
   const [
@@ -240,6 +252,8 @@ export async function adminHomeSnapshot(
     invoices,
     approvals,
     workflowTasks,
+    governanceTasks,
+    budgetTasks,
     competitionReadiness: [],
     authorization: {
       createTask: can(ctx, role, "admin_tasks.create"),
