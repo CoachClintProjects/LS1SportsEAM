@@ -1,3 +1,4 @@
+import {documentTypeFilter} from '@/lib/server/adminDocumentPolicy';
 import { adminHomeSnapshot } from '@/lib/server/adminHomeSnapshot';
 import { NextRequest,NextResponse } from 'next/server';
 import { canUseAdminRoleContext,hasAdminContextPermission,hasPermission,resolveAccess,serviceHeaders,type AccessContext } from '@/lib/server/accessControl';
@@ -110,9 +111,9 @@ async function orgAdminControls(tenant:string,orgs:string[]){
  const scopedPeople=await rest('rpc/admin_compliance_people',{method:'POST',body:JSON.stringify({p_tenant:tenant,p_orgs:orgs})}),personIds=(scopedPeople||[]).map((p:any)=>p.id),personFilter=inFilter(personIds);
  const [requirements,credentials,backgroundChecks,safeSport,waivers,memberships,dataQualityIssues,duplicateCandidates,competitions]=await Promise.all([
   rest('compliance_requirements?select=id,code,name,applies_to_role,applies_to_minor,severity,validity_days,rule_definition&order=name.asc'),
-  personIds.length?rest(`credentials?select=id,person_id,requirement_id,credential_type,issuer,credential_number,issued_on,expires_on,status,verification_status,verified_at,version&person_id=${personFilter}&limit=500`):[],
-  personIds.length?rest(`background_checks?select=id,person_id,check_type,provider,reference_number,submitted_at,completed_at,expires_on,status,result_classification,version&person_id=${personFilter}&limit=500`):[],
-  personIds.length?rest(`safesport_records?select=id,person_id,governing_body_id,certification_type,certificate_id,completed_on,expires_on,status,source,verified_at,version&person_id=${personFilter}&limit=500`):[],
+  personIds.length?rest(`credentials?select=id,person_id,requirement_id,credential_type,issuer,credential_number,issued_on,expires_on,status,verification_status,verified_at,version,document_id&person_id=${personFilter}&limit=500`):[],
+  personIds.length?rest(`background_checks?select=id,person_id,check_type,provider,reference_number,submitted_at,completed_at,expires_on,status,result_classification,version,document_id&person_id=${personFilter}&limit=500`):[],
+  personIds.length?rest(`safesport_records?select=id,person_id,governing_body_id,certification_type,certificate_id,completed_on,expires_on,status,source,verified_at,version,document_id&person_id=${personFilter}&limit=500`):[],
   rest(`waivers?select=id,organization_id,code,name,version,required_for,effective_from,effective_to,status&organization_id=${orgFilter}&limit=500`),
   rest(`memberships?select=id,organization_id,person_id,membership_number,membership_type,starts_on,ends_on,status&organization_id=${orgFilter}&limit=500`),
   rest(`data_quality_issues?select=id,entity_type,entity_id,severity,status,detected_at,resolved_at,details&tenant_id=eq.${tenant}&status=neq.resolved&order=detected_at.desc&limit=200`),
@@ -263,10 +264,15 @@ export async function POST(request:NextRequest){
   if(action==='update-compliance-record'){
    if(!roleHas(ctx,roleName,'record.update')||!roleHas(ctx,roleName,'waivers.read'))return deny(403,'Compliance update denied.');
    const domain=String(body.domain||''),id=String(body.id||''),changes=body.changes&&typeof body.changes==='object'?body.changes:{};if(!id)return deny(400,'Compliance record ID is required.');
-   const specs:Record<string,{table:string,fields:string[]}>={credentials:{table:'credentials',fields:['issuer','credential_number','issued_on','expires_on','status','verification_status','verified_at']},backgroundChecks:{table:'background_checks',fields:['provider','reference_number','submitted_at','completed_at','expires_on','status','result_classification']},safeSport:{table:'safesport_records',fields:['certificate_id','completed_on','expires_on','status','source','verified_at']}};
+   const specs:Record<string,{table:string,fields:string[]}>={credentials:{table:'credentials',fields:['issuer','credential_number','issued_on','expires_on','status','verification_status','verified_at','document_id']},backgroundChecks:{table:'background_checks',fields:['provider','reference_number','submitted_at','completed_at','expires_on','status','result_classification','document_id']},safeSport:{table:'safesport_records',fields:['certificate_id','completed_on','expires_on','status','source','verified_at','document_id']}};
    const spec=specs[domain];if(!spec)return deny(400,'Supported compliance domain is required.');const allowed=Object.fromEntries(Object.entries(changes).filter(([k])=>spec.fields.includes(k)));if(!Object.keys(allowed).length)return deny(400,'No supported compliance changes supplied.');
    const reason=String(body.reason||'').trim();if(reason.length<5)return deny(400,'A decision reason of at least five characters is required.');
    if(!Number.isInteger(body.expectedVersion)||body.expectedVersion<1)return deny(400,'Reload the compliance record before deciding.');
+   if(allowed.document_id){
+    if(!['org_admin','registrar'].includes(roleName)||!/^[0-9a-f-]{36}$/i.test(String(allowed.document_id)))return deny(403,'Supporting document access denied.');
+    const documents=await rest(`documents?select=id,document_types!inner(code)&id=eq.${encodeURIComponent(String(allowed.document_id))}&tenant_id=eq.${tenant}${documentTypeFilter(roleName)}`);
+    if(!documents.length)return deny(403,'Supporting document is outside your evidence authority.');
+   }
    const row=await rest('rpc/admin_compliance_decide',{method:'POST',body:JSON.stringify({p_tenant:tenant,p_orgs:organizationIds(ctx),p_actor_user:ctx.user.id,p_actor_person:ctx.person?.id||null,p_domain:domain,p_id:id,p_version:body.expectedVersion,p_changes:allowed,p_reason:reason})});return NextResponse.json({ok:true,row,correlationId});
   }
   if(action==='create-competition'){

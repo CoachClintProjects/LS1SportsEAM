@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const context = await resolveAccess(request);
   if (!context) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-  if (!context.allowedHubs.includes('admin')) return NextResponse.json({ error: 'Admin access denied.' }, { status: 403 });
+  if (!context.allowedHubs.includes('admin')) return NextResponse.json({ error: context.safetyRestrictions?.length?'Your staff authority requires clearance review. Organization Admin can review the missing evidence or an authorized temporary exception.':'Admin access denied.' }, { status: 403 });
   if (!context.isPlatformSuperUser) return NextResponse.json({ selectionRequired: false, organizations: [], userId: context.user.id });
   const { url } = supabaseServerConfig();
   const headers = serviceHeaders();

@@ -37,7 +37,7 @@ const roles = ['org_admin','team_manager','registrar','competition_manager','tre
  const denied=[];
  await loaded.exports.adminHomeSnapshot(async path=>{denied.push(path);return []},ctx,'treasurer','tenant-id',['organization-id']);
  assert.ok(!denied.some(p=>/^(invoices|customers|work_items|workflow_tasks)\?/.test(p)));
- const schema = [...observed].map(p=>({table:p.split('?')[0],columns:new URLSearchParams(p.split('?')[1]).get('select').split(',')}));
+ const schema = [...observed].filter(p=>p.includes("?")).map(p=>({table:p.split('?')[0],columns:new URLSearchParams(p.split('?')[1]).get('select').split(',')}));
  fs.writeFileSync('/tmp/admin-home-projections.json',JSON.stringify(schema));
  console.log('PASS: Home query isolation across all nine Admin contexts, permission denial, and tenant-bound workflow reads.');
 })().catch(e=>{console.error(e);process.exitCode=1});

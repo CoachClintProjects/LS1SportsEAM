@@ -18,3 +18,15 @@ Pending acceptance with genuine evidence and an authenticated session:
 Not implemented by this change: initial evidence intake, policy-defined 12-month personnel lockout, executive override lifecycle, or full role completion. This controls existing record decisions; it does not certify a person's safety eligibility.
 
 Access blocker: available browser contains only about:blank, no LS1 session. Vercel connector returned 404 for deployment HDSxfACtBppjY5QwW7NVANDjS8Lh despite GitHub's successful Vercel status. Signed-in verification requires the current Preview app URL and a user-authenticated browser session.
+
+## Release candidate additions — 2026-10-03
+
+Application changes are held locally for the coherent Admin release; no application deployment is triggered by this checkpoint. Additive database functions/columns are installed and preserve the deployed API signature.
+
+- Evidence intake for credentials, background checks and SafeSport uses existing scoped people, pending review, a stable request ID, an atomic review work item and audit event. Retries return the same created record only for the same actor and intake values.
+- Documents are associated with the person and role document authority. Activation requires verified, current supporting evidence of the appropriate type. Editing evidence properties returns the source to pending and removes previous verification.
+- Home includes evidence review work and links through the authorized Compliance navigation record into the matching drawer.
+- Lists use database search, allowlisted sorting and 25-row pagination. Drawer history, document review and failure recovery are connected.
+- TypeScript, intake/decision authorization tests and Home role query tests pass. The list RPC executes against the live schema; the intake INSERT shape passes database EXPLAIN without inserting records.
+
+Still pending: signed-in lifecycle acceptance, policy-defined personnel lockout and controlled override, and remaining Admin role scope. This checkpoint does not certify the Admin engine or any full role.

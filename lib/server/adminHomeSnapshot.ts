@@ -52,6 +52,11 @@ export async function adminHomeSnapshot(
     workflowDefinitions,
     governanceTasks,
     budgetTasks,
+    complianceTasks,
+    safetyReviews,
+    journalTasks,
+    periodTasks,
+    payableTasks,
   ] = await Promise.all([
     rest(
       `organizations?select=id,name,code,status&tenant_id=eq.${tenant}&id=${orgFilter}`,
@@ -131,6 +136,36 @@ export async function adminHomeSnapshot(
     finance
       ? rest(
           `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.BUDGET_REVIEW&payload->>organization_id=${orgFilter}&status=eq.open${executive ? "" : `&payload->>assigned_role=eq.${role}`}&limit=500`,
+        )
+      : [],
+    registrar && can(ctx, role, "waivers.read")
+      ? rest(
+          `work_items?select=id,entity_id,entity_type,status,payload&tenant_id=eq.${tenant}&work_type=eq.COMPLIANCE_REVIEW&payload->>organization_id=${orgFilter}&status=eq.open&limit=500`,
+        )
+      : [],
+    executive && can(ctx, role, "record.read")
+      ? Promise.all(
+          orgs.map((org) =>
+            rest("rpc/admin_safety_roster", {
+              method: "POST",
+              body: JSON.stringify({ p_tenant: tenant, p_org: org }),
+            }),
+          ),
+        ).then((rows) => rows.flat())
+      : [],
+    finance
+      ? rest(
+          `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.JOURNAL_REVIEW&status=eq.open&payload->>organization_id=${orgFilter}&order=id.desc&limit=200`,
+        )
+      : [],
+    executive && can(ctx, role, "finance.read")
+      ? rest(
+          `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.PERIOD_CLOSE&status=eq.open&payload->>organization_id=${orgFilter}&order=id.desc&limit=100`,
+        )
+      : [],
+    finance
+      ? rest(
+          `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.VENDOR_BILL_REVIEW&status=eq.open&payload->>organization_id=${orgFilter}${executive ? "" : "&payload->>assigned_role=eq.treasurer"}&order=id.desc&limit=200`,
         )
       : [],
   ]);
@@ -254,6 +289,11 @@ export async function adminHomeSnapshot(
     workflowTasks,
     governanceTasks,
     budgetTasks,
+    complianceTasks,
+    safetyReviews,
+    journalTasks,
+    periodTasks,
+    payableTasks,
     competitionReadiness: [],
     authorization: {
       createTask: can(ctx, role, "admin_tasks.create"),

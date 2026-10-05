@@ -4,6 +4,9 @@ import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import "./admin-home.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+const PersonnelSafety = dynamic(() =>
+  import("./PersonnelSafety").then((m) => m.PersonnelSafety),
+);
 const PersonRecordDrawer = dynamic(() => import("./PersonRecordDrawer"));
 
 import { CalendarDays, Settings } from "lucide-react";
@@ -341,6 +344,36 @@ export function CommandCenter({
         count: governance.length,
         rows: governance,
       });
+    if (data.payableTasks?.length)
+      out.push({
+        key: "payable-review",
+        category: "VENDOR BILLS",
+        title: `${data.payableTasks.length} vendor bills need action`,
+        instruction:
+          "Review a bill, record its approval decision or record the completed payment.",
+        count: data.payableTasks.length,
+        rows: data.payableTasks,
+      });
+    if (data.journalTasks?.length)
+      out.push({
+        key: "journal-review",
+        category: "LEDGER REVIEW",
+        title: `${data.journalTasks.length} draft journals need review`,
+        instruction:
+          "Open a draft, review the accounts and amounts, then post or cancel it.",
+        count: data.journalTasks.length,
+        rows: data.journalTasks,
+      });
+    if (data.periodTasks?.length)
+      out.push({
+        key: "period-close",
+        category: "PERIOD CLOSE",
+        title: `${data.periodTasks.length} fiscal periods await a decision`,
+        instruction:
+          "Review the period and its financial statements before approving closure.",
+        count: data.periodTasks.length,
+        rows: data.periodTasks,
+      });
     if (data.budgetTasks?.length)
       out.push({
         key: "budget-review",
@@ -350,6 +383,29 @@ export function CommandCenter({
           "Open the budget to prepare allocations or record the authorized decision.",
         count: data.budgetTasks.length,
         rows: data.budgetTasks,
+      });
+    if (data.complianceTasks?.length)
+      out.push({
+        key: "compliance-review",
+        category: "COMPLIANCE",
+        title: `${data.complianceTasks.length} evidence records need review`,
+        instruction:
+          "Open the evidence, review its supporting document and record a decision.",
+        count: data.complianceTasks.length,
+        rows: data.complianceTasks,
+      });
+    const blockedStaff = (data.safetyReviews || []).filter(
+      (r: Row) => r.blocked,
+    );
+    if (blockedStaff.length)
+      out.push({
+        key: "personnel-safety",
+        category: "PERSONNEL SAFETY",
+        title: `${blockedStaff.length} personnel role clearances need review`,
+        instruction:
+          "Review missing or expired evidence and record any authorized temporary exception.",
+        count: blockedStaff.length,
+        rows: blockedStaff,
       });
     const byRole: Record<string, string[]> = {
       team_manager: [
@@ -361,10 +417,16 @@ export function CommandCenter({
         "quality",
         "duplicates",
         "compliance-expiry",
+        "compliance-review",
         "registration-review",
       ],
       competition_manager: ["competition-deadlines"],
-      treasurer: ["finance", "budget-review"],
+      treasurer: [
+        "finance",
+        "budget-review",
+        "journal-review",
+        "payable-review",
+      ],
       volunteer_coordinator: ["volunteer-vacancies"],
       communications_media: ["communication-drafts"],
       fundraising_coordinator: ["fundraising-prospects"],
@@ -378,6 +440,61 @@ export function CommandCenter({
             (byRole[role] || []).includes(task.key),
         );
   }, [data, role]);
+  async function openLedger(r: Row, period: boolean, payable = false) {
+    try {
+      const response = await authenticatedFetch(
+          `/api/admin-navigation?role=${encodeURIComponent(role)}`,
+          { cache: "no-store" },
+        ),
+        nav = await response.json();
+      if (!response.ok) throw new Error(nav.error || "Navigation unavailable.");
+      const link = (nav.rows || []).find(
+        (n: Row) => n.component === "FinanceAccounting",
+      );
+      if (!link)
+        throw new Error("Financial workspace is not available for this role.");
+      const q = new URLSearchParams({
+        role,
+        view: link.nav_id,
+        accounting: payable ? "payables" : "ledger",
+      });
+      q.set(payable ? "bill" : period ? "period" : "record", r.entity_id);
+      if (r.payload?.legal_entity_id)
+        q.set("entity", r.payload.legal_entity_id);
+      router.push(`/admin?${q}`);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Cannot open accounting record.",
+      );
+    }
+  }
+  async function openCompliance(record: Row) {
+    setError("");
+    setSaving(true);
+    try {
+      const r = await authenticatedFetch(
+        `/api/admin-navigation?role=${encodeURIComponent(role)}`,
+        { cache: "no-store" },
+      );
+      const j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      const path = j.rows?.find((n: Row) => n.component === "Compliance")?.path;
+      if (!path)
+        throw Error("Compliance workspace is not available in this role.");
+      const target = new URL(path, window.location.origin);
+      target.searchParams.set("role", role);
+      target.searchParams.set("record", record.entity_id);
+      target.searchParams.set("domain", record.entity_type);
+      target.searchParams.set("person", record.payload.person_id);
+      router.push(target.pathname + target.search);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Evidence could not be opened.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
   async function decideApproval(id: string, decision: "approved" | "rejected") {
     setSaving(true);
     setError("");
@@ -1043,7 +1160,58 @@ export function CommandCenter({
                   {error}
                 </p>
               )}
-              {selected.key === "budget-review" ? (
+              {selected.key === "journal-review" ||
+              selected.key === "period-close" ||
+              selected.key === "payable-review" ? (
+                <div className="space-y-3">
+                  {selected.rows.map((r: Row) => (
+                    <article
+                      key={r.id}
+                      className="rounded border border-neutral-600 p-4"
+                    >
+                      <h3 className="font-semibold">{r.payload?.title}</h3>
+                      <button
+                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm"
+                        onClick={() =>
+                          void openLedger(
+                            r,
+                            selected.key === "period-close",
+                            selected.key === "payable-review",
+                          )
+                        }
+                      >
+                        Open{" "}
+                        {selected.key === "period-close"
+                          ? "fiscal period"
+                          : selected.key === "payable-review" ? "vendor bill" : "journal"}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              ) : selected.key === "personnel-safety" ? (
+                <PersonnelSafety onChanged={() => void load()} />
+              ) : selected.key === "compliance-review" ? (
+                <div className="space-y-3">
+                  {selected.rows.map((r: Row) => (
+                    <div
+                      key={r.id}
+                      className="rounded border border-neutral-600 p-4"
+                    >
+                      <h3 className="font-semibold">{r.payload?.title}</h3>
+                      <p className="text-sm text-neutral-400">
+                        {r.payload?.record_status}
+                      </p>
+                      <button
+                        disabled={saving}
+                        onClick={() => void openCompliance(r)}
+                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm font-bold"
+                      >
+                        Review evidence
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : selected.key === "budget-review" ? (
                 <div className="space-y-3">
                   {selected.rows.map((r: Row) => (
                     <div

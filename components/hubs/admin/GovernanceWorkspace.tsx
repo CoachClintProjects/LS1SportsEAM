@@ -4,6 +4,10 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 
+import dynamic from "next/dynamic";
+const PersonnelSafety = dynamic(() =>
+  import("./PersonnelSafety").then((m) => m.PersonnelSafety),
+);
 type Field = {
   key: string;
   label: string;
@@ -147,6 +151,7 @@ export function GovernanceWorkspace({ role = "org_admin" }: { role?: string }) {
           </button>
         )}
       </div>
+      <PersonnelSafety />
       <p className="mt-3 text-sm text-neutral-400">
         Policies, coverage, governing-body renewals and incident decisions.
       </p>

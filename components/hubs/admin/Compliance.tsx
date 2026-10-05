@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
+import {
+  ComplianceEvidenceIntake,
+  type EvidenceDomain,
+} from "./ComplianceEvidenceIntake";
+import { useSearchParams } from "next/navigation";
+import PersonRecordDrawer from "./PersonRecordDrawer";
 type Domain =
   | "dataQualityIssues"
   | "duplicateCandidates"
@@ -10,26 +16,56 @@ type Domain =
   | "waivers"
   | "waiverAcceptances";
 export function Compliance({ role = "org_admin" }: { role?: string }) {
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(0),
+    [sort, setSort] = useState("person"),
+    [direction, setDirection] = useState("asc");
+  const openedRecord = useRef<string | null>(null);
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
-    [domain, setDomain] = useState<Domain>("dataQualityIssues"),
+    [domain, setDomain] = useState<Domain>(() =>
+      ["credentials", "backgroundChecks", "safeSport"].includes(
+        searchParams.get("domain") || "",
+      )
+        ? (searchParams.get("domain") as Domain)
+        : "credentials",
+    ),
     [q, setQ] = useState(""),
     [selected, setSelected] = useState<any>(null),
     [busy, setBusy] = useState(false),
     [reason, setReason] = useState(""),
     [edits, setEdits] = useState<Record<string, string>>({});
+  const [intake, setIntake] = useState<EvidenceDomain | null>(null),
+    [documentPerson, setDocumentPerson] = useState<string | null>(null),
+    [details, setDetails] = useState<any>(null);
   const loadSequence = useRef(0);
   const load = async () => {
     const sequence = ++loadSequence.current;
     try {
+      const evidence = [
+        "credentials",
+        "backgroundChecks",
+        "safeSport",
+      ].includes(domain);
       const r = await authenticatedFetch(
-        `/api/admin-command?role=${encodeURIComponent(role)}`,
+        evidence
+          ? `/api/admin-compliance?${new URLSearchParams({ role, mode: "list", domain, page: String(page), sort, direction, q })}`
+          : `/api/admin-command?role=${encodeURIComponent(role)}`,
         { cache: "no-store" },
       );
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Compliance controls unavailable.");
       if (sequence === loadSequence.current) {
-        setData(j.controls);
+        setData(
+          evidence
+            ? {
+                [domain]: j.rows,
+                total: j.total,
+                hasMore: j.hasMore,
+                authorization: j.authorization,
+              }
+            : j.controls,
+        );
         setError("");
       }
     } catch (e) {
@@ -76,7 +112,9 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
           role,
           domain,
           id: selected.id,
-          changes,
+          changes: Object.fromEntries(
+            Object.entries(changes).map(([k, v]) => [k, v === "" ? null : v]),
+          ),
           reason,
           expectedVersion: selected.version,
         }),
@@ -92,17 +130,91 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
     }
   };
   useEffect(() => {
-    setData(null);
     setSelected(null);
-    void load();
+    const timer = setTimeout(() => void load(), q ? 200 : 0);
     return () => {
+      clearTimeout(timer);
       loadSequence.current++;
     };
-  }, [role]);
+  }, [role, domain, page, sort, direction, q]);
+  useEffect(() => {
+    let current = true;
+    setDetails(null);
+    if (
+      selected &&
+      ["credentials", "backgroundChecks", "safeSport"].includes(domain)
+    ) {
+      void authenticatedFetch(
+        `/api/admin-compliance?role=${encodeURIComponent(role)}&personId=${selected.person_id}&domain=${domain}&id=${selected.id}`,
+        { cache: "no-store" },
+      )
+        .then(async (r) => {
+          const j = await r.json();
+          if (!r.ok) throw Error(j.error);
+          if (current) setDetails(j);
+        })
+        .catch((e) => {
+          if (current) setError(e.message);
+        });
+    }
+    return () => {
+      current = false;
+    };
+  }, [selected, role, domain, documentPerson]);
+  useEffect(() => {
+    const id = searchParams.get("record"),
+      kind = searchParams.get("domain"),
+      person = searchParams.get("person");
+    if (
+      !data ||
+      !id ||
+      openedRecord.current === id ||
+      !kind ||
+      !["credentials", "backgroundChecks", "safeSport"].includes(kind)
+    )
+      return;
+    if (domain !== kind) {
+      setDomain(kind as Domain);
+      return;
+    }
+    const row = data[kind]?.find((r: any) => r.id === id);
+    openedRecord.current = id;
+    const open = (r: any) => {
+      setSelected(r);
+      setReason("");
+      setEdits({});
+    };
+    if (row) {
+      open(row);
+      return;
+    }
+    if (!person) {
+      setError("Evidence person is missing from this link.");
+      return;
+    }
+    let current = true;
+    void authenticatedFetch(
+      `/api/admin-compliance?${new URLSearchParams({ role, domain: kind, id, personId: person })}`,
+      { cache: "no-store" },
+    )
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw Error(j.error);
+        if (current) open(j.record);
+      })
+      .catch((e) => {
+        if (current) setError(e.message);
+      });
+    return () => {
+      current = false;
+    };
+  }, [data, searchParams, domain, role]);
   const rows = useMemo(
     () =>
-      (data?.[domain] || []).filter((r: any) =>
-        JSON.stringify(r).toLowerCase().includes(q.toLowerCase()),
+      (data?.[domain] || []).filter(
+        (r: any) =>
+          ["credentials", "backgroundChecks", "safeSport"].includes(domain) ||
+          JSON.stringify(r).toLowerCase().includes(q.toLowerCase()),
       ),
     [data, domain, q],
   );
@@ -123,6 +235,26 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
         {role.replaceAll("_", " ")} · Compliance
       </div>
       <h1 className="mt-1 text-3xl font-black">Compliance control queue</h1>
+      {["org_admin", "registrar"].includes(role) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(
+            ["credentials", "backgroundChecks", "safeSport"] as EvidenceDomain[]
+          ).map((d) => (
+            <button
+              key={d}
+              onClick={() => setIntake(d)}
+              className="rounded bg-[#FA4616] px-3 py-2 text-sm font-bold text-black"
+            >
+              Add{" "}
+              {d === "credentials"
+                ? "credential"
+                : d === "backgroundChecks"
+                  ? "background check"
+                  : "SafeSport certificate"}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="mt-2 text-sm text-neutral-400">
         Live controls and exceptions from the authorized organization scope.
         Compliance is a function, not a role.
@@ -131,14 +263,18 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
         {tabs.map(([k, n]) => (
           <button
             key={k}
-            onClick={() => setDomain(k)}
+            onClick={() => {
+              setDomain(k);
+              setPage(0);
+              setQ("");
+            }}
             className={
               domain === k
                 ? "rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
                 : "rounded-lg border border-neutral-700 px-3 py-2 text-xs"
             }
           >
-            {n} · {(data[k] || []).length}
+            {n}
           </button>
         ))}
       </div>
@@ -154,11 +290,36 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
         <div className="border-b border-neutral-800 p-4">
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(0);
+            }}
             placeholder="Filter live control records"
             className="w-full max-w-sm rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm"
           />
         </div>
+        {["credentials", "backgroundChecks", "safeSport"].includes(domain) && (
+          <div className="flex gap-4 border-b border-neutral-700 px-4 py-2 text-sm">
+            {[
+              ["person", "Person"],
+              ["status", "Status"],
+              ["expires_on", "Expiry"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setPage(0);
+                  setSort(key);
+                  setDirection(
+                    sort === key && direction === "asc" ? "desc" : "asc",
+                  );
+                }}
+              >
+                {label} {sort === key ? (direction === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="divide-y divide-neutral-800">
           {rows.map((r: any) => (
             <button
@@ -173,6 +334,9 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
             >
               <span>
                 <b>
+                  {r.person_label && (
+                    <span className="mb-1 block">{r.person_label}</span>
+                  )}
                   {r.name ||
                     r.credential_type ||
                     r.check_type ||
@@ -198,6 +362,29 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
         {!rows.length && (
           <div className="p-8 text-sm text-neutral-500">
             No canonical records exist for this control domain.
+          </div>
+        )}
+        {["credentials", "backgroundChecks", "safeSport"].includes(domain) && (
+          <div className="flex items-center justify-between border-t border-neutral-700 p-4 text-sm">
+            <span>
+              Page {page + 1} · {data.total ?? 0} records
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(page - 1)}
+                className="rounded border border-neutral-600 px-3 py-1 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                disabled={!data.hasMore}
+                onClick={() => setPage(page + 1)}
+                className="rounded border border-neutral-600 px-3 py-1 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -234,6 +421,38 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
                 </button>
               )}
             </div>
+            {details && (
+              <section className="mt-5 rounded border border-neutral-700 p-3">
+                <h3 className="font-bold">
+                  {details.person?.preferred_name || details.person?.first_name}{" "}
+                  {details.person?.last_name}
+                </h3>
+                <button
+                  disabled={busy}
+                  onClick={() => setDocumentPerson(selected.person_id)}
+                  className="mt-2 rounded bg-blue-600 px-3 py-2 text-sm font-bold"
+                >
+                  Upload or review documents
+                </button>
+                <label className="mt-3 block text-sm">
+                  Supporting document
+                  <select
+                    value={edits.document_id ?? selected.document_id ?? ""}
+                    onChange={(e) =>
+                      setEdits({ ...edits, document_id: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded border border-neutral-600 bg-black p-2"
+                  >
+                    <option value="">Select supporting evidence</option>
+                    {details.documents.map((d: any) => (
+                      <option key={d.id} value={d.id}>
+                        {d.title} · {d.verification_status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </section>
+            )}
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {Object.entries(selected).map(([k, v]) => (
                 <div key={k} className="border-b border-neutral-800 pb-2">
@@ -376,8 +595,50 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
                 </div>
               </div>
             )}
+            {details && (
+              <section className="mt-6 border-t border-neutral-700 pt-4">
+                <h3 className="font-bold">Decision history</h3>
+                {details.history.map((h: any) => (
+                  <div
+                    key={h.id}
+                    className="mt-3 border-b border-neutral-800 pb-2 text-sm"
+                  >
+                    <b>{h.action.replaceAll("_", " ")}</b>
+                    <p>{h.reason}</p>
+                    <time className="text-xs text-neutral-400">
+                      {new Date(h.occurred_at).toLocaleString()}
+                    </time>
+                  </div>
+                ))}
+                {!details.history.length && (
+                  <p className="text-sm text-neutral-400">
+                    No recorded decisions.
+                  </p>
+                )}
+              </section>
+            )}
           </aside>
         </div>
+      )}
+      {intake && (
+        <ComplianceEvidenceIntake
+          role={role}
+          domain={intake}
+          onClose={() => setIntake(null)}
+          onSaved={() => {
+            setDomain(intake);
+            setIntake(null);
+            void load();
+          }}
+        />
+      )}
+      {documentPerson && (
+        <PersonRecordDrawer
+          personId={documentPerson}
+          role={role}
+          initialTab="Documents"
+          onClose={() => setDocumentPerson(null)}
+        />
       )}
     </main>
   );
