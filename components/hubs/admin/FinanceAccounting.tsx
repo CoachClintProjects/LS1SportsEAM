@@ -102,7 +102,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       </>
     );
   if (!data)
-    return <State text={error || "Loading canonical finance records…"} />;
+    return <State text={error || "Loading club financial records…"} />;
   return (
     <main className="p-5 text-white lg:p-7">
       <header className="border-b border-neutral-800 pb-5">
@@ -110,9 +110,9 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
           {role === "treasurer" ? "Treasurer" : "Organization Administrator"} ·
           Finance
         </div>
-        <h1 className="mt-1 text-3xl font-black">Financial control</h1>
+        <h1 className="mt-1 text-3xl font-black">Fees and spending</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Canonical receivables and payables. No simulated balances or trends.
+          Manage fees owed to the club, supplier bills and payments.
         </p>
       </header>
       {error && (
@@ -120,6 +120,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
           {error}
         </div>
       )}
+      {!data.invoices?.length && !data.vendorBills?.length && <p className="mt-5 rounded-lg border border-blue-800 bg-blue-950/30 p-4 text-sm text-blue-100">No financial records yet. Start with Finance setup, then enter the club’s invoices and supplier bills. Figures shown are recorded balances, not an assessment of the club’s finances.</p>}
       <section className="mt-5 flex flex-wrap gap-2">
         <button
           onClick={() => setSetup(true)}
@@ -145,16 +146,16 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
               : "rounded-lg border border-neutral-700 px-4 py-2 text-xs"
           }
         >
-          Accounts receivable · {money(data.metrics?.arBalance, currency)}
+          Fees owed to the club · {data.invoices.length ? money(data.metrics?.arBalance, currency) : "No records"}
         </button>
         <button
           onClick={() => setTab("payables")}
           className="rounded-lg border border-neutral-700 px-4 py-2 text-xs"
         >
-          Accounts payable · {money(data.metrics?.apBalance, currency)}
+          Supplier bills · {data.vendorBills.length ? money(data.metrics?.apBalance, currency) : "No records"}
         </button>
         <span className="px-3 py-2 text-xs text-neutral-500">
-          {data.metrics?.pastDue || 0} past-due receivables
+          {data.metrics?.pastDue || 0} overdue invoices
         </span>
       </section>
       <section className="mt-4 overflow-hidden rounded-2xl border border-neutral-800 bg-[#090b0b]">
@@ -162,7 +163,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter canonical records"
+            placeholder="Search financial records"
             className="w-full max-w-sm rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm"
           />
         </div>
@@ -233,7 +234,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
         </div>
         {!rows.length && (
           <div className="p-8 text-sm text-neutral-500">
-            No canonical {tab} records exist in the authorized scope.
+            No {tab} records yet. Use the actions above to add your club’s records.
           </div>
         )}
       </section>
@@ -339,7 +340,7 @@ function Drawer({
           Close
         </button>
         <div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">
-          Canonical financial record
+          Financial record
         </div>
         <h2 className="mt-2 text-2xl font-black">
           {row.invoice_number || row.bill_number || row.id}
@@ -377,7 +378,7 @@ function Drawer({
               </div>
             ))}
             <div className="mt-3 text-xs text-neutral-500">
-              {allocations.length} canonical allocation record
+              {allocations.length} payment allocation record
               {allocations.length === 1 ? "" : "s"}
             </div>
           </section>
@@ -582,8 +583,7 @@ function FinanceSetup({
         </button>
         <h2 className="text-xl font-black">Finance setup</h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Create canonical prerequisites. Currency and country are explicit
-          configuration, never inferred.
+          Enter the club’s billing details, country and currency to begin.
         </p>
         {!ctx?.legalEntities?.length && (
           <section className="mt-5 border-t border-neutral-800 pt-4">
@@ -812,7 +812,7 @@ export function FinanceAccounting({ role = "org_admin" }: { role?: string }) {
 function State({ text }: { text: string }) {
   return (
     <div className="p-8 text-white">
-      <h1 className="text-2xl font-black">Financial control</h1>
+      <h1 className="text-2xl font-black">Fees and spending</h1>
       <p className="mt-2 text-neutral-500">{text}</p>
     </div>
   );

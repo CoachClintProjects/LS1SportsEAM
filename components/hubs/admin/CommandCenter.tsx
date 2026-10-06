@@ -52,6 +52,20 @@ export function CommandCenter({
   const [recordPersonId, setRecordPersonId] = useState<string | null>(null);
   const [competitionData, setCompetitionData] = useState<any>(null),
     [openingCompetition, setOpeningCompetition] = useState(false);
+  const [taskDueOn, setTaskDueOn] = useState("");
+  const [taskRole, setTaskRole] = useState(role);
+  const [taskRoles, setTaskRoles] = useState<{id: string; label: string}[]>([]);
+  useEffect(() => {
+    if (!newTask || role !== "org_admin") return;
+    let cancelled = false;
+    authenticatedFetch("/api/admin-role-contexts", {cache: "no-store"})
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Unable to load staff roles.");
+        if (!cancelled) setTaskRoles(result.options || []);
+      }).catch(error => { if (!cancelled) setError(error.message); });
+    return () => { cancelled = true; };
+  }, [newTask, role]);
   const requestVersion = useRef(0);
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -171,7 +185,7 @@ export function CommandCenter({
         category: "COMPETITION",
         title: `${deadlines.length} competition deadline${deadlines.length === 1 ? "" : "s"} overdue or due within 30 days`,
         instruction:
-          "Open the competition deadline records and complete the required operational action before the canonical due date.",
+          "Open the competition deadline records and complete the required operational action before its deadline.",
         count: deadlines.length,
         rows: deadlines,
       });
@@ -211,7 +225,7 @@ export function CommandCenter({
         category: "RISK / DATA INTEGRITY",
         title: `${dq.length} person records require data correction`,
         instruction:
-          "Open the affected people, enter the missing canonical information, and save each corrected record. Resolved source conditions will clear from this queue after reconciliation.",
+          "Open each person, add the missing information and save. Completed corrections leave this list when it refreshes.",
         count: dq.length,
         rows: dq,
       });
@@ -221,7 +235,7 @@ export function CommandCenter({
         category: "WORKFORCE / RECORD INTEGRITY",
         title: `${dupes.length} potential duplicate people require review`,
         instruction:
-          "Open the duplicate review queue and compare the linked person records before resolving the canonical identity.",
+          "Open the duplicate review queue and compare the linked person records before choosing which record to keep.",
         count: dupes.length,
         rows: dupes,
       });
@@ -237,7 +251,7 @@ export function CommandCenter({
         category: "APPROVALS",
         title: `${approvals.length} approval${approvals.length === 1 ? "" : "s"} require a decision`,
         instruction:
-          "Review the canonical approval request and record the authorized decision.",
+          "Review the request and record your decision.",
         count: approvals.length,
         rows: approvals,
       });
@@ -246,7 +260,7 @@ export function CommandCenter({
         key: "workflow",
         category: "WORKFLOW",
         title: `${workflow.length} workflow task${workflow.length === 1 ? "" : "s"} require execution`,
-        instruction: "Complete the assigned canonical workflow task.",
+        instruction: "Complete the assigned task.",
         count: workflow.length,
         rows: workflow,
       });
@@ -256,15 +270,15 @@ export function CommandCenter({
         category: "FINANCIAL MANAGEMENT",
         title: `${overdue.length} past-due invoice${overdue.length === 1 ? "" : "s"} require action`,
         instruction:
-          "Open the receivable records, verify the balance and due date, then execute the appropriate financial lifecycle action.",
+          "Open overdue invoices to review what is owed and record any payments.",
         count: overdue.length,
         rows: overdue,
       });
     work.forEach((r: Row) =>
       out.push({
         key: `work-${r.id}`,
-        category: "ASSIGNED WORK ITEM",
-        title: r.payload?.title || "Organization work item",
+        category: r.payload?.due_on && r.payload.due_on < new Date().toLocaleDateString("en-CA") ? "OVERDUE TASK" : "ASSIGNED TASK",
+        title: r.payload?.title || "Club task",
         instruction:
           r.payload?.description ||
           "Open and complete the assigned organization action.",
@@ -338,7 +352,7 @@ export function CommandCenter({
       out.push({
         key: "governance",
         category: "GOVERNANCE & RISK",
-        title: `${governance.length} governance records need attention`,
+        title: `${governance.length} club policy, insurance or incident records need attention`,
         instruction:
           "Review the source record and complete its authorized decision or follow-up.",
         count: governance.length,
@@ -440,6 +454,19 @@ export function CommandCenter({
             (byRole[role] || []).includes(task.key),
         );
   }, [data, role]);
+  async function openWorkspace(component: string) {
+    setError("");
+    try {
+      const response = await authenticatedFetch(`/api/admin-navigation?role=${encodeURIComponent(role)}`, { cache: "no-store" });
+      const nav = await response.json();
+      if (!response.ok) throw new Error(nav.error || "Unable to load club menus.");
+      const link = (nav.rows || []).find((row: Row) => row.component === component);
+      if (!link) throw new Error("This workspace is not enabled for your account. Please contact your club administrator.");
+      router.push(`/admin?${new URLSearchParams({ role, view: link.nav_id })}`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to open workspace.");
+    }
+  }
   async function openLedger(r: Row, period: boolean, payable = false) {
     try {
       const response = await authenticatedFetch(
@@ -572,6 +599,8 @@ export function CommandCenter({
           action: "create-task",
           title,
           description: taskDescription.trim() || null,
+          assignedRole: role === "org_admin" ? taskRole : role,
+          dueOn: taskDueOn || null,
           role,
         }),
       });
@@ -579,6 +608,7 @@ export function CommandCenter({
       if (!r.ok) throw new Error(j.error);
       setTaskTitle("");
       setTaskDescription("");
+      setTaskDueOn("");
       setNewTask(false);
       setTaskTab("open");
       await load();
@@ -657,7 +687,7 @@ export function CommandCenter({
       setSaving(false);
     }
   }
-  if (!data) return <State text={error || "Loading organization work…"} />;
+  if (!data) return <State text={error || "Loading your club tasks…"} />;
   const org =
     data.orgAdmin?.organizations?.[0] || data.controls?.organizations?.[0];
   return (
@@ -718,6 +748,21 @@ export function CommandCenter({
           {error}
         </div>
       )}
+      {role === "org_admin" && (
+        <section aria-label="Manage your club" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["OrganizationArchitecture", "Staff and club settings", "Manage people, roles and access."],
+            ["GovernanceWorkspace", "Policies, insurance and incidents", "Assign follow-up, add documents and record decisions."],
+            ["BudgetWorkspace", "Budgets", "Prepare and review the club’s spending plan."],
+            ["FinanceAccounting", "Fees and spending", "Review bills, payments and spending approvals."],
+          ].map(([component, title, description]) => (
+            <button key={component} onClick={() => void openWorkspace(component)} className="rounded-xl border border-neutral-700 bg-[#15191c] p-4 text-left hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-blue-400">
+              <span className="block text-sm font-semibold text-blue-300">{title} →</span>
+              <span className="mt-2 block text-sm text-neutral-300">{description}</span>
+            </button>
+          ))}
+        </section>
+      )}
       {newTask && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4"
@@ -753,6 +798,17 @@ export function CommandCenter({
                 className="mt-1 block w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-white"
               />
             </label>
+            <label className="mt-4 block text-sm text-neutral-300">
+              Due date (optional)
+              <input type="date" value={taskDueOn} onChange={event => setTaskDueOn(event.target.value)} className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white" />
+            </label>
+            {role === "org_admin" && <label className="mt-4 block text-sm text-neutral-300">
+              Responsible role
+              <select value={taskRole} onChange={event => setTaskRole(event.target.value)} className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white">
+                {!taskRoles.length && <option value="org_admin">Organization Administrator</option>}
+                {taskRoles.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+            </label>}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 onClick={() => setNewTask(false)}
@@ -860,6 +916,7 @@ export function CommandCenter({
                       {task.category}
                     </span>
                     <strong className="mt-1 block text-sm">{task.title}</strong>
+                    {task.key.startsWith("work-") && <span className="mt-1 block text-xs text-neutral-300">{String(task.rows[0]?.payload?.assigned_role || role).replaceAll("_", " ")}{task.rows[0]?.payload?.due_on ? ` · Due ${task.rows[0].payload.due_on}` : " · No due date"}</span>}
                   </span>
                   <span className="shrink-0 text-xs text-[#145b91]">
                     Review →
@@ -880,7 +937,7 @@ export function CommandCenter({
                   key={r.id}
                   className="border-b border-[#e5e8ec] px-4 py-3 text-sm last:border-0"
                 >
-                  {r.payload?.title || "Organization work item"}
+                  {r.payload?.title || "Club task"}
                 </div>
               ))
           ) : (
@@ -1254,7 +1311,7 @@ export function CommandCenter({
                           setGovernanceId(r.entity_id);
                         }}
                       >
-                        Open governance record
+                        Open club record
                       </button>
                     </div>
                   ))}
@@ -1307,7 +1364,7 @@ export function CommandCenter({
                             </div>
                             <div className="mt-1 text-sm text-neutral-500">
                               {r.details?.message ||
-                                "Canonical person data requires review."}
+                                "This person’s details need review."}
                             </div>
                             <div className="mt-1 text-xs text-neutral-700">
                               {p?.email || ""}
@@ -1397,6 +1454,7 @@ export function CommandCenter({
                   <p className="mt-2 text-sm text-neutral-400">
                     {selected.instruction}
                   </p>
+                  <p className="mt-3 text-sm text-neutral-300">Responsible role: {String(selected.rows[0]?.payload?.assigned_role || role).replaceAll("_", " ")} · Due: {selected.rows[0]?.payload?.due_on || "No due date"}</p>
                   {data.authorization?.updateTask && (
                     <button
                       disabled={saving}
@@ -1420,7 +1478,7 @@ export function CommandCenter({
                           r.counterparty_name ||
                           r.invoice_number ||
                           r.entity_type ||
-                          "Canonical record"}
+                          "Club record"}
                       </div>
                       <div className="mt-1 text-sm text-neutral-500">
                         {r.match_reason || r.status || ""}

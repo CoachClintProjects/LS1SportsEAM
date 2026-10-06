@@ -112,7 +112,7 @@ export function GovernanceWorkspace({ role = "org_admin" }: { role?: string }) {
     } catch (e) {
       if (version === seq.current)
         setError(
-          e instanceof Error ? e.message : "Could not load governance records.",
+          e instanceof Error ? e.message : "Could not load club records.",
         );
     } finally {
       if (version === seq.current) setLoading(false);
@@ -140,7 +140,7 @@ export function GovernanceWorkspace({ role = "org_admin" }: { role?: string }) {
           <p className="text-xs text-orange-400">
             {data?.organization.name} · Organization Administrator
           </p>
-          <h1 className="mt-1 text-2xl font-bold">Governance & risk</h1>
+          <h1 className="mt-1 text-2xl font-bold">Policies, insurance and incidents</h1>
         </div>
         {data?.authorization.create && (
           <button
@@ -164,7 +164,7 @@ export function GovernanceWorkspace({ role = "org_admin" }: { role?: string }) {
         </p>
       )}
       <nav
-        aria-label="Governance categories"
+        aria-label="Club record categories"
         className="my-5 flex flex-wrap gap-2"
       >
         {data?.types.map((t) => (
@@ -967,12 +967,12 @@ export function GovernanceRecordDrawer({
         <aside
           role="dialog"
           aria-modal="true"
-          aria-label="Governance record"
+          aria-label="Club record"
           className="ml-auto h-full w-full max-w-xl bg-[#242529] p-6 text-white"
         >
           <button onClick={onClose}>Close</button>
           <p role={error ? "alert" : "status"} className="mt-6">
-            {error || "Loading governance record…"}
+            {error || "Loading club record…"}
           </p>
         </aside>
       </div>,

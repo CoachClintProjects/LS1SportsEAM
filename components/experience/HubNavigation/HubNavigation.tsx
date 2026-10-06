@@ -225,7 +225,7 @@ export function HubNavigation() {
           : 'Select option';
 
   return (
-    <nav className={`${sidebarFont.className} flex h-full w-full flex-col bg-[#080909] text-white`}>
+    <nav style={sidebarFont.style} className={`${sidebarFont.className} flex h-full w-full flex-col bg-[#080909] text-white`}>
       <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
         <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">
           {currentHub.codeLane}
@@ -290,7 +290,7 @@ export function HubNavigation() {
                         }),
                       )
                     }
-                    className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[12px] transition-colors ${
+                    className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[14px] font-normal leading-5 transition-colors ${
                       activeItem === item.id
                         ? 'bg-[#FA4616]/10 text-[#FA4616]'
                         : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
