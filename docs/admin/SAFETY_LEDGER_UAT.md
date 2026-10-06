@@ -47,3 +47,21 @@ The former payables list incorrectly opened the receivable invoice drawer and it
 The transactional write locks the bill, rejects stale edits, recomputes totals, rejects duplicate vendor bill numbers, rejects overpayments, reuses a payment UUID on retries, and updates bill balance, AP payment, audit and Home work together. No bills or payments were inserted during implementation. `admin-payables-boundary.cjs` controlled permission/scope/pagination tests pass. Signed-in acceptance remains NOT RUN.
 
 Additional runtime cases: enter a real authorized bill; reload; edit/save; submit as Treasurer; approve as Org Admin; record an actual payment reference; refresh both roles and verify balance/history/work. Deny overpayment, wrong vendor organization, stale edits, payment before approval, cancellation after payment and mismatched payment retries. Verify exact retry creates one payment only. These cases are specified, not claimed executed.
+
+
+## 2026-10-06 release evidence and spending authority continuation
+
+The prior batch deployed successfully to Preview as GitHub commit `f8c38f6e9af0a7edb0fc84d4ea8b3c3614a5779b`; Vercel status is success at https://vercel.com/pieify/ls1sportseam/Gc62tHrYW4upyW2tq8TF9tNtaJTU. This confirms deployment only. On 2026-10-06 the verification browser reached Vercel's sign-in wall before LS1, so application acceptance is NOT RUN.
+
+New, not-yet-deployed spending authority work adds an Org Admin policy drawer per legal entity, exact monetary input, version checks, retry recognition and decision history. A bill snapshots authority on submission: at or above the configured threshold requires Org Admin; below permits Treasurer or Org Admin. An absent policy and a zero threshold require Org Admin. Existing submissions retain their authorization; return-to-draft and resubmit uses the current policy. The actual policy remains unconfigured until the authorized administrator chooses a value. No sample spending limits or financial data are inserted.
+
+Technical evidence: type check and controlled API role/scope/input tests pass. Database migration applied with RLS enabled and routine execution denied to anon/authenticated; service_role alone has execution. Signed-in acceptance remains NOT RUN. Acceptance must exercise actual authorized below/equal/above-threshold bills, exact retry, stale-policy rejection, forbidden Treasurer policy update, unchanged existing submission after policy edit, resubmission under revised policy, and both role Home task links.
+
+
+## Payables-to-ledger continuation (2026-10-06, not yet deployed)
+
+The bill drawer now maps bill lines to expense/asset accounts, tax to a selected asset/expense account and the total to a liability control account. Approved bills post through the canonical accrual ledger with an open period. Recording payment debits that liability and credits the selected bank/cash asset, in the same transaction as the AP balance, audit and work item. No funds are transferred. Posted bill cancellation and payment reversal create reversal journals and correct AP together; deferred database constraints reject disconnected reversals and payments. Posted bills cannot return to editable draft. Original entries and payment history remain intact.
+
+A reconciliation drawer compares current posted bill balances with GL control balances, identifies unposted bills/unlinked payments, exposes variance and exports CSV. It includes all posted dates and is not a bank-statement reconciliation. Tax classification remains the authorized operator's accounting decision; no tax entitlement is invented.
+
+Technical checks: TypeScript and focused API checks pass. Database migrations apply successfully; scoped execution and deferred guards inspected. No business transactions created for testing. Signed-in workflow acceptance is NOT RUN. Required acceptance: actual authorized bill with valid accounts and open period; below/equal/above threshold approval; post -> payment -> reload -> ledger report/control reconciliation; cancellation; payment reversal; exact retry; stale save; closed period; wrong organization/account/currency; direct linked-journal reversal denial; downstream Home task state; read after re-login. Until those run, these changes are implemented/unverified, not operationally certified.

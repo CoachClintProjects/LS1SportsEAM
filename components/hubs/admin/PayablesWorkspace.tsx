@@ -1,8 +1,11 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import { AdminDrawerShell } from "./AdminDrawerShell";
+import PayableReconciliationDrawer from "./PayableReconciliationDrawer";
+import PayableLedgerActions from "./PayableLedgerActions";
+import PayableAuthorityDrawer from "./PayableAuthorityDrawer";
 type Bill = {
   id: string;
   legal_entity_id: string;
@@ -16,9 +19,15 @@ type Bill = {
   balance_due: string;
   status: string;
   version: number;
+  approval_required_role: string;
+  approval_policy_version: number | null;
+  approved_at: string | null;
+  journal_id: string | null;
   vendors: { name: string };
 };
 type Line = {
+  line_no?: number;
+  account_id?: string;
   description: string;
   quantity: string;
   unit_price: string;
@@ -28,6 +37,13 @@ type Data = {
   entities: { id: string; legal_name: string; base_currency: string }[];
   vendors: { id: string; name: string; status: string }[];
   methods: { id: string; code: string; name: string }[];
+  ledgers: { id: string; name: string; currency: string }[];
+  accounts: {
+    id: string;
+    account_code: string;
+    account_name: string;
+    account_type: string;
+  }[];
   rows: Bill[];
   hasMore: boolean;
   bill: Bill | null;
@@ -38,6 +54,8 @@ type Data = {
     amount: string;
     reference: string;
     method: string;
+    status: string;
+    journal_id: string | null;
   }[];
   history: {
     id: string;
@@ -79,6 +97,8 @@ export default function PayablesWorkspace({
     [data, setData] = useState<Data | null>(null),
     [selected, setSelected] = useState<string | null>(params.get("bill")),
     [creating, setCreating] = useState(false),
+    [authorityOpen, setAuthorityOpen] = useState(false),
+    [reconciliationOpen, setReconciliationOpen] = useState(false),
     [error, setError] = useState(""),
     [page, setPage] = useState(0),
     [sort, setSort] = useState("bill_date"),
@@ -114,6 +134,8 @@ export default function PayablesWorkspace({
   useEffect(() => {
     void load();
     return () => {
+      // Invalidate outstanding requests after navigation or unmount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       seq.current++;
     };
   }, [load]);
@@ -150,6 +172,31 @@ export default function PayablesWorkspace({
           </button>
         )}
       </header>
+      <button
+        className={`${button} mt-4 bg-blue-700`}
+        onClick={() => setAuthorityOpen(true)}
+      >
+        Spending authority
+      </button>
+      <button
+        className={`${button} mt-4 ml-3 bg-blue-700`}
+        onClick={() => setReconciliationOpen(true)}
+      >
+        Reconcile payable ledger
+      </button>
+      {reconciliationOpen && (
+        <PayableReconciliationDrawer
+          role={role}
+          entities={data.entities}
+          onClose={() => setReconciliationOpen(false)}
+        />
+      )}
+      {authorityOpen && (
+        <PayableAuthorityDrawer
+          role={role}
+          onClose={() => setAuthorityOpen(false)}
+        />
+      )}
       {error && (
         <p role="alert" className="mt-4 text-red-300">
           {error}
@@ -278,7 +325,7 @@ export default function PayablesWorkspace({
       </div>
       {(creating || (selected && data.bill?.id === selected)) && (
         <BillDrawer
-          key={creating ? "new" : selected}
+          key={creating ? "new" : `${selected}:${data.bill?.version}`}
           role={role}
           data={data}
           creating={creating}
@@ -309,6 +356,16 @@ function BillDrawer({
   onClose: () => void;
   onSaved: (id: string) => Promise<void>;
 }) {
+  const router = useRouter(),
+    currentParams = useSearchParams();
+  const openJournal = (journalId: string) => {
+    const q = new URLSearchParams(currentParams.toString());
+    q.set("accounting", "ledger");
+    q.set("record", journalId);
+    q.set("entity", data.bill!.legal_entity_id);
+    q.delete("bill");
+    router.push(`?${q.toString()}`);
+  };
   const b = creating ? null : data.bill!,
     [id] = useState(() => crypto.randomUUID()),
     [values, setValues] = useState({
@@ -333,30 +390,14 @@ function BillDrawer({
     [busy, setBusy] = useState(false),
     [payment, setPayment] = useState({
       payment_id: crypto.randomUUID(),
+      journal_id: crypto.randomUUID(),
+      journal_number: "",
+      cash_account_id: "",
       amount: "",
       method: "",
       reference: "",
       payment_date: "",
     });
-  useEffect(() => {
-    if (b) {
-      setValues({
-        legal_entity_id: b.legal_entity_id,
-        vendor_id: b.vendor_id,
-        bill_number: b.bill_number,
-        bill_date: b.bill_date,
-        due_date: b.due_date,
-        tax_total: String(b.tax_total),
-      });
-      setLines(
-        data.lines.map((l) => ({
-          ...l,
-          quantity: String(l.quantity),
-          unit_price: String(l.unit_price),
-        })),
-      );
-    }
-  }, [b?.version]);
   const edit =
     (creating || b?.status === "draft") &&
     (creating ? data.authorization.create : data.authorization.edit);
@@ -379,7 +420,7 @@ function BillDrawer({
           unit_price: String(l.unit_price),
         })),
       );
-  const act = async (operation: string) => {
+  const act = async (operation: string, extra?: Record<string, unknown>) => {
     setBusy(true);
     setError("");
     try {
@@ -388,7 +429,8 @@ function BillDrawer({
         id: b?.id || id,
         operation,
         expectedVersion: b?.version || 0,
-        values: operation === "payment" ? payment : { ...values, lines },
+        values:
+          extra || (operation === "payment" ? payment : { ...values, lines }),
         reason,
       });
       await onSaved(j.row.id);
@@ -396,6 +438,9 @@ function BillDrawer({
       if (operation === "payment")
         setPayment({
           payment_id: crypto.randomUUID(),
+          journal_id: crypto.randomUUID(),
+          journal_number: "",
+          cash_account_id: "",
           amount: "",
           method: "",
           reference: "",
@@ -423,6 +468,21 @@ function BillDrawer({
         {creating ? "Draft" : b!.status}
         {b ? ` · ${b.currency} ${b.balance_due} outstanding` : ""}
       </p>
+      {b && b.status !== "draft" && (
+        <p className="mb-4 text-sm text-amber-200">
+          Required approval:{" "}
+          {b.approval_required_role === "treasurer"
+            ? "Treasurer or Organization Admin"
+            : "Organization Admin"}{" "}
+          ·{" "}
+          {b.approval_policy_version
+            ? `Policy version ${b.approval_policy_version}`
+            : "Executive approval default"}
+          {b.approved_at
+            ? ` · Approved ${new Date(b.approved_at).toLocaleString()}`
+            : ""}
+        </p>
+      )}
       <fieldset disabled={!edit || busy} className="grid gap-4 sm:grid-cols-2">
         <label>
           Legal entity
@@ -597,27 +657,29 @@ function BillDrawer({
                 Approve bill
               </button>
             )}
-            {(b?.status === "submitted" ||
-              (b?.status === "approved" && data.authorization.approve)) && (
-              <button
-                className={`${button} bg-blue-700`}
-                disabled={disabled}
-                onClick={() => void act("return")}
-              >
-                Return to draft
-              </button>
-            )}
-            {(b?.status === "draft" ||
-              b?.status === "submitted" ||
-              (b?.status === "approved" && data.authorization.approve)) && (
-              <button
-                className={`${button} bg-red-800`}
-                disabled={disabled}
-                onClick={() => void act("cancel")}
-              >
-                Cancel bill
-              </button>
-            )}
+            {!b?.journal_id &&
+              (b?.status === "submitted" ||
+                (b?.status === "approved" && data.authorization.approve)) && (
+                <button
+                  className={`${button} bg-blue-700`}
+                  disabled={disabled}
+                  onClick={() => void act("return")}
+                >
+                  Return to draft
+                </button>
+              )}
+            {!b?.journal_id &&
+              (b?.status === "draft" ||
+                b?.status === "submitted" ||
+                (b?.status === "approved" && data.authorization.approve)) && (
+                <button
+                  className={`${button} bg-red-800`}
+                  disabled={disabled}
+                  onClick={() => void act("cancel")}
+                >
+                  Cancel bill
+                </button>
+              )}
           </>
         )}
       </div>
@@ -626,7 +688,43 @@ function BillDrawer({
           Save changes before submitting.
         </p>
       )}
+      {b?.journal_id && (
+        <button
+          className={`${button} mt-4 bg-blue-700`}
+          onClick={() => openJournal(b.journal_id!)}
+        >
+          Open bill journal
+        </button>
+      )}
+      {b && (
+        <PayableLedgerActions
+          key={`${b.id}:${b.version}`}
+          bill={b}
+          lines={data.lines}
+          accounts={data.accounts}
+          ledgers={data.ledgers}
+          payments={data.payments}
+          busy={busy}
+          canAct={!disabled}
+          canDecide={data.authorization.decide}
+          canApprove={data.authorization.approve}
+          onAction={act}
+        />
+      )}
       {b &&
+        data.payments
+          .filter((p) => p.journal_id)
+          .map((p) => (
+            <button
+              key={p.id}
+              className={`${button} mt-3 mr-3 bg-blue-700`}
+              onClick={() => openJournal(p.journal_id!)}
+            >
+              Payment journal · {p.reference} · {p.status}
+            </button>
+          ))}
+      {b &&
+        b.journal_id &&
         ["approved", "partially_paid"].includes(b.status) &&
         data.authorization.decide && (
           <section className="mt-6 border-t border-neutral-600 pt-4">
@@ -640,6 +738,7 @@ function BillDrawer({
                 ["amount", "Amount", "text"],
                 ["payment_date", "Payment date", "date"],
                 ["reference", "Bank or cheque reference", "text"],
+                ["journal_number", "Payment journal number", "text"],
               ].map(([key, label, type]) => (
                 <label key={key} className="text-sm">
                   {label}
@@ -653,6 +752,25 @@ function BillDrawer({
                   />
                 </label>
               ))}
+              <label className="text-sm">
+                Bank or cash ledger account
+                <select
+                  className={input}
+                  value={payment.cash_account_id}
+                  onChange={(e) =>
+                    setPayment({ ...payment, cash_account_id: e.target.value })
+                  }
+                >
+                  <option value="">Select asset account</option>
+                  {data.accounts
+                    .filter((a) => a.account_type.toLowerCase() === "asset")
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.account_code} · {a.account_name}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <label className="text-sm">
                 Payment method
                 <select
@@ -676,6 +794,8 @@ function BillDrawer({
               disabled={
                 disabled ||
                 !payment.amount ||
+                !payment.cash_account_id ||
+                !payment.journal_number ||
                 !payment.reference ||
                 !payment.method ||
                 !payment.payment_date

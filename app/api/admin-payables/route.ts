@@ -43,6 +43,21 @@ export async function GET(request: NextRequest) {
         .replace(/[%_*(),.]/g, " ")
         .trim()
         .slice(0, 120);
+    if (q.get("mode") === "reconciliation") {
+      const entity = q.get("entity");
+      if (!entity || !ids.includes(entity))
+        throw new PersonRecordError(404, "Legal entity outside organization.");
+      return NextResponse.json(
+        await rest("rpc/admin_payable_reconciliation", {
+          method: "POST",
+          body: JSON.stringify({
+            p_tenant: tenant,
+            p_org: org,
+            p_entity: entity,
+          }),
+        }),
+      );
+    }
     const rows = ids.length
       ? await rest(
           `vendor_bills?select=*,vendors(name)&legal_entity_id=in.(${ids.join(",")})${search ? `&bill_number=ilike.*${encodeURIComponent(search)}*` : ""}&order=${sort}.${direction},id.asc&limit=26&offset=${page * 25}`,
@@ -51,7 +66,9 @@ export async function GET(request: NextRequest) {
     let bill = null,
       lines = [],
       payments = [],
-      history = [];
+      history = [],
+      ledgers = [],
+      accounts = [];
     const id = q.get("id");
     if (id) {
       if (!uuid.test(id) || !ids.length)
@@ -60,7 +77,7 @@ export async function GET(request: NextRequest) {
         `vendor_bills?select=*,vendors(name)&id=eq.${id}&legal_entity_id=in.(${ids.join(",")})`,
       );
       if (!bill) throw new PersonRecordError(404, "Bill outside organization.");
-      [lines, payments, history] = await Promise.all([
+      [lines, payments, history, ledgers, accounts] = await Promise.all([
         rest(
           `vendor_bill_lines?select=*&vendor_bill_id=eq.${id}&order=line_no.asc`,
         ),
@@ -69,6 +86,12 @@ export async function GET(request: NextRequest) {
         ),
         rest(
           `audit_events?select=id,action,reason,occurred_at&tenant_id=eq.${tenant}&entity_type=eq.vendor_bill&entity_id=eq.${id}&order=occurred_at.desc&limit=100`,
+        ),
+        rest(
+          `accounting_ledgers?select=id,name,currency,accounting_basis&legal_entity_id=eq.${bill.legal_entity_id}&accounting_basis=eq.accrual`,
+        ),
+        rest(
+          `chart_of_accounts?select=id,account_code,account_name,account_type&legal_entity_id=eq.${bill.legal_entity_id}&active=eq.true&order=account_code.asc`,
         ),
       ]);
     }
@@ -82,6 +105,8 @@ export async function GET(request: NextRequest) {
       lines,
       payments,
       history,
+      ledgers,
+      accounts,
       authorization: {
         create:
           can(ctx, role, "record.create") && can(ctx, role, "record.update"),
@@ -89,7 +114,8 @@ export async function GET(request: NextRequest) {
         decide:
           can(ctx, role, "workflow.execute") && can(ctx, role, "record.update"),
         approve:
-          role === "org_admin" &&
+          (role === "org_admin" ||
+            bill?.approval_required_role === "treasurer") &&
           can(ctx, role, "workflow.execute") &&
           can(ctx, role, "record.update"),
       },
@@ -112,6 +138,8 @@ export async function POST(request: NextRequest) {
         "return",
         "cancel",
         "payment",
+        "post_ledger",
+        "reverse_payment",
       ].includes(b.operation) ||
       !uuid.test(b.id || "") ||
       !Number.isInteger(b.expectedVersion) ||
@@ -128,23 +156,29 @@ export async function POST(request: NextRequest) {
       !can(ctx, role, "workflow.execute")
     )
       throw new PersonRecordError(403, "Bill decision denied.");
-    if (b.operation === "approve" && role !== "org_admin")
-      throw new PersonRecordError(403, "Organization Admin approval required.");
-    const row = await rest("rpc/admin_vendor_bill_write", {
-      method: "POST",
-      body: JSON.stringify({
-        p_tenant: tenant,
-        p_org: org,
-        p_actor_user: ctx.user.id,
-        p_actor_person: ctx.person?.id || null,
-        p_role: role,
-        p_id: b.id,
-        p_operation: b.operation,
-        p_expected_version: b.expectedVersion,
-        p_values: b.values || {},
-        p_reason: String(b.reason).trim(),
-      }),
-    });
+    // The transaction enforces the authority snapshotted on this bill.
+    const row = await rest(
+      ["post_ledger", "payment", "reverse_payment", "cancel"].includes(
+        b.operation,
+      )
+        ? "rpc/admin_payable_ledger_write"
+        : "rpc/admin_vendor_bill_write",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          p_tenant: tenant,
+          p_org: org,
+          p_actor_user: ctx.user.id,
+          p_actor_person: ctx.person?.id || null,
+          p_role: role,
+          p_id: b.id,
+          p_operation: b.operation,
+          p_expected_version: b.expectedVersion,
+          p_values: b.values || {},
+          p_reason: String(b.reason).trim(),
+        }),
+      },
+    );
     return NextResponse.json({ row });
   } catch (e) {
     return fail(e);

@@ -237,6 +237,31 @@ export async function POST(request: NextRequest) {
       !can(ctx, role, "workflow.execute")
     )
       throw new PersonRecordError(403, "Journal decision authority denied.");
+    if (b.operation === "reverse") {
+      const entities = await rest(
+        `legal_entities?select=id&organization_id=eq.${org}`,
+      );
+      const ids = entities.map((e: { id: string }) => e.id);
+      const [journal] = ids.length
+        ? await rest(
+            `gl_journals?select=id,source,reversal_of&legal_entity_id=in.(${ids.join(",")})&id=eq.${b.id}`,
+          )
+        : [];
+      if (!journal)
+        throw new PersonRecordError(404, "Journal outside organization.");
+      let source = journal.source;
+      if (journal.reversal_of) {
+        const [original] = await rest(
+          `gl_journals?select=source&id=eq.${journal.reversal_of}&legal_entity_id=in.(${ids.join(",")})`,
+        );
+        source = original?.source;
+      }
+      if (["vendor_bill", "vendor_payment"].includes(source))
+        throw new PersonRecordError(
+          409,
+          "Reverse this transaction from its vendor bill so the payable balance and ledger stay reconciled.",
+        );
+    }
     return NextResponse.json({
       row: await rpc("admin_ledger_write", {
         ...common,

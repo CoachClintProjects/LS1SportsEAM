@@ -2,7 +2,7 @@ alter table public.vendor_bills add column if not exists version integer not nul
 -- All Admin AP changes run as one scoped transaction, including history and work.
 create or replace function public.admin_vendor_bill_write(p_tenant uuid,p_org uuid,p_actor_user uuid,p_actor_person uuid,p_role text,p_id uuid,p_operation text,p_expected_version integer,p_values jsonb,p_reason text)
 returns jsonb language plpgsql security invoker set search_path=public as $$
-declare prior vendor_bills; saved vendor_bills; entity uuid; vendor uuid; line jsonb; line_number integer:=0; subtotal_value numeric:=0; line_value numeric; tax numeric; total_value numeric; currency_code text; payment ap_payments; amount_value numeric; task uuid;
+declare prior vendor_bills; saved vendor_bills; entity uuid; vendor uuid; line jsonb; line_number integer:=0; subtotal_value numeric:=0; line_value numeric; tax numeric; total_value numeric; currency_code text; payment ap_payments; amount_value numeric; task uuid; policy payable_authority_policies; required_role text;
 begin
  if p_actor_user is null or p_role is null or p_role not in ('org_admin','treasurer') or p_id is null or length(trim(coalesce(p_reason,'')))<5 or p_operation is null or p_operation not in ('create','edit','submit','approve','return','cancel','payment') then raise exception 'Authorized actor, supported action and reason required';end if;
  perform pg_advisory_xact_lock(hashtextextended('vendor-bill:'||p_id,0));
@@ -24,6 +24,8 @@ begin
   end if;
  end if;
  if p_operation<>'create' and prior.version is distinct from p_expected_version then raise exception 'Vendor bill changed. Reload before continuing.';end if;
+ if prior.journal_id is not null and p_operation in ('edit','return') then raise exception 'Posted bills cannot return to draft; cancel with a ledger reversal';end if;
+ if prior.journal_id is not null and p_operation='cancel' and not exists(select 1 from gl_journals where reversal_of=prior.journal_id and status='posted') then raise exception 'Cancel posted bills through their ledger reversal';end if;
  if p_operation in ('create','edit') then
   if p_operation='edit' and prior.status<>'draft' then raise exception 'Return the bill to draft before editing';end if;
   vendor:=(p_values->>'vendor_id')::uuid;
@@ -49,7 +51,7 @@ begin
    insert into vendor_bill_lines(vendor_bill_id,line_no,description,quantity,unit_price,line_total) values(p_id,line_number,trim(line->>'description'),(line->>'quantity')::numeric,(line->>'unit_price')::numeric,round((line->>'quantity')::numeric*(line->>'unit_price')::numeric,2));
   end loop;
  elsif p_operation='payment' then
-  if prior.status not in ('approved','partially_paid') then raise exception 'Executive approval is required before recording payment';end if;
+  if prior.status not in ('approved','partially_paid') then raise exception 'Bill approval is required before recording payment';end if;
   amount_value:=(p_values->>'amount')::numeric;
   if amount_value is null or amount_value<=0 or amount_value>prior.balance_due or amount_value='NaN'::numeric or round(amount_value,2)<>amount_value or (p_values->>'payment_date')::date is null or (p_values->>'payment_date')::date>current_date or nullif(trim(p_values->>'reference'),'') is null then raise exception 'Payment amount, actual payment date and bank or cheque reference required';end if;
   if not exists(select 1 from payment_methods where tenant_id=p_tenant and organization_id=p_org and code=p_values->>'method' and status='active') then raise exception 'Select an active payment method';end if;
@@ -57,20 +59,24 @@ begin
   update vendor_bills set balance_due=balance_due-amount_value,status=case when balance_due=amount_value then 'paid' else 'partially_paid' end,version=version+1 where id=p_id;
  else
   if p_operation='approve' then
-   if p_role<>'org_admin' or prior.status<>'submitted' then raise exception 'Organization Admin approves submitted bills';end if;
+   if prior.status<>'submitted' or (p_role<>'org_admin' and prior.approval_required_role<>'treasurer') then raise exception 'The designated authority must approve the submitted bill';end if;
   elsif p_operation='submit' then
    if prior.status<>'draft' or prior.total<=0 or not exists(select 1 from vendor_bill_lines where vendor_bill_id=p_id) then raise exception 'Only complete draft bills can be submitted';end if;
+   perform pg_advisory_xact_lock(hashtextextended('payable-policy:'||entity,0));
+   select * into policy from payable_authority_policies where legal_entity_id=entity;
+   required_role:=case when policy.legal_entity_id is null or prior.total>=policy.executive_threshold then 'org_admin' else 'treasurer' end;
+   update vendor_bills set approval_required_role=required_role,approval_policy_version=policy.version where id=p_id;
   elsif p_operation='return' then
-   if prior.status not in ('submitted','approved') or (prior.status='approved' and p_role<>'org_admin') then raise exception 'This bill cannot be returned to draft';end if;
+   if prior.status not in ('submitted','approved') or (prior.status='approved' and p_role<>'org_admin' and prior.approval_required_role<>'treasurer') then raise exception 'This bill cannot be returned to draft';end if;
   elsif p_operation='cancel' then
-   if prior.status not in ('draft','submitted','approved') or (prior.status='approved' and p_role<>'org_admin') or exists(select 1 from ap_payments where vendor_bill_id=p_id and status='posted') then raise exception 'Only unpaid bills can be cancelled by the authorized role';end if;
+   if prior.status not in ('draft','submitted','approved') or (prior.status='approved' and p_role<>'org_admin' and prior.approval_required_role<>'treasurer') or exists(select 1 from ap_payments where vendor_bill_id=p_id and status='posted') then raise exception 'Only unpaid bills can be cancelled by the authorized role';end if;
   end if;
-  update vendor_bills set status=case p_operation when 'approve' then 'approved' when 'submit' then 'submitted' when 'return' then 'draft' else 'cancelled' end,version=version+1 where id=p_id;
+  update vendor_bills set status=case p_operation when 'approve' then 'approved' when 'submit' then 'submitted' when 'return' then 'draft' else 'cancelled' end,approved_by=case when p_operation='approve' then p_actor_user else null end,approved_at=case when p_operation='approve' then now() else null end,version=version+1 where id=p_id;
  end if;
  select * into saved from vendor_bills where id=p_id;
  select id into task from work_items where tenant_id=p_tenant and entity_type='vendor_bill' and entity_id=p_id and work_type='VENDOR_BILL_REVIEW' limit 1;
  if task is null then insert into work_items(tenant_id,work_type,entity_type,entity_id,status) values(p_tenant,'VENDOR_BILL_REVIEW','vendor_bill',p_id,'open') returning id into task;end if;
- update work_items set status=case when saved.status in ('paid','cancelled') then 'completed' else 'open' end,payload=jsonb_build_object('title',saved.bill_number,'organization_id',p_org,'legal_entity_id',entity,'assigned_role',case when saved.status='submitted' then 'org_admin' else 'treasurer' end,'bill_status',saved.status,'due_on',saved.due_date) where id=task;
+ update work_items set status=case when saved.status in ('paid','cancelled') then 'completed' else 'open' end,payload=jsonb_build_object('title',saved.bill_number,'organization_id',p_org,'legal_entity_id',entity,'assigned_role',case when saved.status='submitted' then saved.approval_required_role else 'treasurer' end,'bill_status',saved.status,'due_on',saved.due_date) where id=task;
  insert into audit_events(tenant_id,actor_user_id,actor_person_id,action,entity_type,entity_id,before_data,after_data,correlation_id,reason) values(p_tenant,p_actor_user,p_actor_person,'vendor_bill.'||p_operation,'vendor_bill',p_id,to_jsonb(prior),jsonb_build_object('bill',to_jsonb(saved),'payment',to_jsonb(payment),'request',p_values),gen_random_uuid(),trim(p_reason));
  return to_jsonb(saved);
 end $$;
