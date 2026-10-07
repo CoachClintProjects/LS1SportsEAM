@@ -1,0 +1,210 @@
+.ls1-triage {
+  background: #0a0c10 !important;
+  color: #fff !important;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 24px 0;
+  font-family: var(--font-lexend), "Lexend Deca", sans-serif;
+  font-size: 14px;
+  color-scheme: dark;
+}
+.ls1-triage h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff !important;
+}
+.ls1-triage h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 16px 0 12px;
+  color: #fff !important;
+}
+.ls1-triage p {
+  margin: 8px 0;
+  color: #c9d1d9 !important;
+}
+.ls1-triage small,
+.ls1-triage dt {
+  color: #9faeba !important;
+}
+.ls1-triage button {
+  background: #161b22 !important;
+  color: #fff !important;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.ls1-triage button:hover {
+  border-color: #7e9bb5;
+}
+.ls1-triage button:focus-visible,
+.ls1-triage input:focus-visible,
+.ls1-triage select:focus-visible,
+.ls1-triage textarea:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.ls1-triage button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ls1-triage .triage-primary {
+  background: #b84a0b !important;
+  border-color: #e16c26;
+  color: #fff !important;
+  font-weight: 700;
+}
+.triage-toolbar,
+.triage-actions,
+.triage-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.triage-filters {
+  justify-content: flex-start;
+  margin: 20px 0;
+}
+.ls1-triage label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.ls1-triage input:not([type="checkbox"]),
+.ls1-triage select,
+.ls1-triage textarea {
+  background: #161b22 !important;
+  color: #fff !important;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 9px;
+  max-width: 100%;
+  min-height: 38px;
+}
+.ls1-triage textarea {
+  min-height: 110px;
+  width: 100%;
+}
+.ls1-triage input[type="checkbox"] {
+  accent-color: #e16c26;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.triage-table {
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.triage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #30363d;
+  padding: 10px;
+}
+.triage-row:last-child {
+  border-bottom: 0;
+}
+.ls1-triage .triage-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 6px;
+  border: 0;
+  background: transparent !important;
+}
+.triage-signal {
+  font-size: 11px;
+  font-weight: 700;
+}
+.ls1-triage .triage-critical {
+  color: #ff8c86 !important;
+}
+.ls1-triage .triage-attention {
+  color: #f2cc60 !important;
+}
+.ls1-triage .triage-good {
+  color: #7ee787 !important;
+}
+.ls1-triage .triage-error {
+  background: #381317 !important;
+  border: 1px solid #f85149;
+  padding: 12px;
+  color: #ffb8b3 !important;
+}
+.triage-empty {
+  padding: 20px;
+}
+.triage-columns {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 24px;
+}
+.triage-columns > section {
+  min-width: 0;
+}
+.triage-columns dd {
+  margin: 3px 0 16px;
+  overflow-wrap: anywhere;
+}
+.triage-columns pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  background: #161b22;
+  padding: 12px;
+  border-radius: 5px;
+}
+.triage-activity {
+  border-top: 1px solid #30363d;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.triage-activity time {
+  font-size: 11px;
+  color: #9faeba;
+}
+.ls1-triage.triage-drawer {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent !important;
+}
+.triage-drawer {
+  animation: triage-slide 0.2s ease-out;
+}
+@keyframes triage-slide {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .triage-drawer {
+    animation: none;
+  }
+}
+@media (max-width: 850px) {
+  .triage-columns {
+    grid-template-columns: 1fr;
+  }
+  .triage-row {
+    gap: 5px;
+  }
+  .triage-row > button:last-child {
+    display: none;
+  }
+}

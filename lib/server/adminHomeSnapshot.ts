@@ -233,11 +233,7 @@ export async function adminHomeSnapshot(
             `safesport_records?select=id,person_id,certification_type,expires_on,status&person_id=${ids(personIds)}&order=expires_on.asc&limit=500`,
           )
         : [],
-      instances.length
-        ? rest(
-            `workflow_tasks?select=id,task_code,status,due_at,assigned_to&workflow_instance_id=${ids(instances.map((i: Row) => i.id))}&status=not.in.(completed,cancelled)&or=(assigned_to.eq.${ctx.person?.id || "00000000-0000-0000-0000-000000000000"},assigned_to.is.null)&order=due_at.asc&limit=200`,
-          )
-        : [],
+      [], // Workflow tasks use the scoped triage endpoint.
     ]);
   const names = new Map(compliancePeople.map((p: Row) => [p.id, p]));
   const athleteById = new Map(athletes.map((a: Row) => [a.id, a]));

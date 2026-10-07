@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import "./admin-home.css";
 import dynamic from "next/dynamic";
+import TriageTaskHub from "../superuser/TriageTaskHub";
 import { useRouter } from "next/navigation";
 const PersonnelSafety = dynamic(() =>
   import("./PersonnelSafety").then((m) => m.PersonnelSafety),
@@ -23,7 +24,10 @@ type Task = {
   count: number;
   rows: Row[];
 };
-export function CommandCenter({
+export function CommandCenter(props: { role?: string; roleLabel?: string }) {
+  return <><TriageTaskHub key={props.role || "org_admin"} role={props.role} /><ClubFollowUp {...props} /></>;
+}
+function ClubFollowUp({
   role = "org_admin",
   roleLabel,
 }: {
@@ -241,9 +245,6 @@ export function CommandCenter({
       });
     const approvals = (data.approvals || []).filter(
         (r: Row) => !r.status || r.status === "pending",
-      ),
-      workflow = (data.workflowTasks || []).filter(
-        (r: Row) => !["completed", "cancelled"].includes(r.status),
       );
     if (approvals.length)
       out.push({
@@ -254,15 +255,6 @@ export function CommandCenter({
           "Review the request and record your decision.",
         count: approvals.length,
         rows: approvals,
-      });
-    if (workflow.length)
-      out.push({
-        key: "workflow",
-        category: "WORKFLOW",
-        title: `${workflow.length} workflow task${workflow.length === 1 ? "" : "s"} require execution`,
-        instruction: "Complete the assigned task.",
-        count: workflow.length,
-        rows: workflow,
       });
     if (overdue.length)
       out.push({
@@ -541,25 +533,6 @@ export function CommandCenter({
       setSaving(false);
     }
   }
-  async function completeWorkflowTask(id: string) {
-    setSaving(true);
-    setError("");
-    try {
-      const r = await authenticatedFetch("/api/admin-command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "complete-workflow-task", id, role }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error);
-      setSelected(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Workflow task failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
   async function updateBirthDate(personId: string) {
     const birth_date = birthDates[personId];
     if (!birth_date) return;
@@ -687,7 +660,7 @@ export function CommandCenter({
       setSaving(false);
     }
   }
-  if (!data) return <State text={error || "Loading your club tasks…"} />;
+  if (!data) return <State text={error || "Loading club follow-up…"} />;
   const org =
     data.orgAdmin?.organizations?.[0] || data.controls?.organizations?.[0];
   return (
@@ -866,7 +839,7 @@ export function CommandCenter({
       <section className="mt-8">
         <div className="mb-2 flex items-center justify-between border-b border-[#d8dde4] pb-2">
           <h2 className="text-sm font-bold">
-            Today’s tasks · {roleLabel || role.replaceAll("_", " ")}
+            Club follow-up · {roleLabel || role.replaceAll("_", " ")}
           </h2>
           {data.authorization?.createTask && (
             <button
@@ -1427,24 +1400,6 @@ export function CommandCenter({
                           Approve
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key === "workflow" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded-xl border border-neutral-800 p-4"
-                    >
-                      <div className="font-bold">{r.task_code}</div>
-                      <button
-                        disabled={saving}
-                        onClick={() => completeWorkflowTask(r.id)}
-                        className="mt-3 rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-                      >
-                        Complete workflow task
-                      </button>
                     </div>
                   ))}
                 </div>
