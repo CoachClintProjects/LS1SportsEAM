@@ -63,7 +63,7 @@ export function AdminDrawerShell({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="ml-auto h-full w-full max-w-5xl overflow-y-auto border-l border-neutral-600 bg-[#242529] p-6 text-white"
+        className="ml-auto h-full w-full max-w-5xl overflow-y-auto border-l border-[#30363D] bg-[#0A0C10] p-6 text-white"
       >
         <header className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-2xl font-bold">{title}</h2>

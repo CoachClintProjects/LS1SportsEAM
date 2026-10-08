@@ -1,5 +1,6 @@
 'use client';
 
+import NotificationDrawer from "./NotificationDrawer";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
@@ -48,6 +49,7 @@ export function GlobalHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { activeHubId, currentHub, setActiveHub } = useHub();
+  const [notificationsOpen,setNotificationsOpen]=useState(false);
   const [hubMenuOpen, setHubMenuOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,7 +175,7 @@ export function GlobalHeader() {
         </div>
 
         <div className="flex shrink-0 items-center justify-end">
-          <HeaderIconButton label="Notifications" onClick={() => goSuperUser('alerts')}><Bell className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
+          <HeaderIconButton label="Notifications" onClick={() => setNotificationsOpen(true)}><Bell className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
           <HeaderIconButton label="What's New" onClick={() => goSuperUser('product')}><Sparkles className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
           <HeaderIconButton label="Upload" onClick={() => goSuperUser('imports')}><Upload className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
           <HeaderIconButton label="Help" onClick={() => goSuperUser('knowledge')}><CircleHelp className="h-[18px] w-[18px]" strokeWidth={1.8} /></HeaderIconButton>
@@ -212,6 +214,7 @@ export function GlobalHeader() {
           </button>
         </div>
       </div>
-    </header>
+    {notificationsOpen && <NotificationDrawer onClose={()=>setNotificationsOpen(false)} />}
+      </header>
   );
 }

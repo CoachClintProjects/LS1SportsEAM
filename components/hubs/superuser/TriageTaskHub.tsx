@@ -9,6 +9,10 @@ import {
   type TriageTask,
 } from "@/lib/triage/types";
 import "./triage.css";
+import CashboxAuthorizationDrawer from "@/components/hubs/admin/CashboxAuthorizationDrawer";
+import TriageResolutionPanel from "@/components/hubs/admin/TriageResolutionPanel";
+import PersonRecordDrawer from "@/components/hubs/admin/PersonRecordDrawer";
+import { TaskBillDrawer } from "@/components/hubs/admin/PayablesWorkspace";
 import { Lexend_Deca } from "next/font/google";
 const triageFont = Lexend_Deca({
   subsets: ["latin"],
@@ -67,6 +71,12 @@ export default function TriageTaskHub({
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(1);
+  const [cashbox, setCashbox] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [linked, setLinked] = useState<{
+    kind: "person" | "bill";
+    id: string;
+  } | null>(null);
   const [selected, setSelected] = useState<TriageTask | null>(null),
     [history, setHistory] = useState<History[]>([]),
     [detailLoading, setDetailLoading] = useState(false),
@@ -114,22 +124,38 @@ export default function TriageTaskHub({
   );
   const load = useCallback(async () => {
     const current = ++version.current;
-    const r = await authenticatedFetch(`/api/admin-triage?${params()}`, {
-        cache: "no-store",
-      }),
-      j = await r.json();
-    if (current !== version.current || !mounted.current) return;
-    if (!r.ok) throw new Error(j.error || "Unable to load tasks.");
-    if (j.total > 0 && page > Math.ceil(j.total / 25)) {
-      setPage(Math.ceil(j.total / 25));
-      return;
+    try {
+      if (role !== "team_manager" || team) {
+        const sync = await authenticatedFetch("/api/admin-triage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role, team: team || null, action: "sync" }),
+        });
+        if (!sync.ok) {
+          const failure = await sync.json();
+          throw new Error(failure.error || "Unable to refresh source records.");
+        }
+      }
+      const r = await authenticatedFetch(`/api/admin-triage?${params()}`, {
+          cache: "no-store",
+        }),
+        j = await r.json();
+      if (current !== version.current || !mounted.current) return;
+      if (!r.ok) throw new Error(j.error || "Unable to load tasks.");
+      if (j.total > 0 && page > Math.ceil(j.total / 25)) {
+        setPage(Math.ceil(j.total / 25));
+        return;
+      }
+      setFeed(j);
+      setError("");
+    } catch (failure) {
+      if (current === version.current && mounted.current) throw failure;
     }
-    setFeed(j);
-    setError("");
-  }, [params, page]);
+  }, [params, page, role, team]);
   useEffect(() => {
     setFeed(null);
     setSelected(null);
+    setLinked(null);
     detailVersion.current++;
     void load().catch((e) => {
       if (mounted.current) setError(e.message);
@@ -237,6 +263,8 @@ export default function TriageTaskHub({
   };
   const canResolve =
     selected?.canUpdate &&
+    !selected.generated &&
+    !["fee_voucher", "cashbox"].includes(selected.resolutionKind || "") &&
     (selected.source !== "competition_exceptions" ||
       ["org_admin", "competition_manager"].includes(role));
   return (
@@ -245,12 +273,18 @@ export default function TriageTaskHub({
       style={{ fontFamily: triageFont.style.fontFamily }}
       aria-label="Today's tasks"
     >
+      {notice && <p role="status">{notice}</p>}
       <header className="triage-toolbar">
         <div>
           <h2>Today’s Tasks</h2>
           <p>{roleName(role)} · Live club records</p>
         </div>
         <div className="triage-actions">
+          {["org_admin", "competition_manager"].includes(role) && (
+            <button disabled={busy} onClick={() => setCashbox(true)}>
+              Authorize cash box
+            </button>
+          )}
           <button
             onClick={() => void load().catch((e) => setError(e.message))}
             disabled={busy}
@@ -350,11 +384,9 @@ export default function TriageTaskHub({
                 >
                   <input
                     type="checkbox"
-                    aria-label={`Review ${task.title}`}
-                    checked={
-                      selected?.id === task.id &&
-                      selected?.source === task.source
-                    }
+                    aria-label={`${closedTask(task.status) ? "Review completed task" : "Resolve task"}: ${task.title}`}
+                    title="Open the task to record its resolution. The checkmark reflects its saved status."
+                    checked={closedTask(task.status)}
                     onChange={() => void open(task)}
                   />
                   <button
@@ -412,7 +444,7 @@ export default function TriageTaskHub({
           </footer>
         </>
       )}
-      {(selected || creating) && (
+      {(selected || creating) && !linked && (
         <AdminDrawerShell
           title={creating ? "Add a club task" : selected!.title}
           busy={busy}
@@ -587,6 +619,23 @@ export default function TriageTaskHub({
                         {selected.recommendedAction && (
                           <p>{selected.recommendedAction}</p>
                         )}
+                        <TriageResolutionPanel
+                          key={selected.id}
+                          onBusy={(value) => {
+                            setBusy(value);
+                            saving.current = value;
+                          }}
+                          onNotice={setNotice}
+                          task={selected}
+                          role={role}
+                          team={team}
+                          onPerson={(id) => setLinked({ kind: "person", id })}
+                          onBill={(id) => setLinked({ kind: "bill", id })}
+                          onSaved={async () => {
+                            await load();
+                            await open(selected);
+                          }}
+                        />
                         {selected.source === "competition_exceptions" && (
                           <p>
                             Confirm resolution only after the underlying
@@ -641,7 +690,12 @@ export default function TriageTaskHub({
                           <p>
                             {closedTask(selected.status)
                               ? "This task is closed."
-                              : "Your role can review this task. An authorized role must record its resolution."}
+                              : selected.generated ||
+                                  ["fee_voucher", "cashbox"].includes(
+                                    selected.resolutionKind || "",
+                                  )
+                                ? "This task follows its source record. Use the controls above; the queue refreshes after changes."
+                                : "Your role can review this task. An authorized role must record its resolution."}
                           </p>
                         )}
                         <h3>Recent activity</h3>
@@ -669,17 +723,7 @@ export default function TriageTaskHub({
                             reference: {selected.entityId}
                           </p>
                         )}
-                        {selected.evidence ? (
-                          <pre>
-                            {typeof selected.evidence === "string"
-                              ? selected.evidence
-                              : JSON.stringify(selected.evidence, null, 2)}
-                          </pre>
-                        ) : (
-                          <p>
-                            No supporting evidence is attached to this task.
-                          </p>
-                        )}
+                        <TaskEvidence evidence={selected.evidence} />
                       </section>
                     </div>
                   )}
@@ -689,6 +733,126 @@ export default function TriageTaskHub({
           </div>
         </AdminDrawerShell>
       )}
+      {linked?.kind === "person" && (
+        <PersonRecordDrawer
+          personId={linked.id}
+          role={role}
+          initialTab="Documents"
+          onClose={() => {
+            setLinked(null);
+            void load()
+              .then(() => selected && open(selected))
+              .catch((e) => setError(e.message));
+          }}
+          onSaved={() => void load().catch((e) => setError(e.message))}
+        />
+      )}
+      {linked?.kind === "bill" && (
+        <TaskBillDrawer
+          id={linked.id}
+          role={role}
+          onClose={() => {
+            setLinked(null);
+            void load()
+              .then(() => selected && open(selected))
+              .catch((e) => setError(e.message));
+          }}
+          onSaved={load}
+        />
+      )}
+      {cashbox && (
+        <CashboxAuthorizationDrawer
+          role={role}
+          onClose={() => setCashbox(false)}
+          onSaved={async () => {
+            setNotice("Cash-box authorization sent to Treasurer.");
+            await load();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+function TaskEvidence({ evidence }: { evidence: unknown }) {
+  if (!evidence) return <p>No supporting evidence is attached to this task.</p>;
+  if (typeof evidence !== "object") return <p>{String(evidence)}</p>;
+  const data = evidence as Record<string, unknown>;
+  const allocations = Array.isArray(data.allocations)
+    ? (data.allocations as Record<string, unknown>[])
+    : null;
+  const lines = Array.isArray(data.lines)
+    ? (data.lines as Record<string, unknown>[])
+    : null;
+  return (
+    <>
+      {allocations && (
+        <table className="w-full text-left text-sm">
+          <caption>Authorized official payouts</caption>
+          <thead>
+            <tr>
+              <th>Official</th>
+              <th>Role</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allocations.map((a, i) => (
+              <tr key={String(a.assignment_id || i)}>
+                <td>{String(a.official || "Assigned official")}</td>
+                <td>{String(a.role || "").replaceAll("_", " ")}</td>
+                <td>
+                  {String(a.amount)} {String(data.currency || "")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {lines && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption>Entry fees reviewed for this squad</caption>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Quantity</th>
+                <th>Unit fee</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, i) => (
+                <tr key={String(line.fee_id || i)}>
+                  <td>{String(line.event || "Entry fee")}</td>
+                  <td>{String(line.quantity)}</td>
+                  <td>{String(line.unit_amount)}</td>
+                  <td>
+                    {String(line.total_amount)} {String(data.currency || "")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <dl>
+        {Object.entries(data)
+          .filter(
+            ([key, value]) =>
+              key !== "lines" &&
+              !key.endsWith("_id") &&
+              typeof value !== "object",
+          )
+          .map(([key, value]) => (
+            <div key={key}>
+              <dt>{key.replaceAll("_", " ")}</dt>
+              <dd>{String(value ?? "Not recorded")}</dd>
+            </div>
+          ))}
+      </dl>
+      {Array.isArray(evidence) &&
+        evidence.map((row, i) => <TaskEvidence key={i} evidence={row} />)}
+    </>
   );
 }

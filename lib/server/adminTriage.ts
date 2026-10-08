@@ -151,7 +151,8 @@ export function mapTriageTask(
       readable(row.description) ||
       readable(row.problem) ||
       readable(metadata.problem),
-    exceptionCode: readable(row.exception_code) || null,
+    exceptionCode:
+      readable(row.exception_code) || readable(metadata.exception_code) || null,
     recommendedAction:
       readable(recommended) ||
       readable((recommended as Record<string, unknown>)?.description),
@@ -172,5 +173,14 @@ export function mapTriageTask(
       readable(row.entity_type) || readable(metadata.entity_type) || null,
     canUpdate,
     evidence: row.evidence || metadata.evidence || null,
+    resolutionKind:
+      readable(metadata.kind) ||
+      (["vendor_bill", "vendor_bills"].includes(
+        readable(row.entity_type) || readable(metadata.entity_type),
+      )
+        ? "payable"
+        : null),
+    personId: readable(metadata.person_id) || null,
+    generated: !!row.origin_key,
   };
 }

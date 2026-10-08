@@ -34,6 +34,9 @@ export type TriageTask = {
   entityType: string | null;
   canUpdate: boolean;
   evidence: unknown;
+  resolutionKind: string | null;
+  personId: string | null;
+  generated: boolean;
 };
 export type TriageFeed = {
   tasks: TriageTask[];

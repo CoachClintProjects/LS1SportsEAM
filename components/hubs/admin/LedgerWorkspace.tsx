@@ -1468,3 +1468,66 @@ function Statements({
   );
 }
 export default LedgerWorkspace;
+
+export function TaskJournalDrawer({
+  role,
+  id,
+  entity,
+  onClose,
+  onSaved,
+}: {
+  role: string;
+  id: string;
+  entity: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [data, setData] = useState<Data | null>(null),
+    [error, setError] = useState("");
+  const generation = useRef(0);
+  const load = useCallback(async () => {
+    const n = ++generation.current;
+    const result = await request(
+      `/api/admin-ledger?${new URLSearchParams({ role, id, entity })}`,
+    );
+    if (n === generation.current) {
+      setData(result);
+      setError("");
+    }
+  }, [role, id, entity]);
+  useEffect(() => {
+    let active = true;
+    void load().catch((e) => {
+      if (active) setError(e.message);
+    });
+    const generationRef = generation;
+    return () => {
+      active = false;
+      generationRef.current++;
+    };
+  }, [load]);
+  if (!data)
+    return (
+      <AdminDrawerShell title="Review journal" onClose={onClose}>
+        <p role={error ? "alert" : "status"}>{error || "Loading journal…"}</p>
+        {error && (
+          <button onClick={() => void load().catch((e) => setError(e.message))}>
+            Retry
+          </button>
+        )}
+      </AdminDrawerShell>
+    );
+  return (
+    <JournalDrawer
+      key={`${id}:${data.journal?.version}`}
+      role={role}
+      data={data}
+      creating={false}
+      onClose={onClose}
+      onSaved={async () => {
+        await load();
+        await onSaved();
+      }}
+    />
+  );
+}

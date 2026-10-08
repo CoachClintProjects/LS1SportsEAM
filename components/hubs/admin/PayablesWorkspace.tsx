@@ -6,6 +6,7 @@ import { AdminDrawerShell } from "./AdminDrawerShell";
 import PayableReconciliationDrawer from "./PayableReconciliationDrawer";
 import PayableLedgerActions from "./PayableLedgerActions";
 import PayableAuthorityDrawer from "./PayableAuthorityDrawer";
+import { TaskJournalDrawer } from "./LedgerWorkspace";
 type Bill = {
   id: string;
   legal_entity_id: string;
@@ -344,6 +345,7 @@ export default function PayablesWorkspace({
   );
 }
 function BillDrawer({
+  onJournal,
   role,
   data,
   creating,
@@ -355,10 +357,15 @@ function BillDrawer({
   creating: boolean;
   onClose: () => void;
   onSaved: (id: string) => Promise<void>;
+  onJournal?: (id: string, entity: string) => void;
 }) {
   const router = useRouter(),
     currentParams = useSearchParams();
   const openJournal = (journalId: string) => {
+    if (onJournal) {
+      onJournal(journalId, data.bill!.legal_entity_id);
+      return;
+    }
     const q = new URLSearchParams(currentParams.toString());
     q.set("accounting", "ledger");
     q.set("record", journalId);
@@ -836,5 +843,87 @@ function BillDrawer({
         </>
       )}
     </AdminDrawerShell>
+  );
+}
+
+/** Opens an existing payable from a task without changing the canvas route. */
+export function TaskBillDrawer({
+  role,
+  id,
+  onClose,
+  onSaved,
+}: {
+  role: string;
+  id: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [recordId, setRecordId] = useState(id);
+  const [journal, setJournal] = useState<{ id: string; entity: string } | null>(
+    null,
+  );
+  const [data, setData] = useState<Data | null>(null),
+    [error, setError] = useState("");
+  const generation = useRef(0);
+  const load = useCallback(async () => {
+    const version = ++generation.current;
+    const result = await request(
+      `/api/admin-payables?${new URLSearchParams({ role, id: recordId })}`,
+    );
+    if (version === generation.current) {
+      setData(result);
+      setError("");
+    }
+  }, [role, recordId]);
+  useEffect(() => {
+    let active = true;
+    const generationRef = generation;
+    void load().catch((e) => {
+      if (active) setError(e.message);
+    });
+    return () => {
+      active = false;
+      generationRef.current++;
+    };
+  }, [load]);
+  if (!data)
+    return (
+      <AdminDrawerShell title="Review payable" onClose={onClose}>
+        <p role={error ? "alert" : "status"}>
+          {error || "Loading bill and payment controls…"}
+        </p>
+        {error && (
+          <button onClick={() => void load().catch((e) => setError(e.message))}>
+            Retry
+          </button>
+        )}
+      </AdminDrawerShell>
+    );
+  if (journal)
+    return (
+      <TaskJournalDrawer
+        role={role}
+        id={journal.id}
+        entity={journal.entity}
+        onClose={() => setJournal(null)}
+        onSaved={onSaved}
+      />
+    );
+  return (
+    <BillDrawer
+      key={`${recordId}:${data.bill?.version}`}
+      role={role}
+      onJournal={(id, entity) => setJournal({ id, entity })}
+      data={data}
+      creating={!recordId}
+      onClose={onClose}
+      onSaved={async (savedId) => {
+        if (recordId !== savedId) {
+          setData(null);
+          setRecordId(savedId);
+        } else await load();
+        await onSaved();
+      }}
+    />
   );
 }

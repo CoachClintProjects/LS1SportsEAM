@@ -102,6 +102,35 @@ export async function GET(request: NextRequest) {
       role,
       q.get("team") || null,
     );
+    if (q.get("mode") === "cashbox_options") {
+      if (
+        !["org_admin", "competition_manager"].includes(role) ||
+        !hasAdminContextPermission(ctx, role, "workflow.execute") ||
+        scope.teamIds?.length
+      )
+        throw new TriageError(
+          "Club-wide competition authorization required.",
+          403,
+        );
+      const competitions = await rest(
+        `competitions?select=id,name,organization_id&tenant_id=eq.${scope.tenant}&organization_id=in.(${scope.orgs.join(",")})&status=not.in.(cancelled,completed)&order=starts_at.desc&limit=100`,
+      );
+      const entities = await rest(
+        `legal_entities?select=id,legal_name,organization_id,base_currency&organization_id=in.(${scope.orgs.join(",")})`,
+      );
+      const competition = q.get("competition");
+      if (
+        competition &&
+        !competitions.some((c: { id: string }) => c.id === competition)
+      )
+        throw new TriageError("Competition outside your assignment.", 403);
+      const officials = competition
+        ? await rest(
+            `competition_official_assignments?select=id,role_code,status,people(first_name,last_name)&competition_id=eq.${competition}&status=not.in.(cancelled,declined)&person_id=not.is.null&order=role_code.asc&limit=250`,
+          )
+        : [];
+      return reply({ competitions, entities, officials });
+    }
     const id = q.get("id"),
       source = q.get("source") as TriageSource;
     if (id) {
@@ -117,6 +146,68 @@ export async function GET(request: NextRequest) {
           "[DENY: ERR-901] Task is outside your assignment.",
           403,
         );
+      if (q.get("domain") === "1") {
+        const metadata = rows[0].metadata || {};
+        if (
+          source !== "operational_tasks" ||
+          !uuid.test(metadata.entity_id || "")
+        )
+          throw new TriageError("This task has no linked resolution record.");
+        if (metadata.kind === "waiver") {
+          const assignments = await rest(
+            `waiver_assignments?select=id,waiver_id&tenant_id=eq.${scope.tenant}&organization_id=eq.${rows[0].organization_id}&id=eq.${metadata.evidence.waiver_assignment_id}`,
+          );
+          if (!assignments.length)
+            throw new TriageError(
+              "Waiver assignment is no longer available.",
+              404,
+            );
+          const policies = await rest(
+            `triage_consent_policies?select=enabled,team_manager_allowed,policy_reference,version&waiver_id=eq.${assignments[0].waiver_id}&tenant_id=eq.${scope.tenant}&organization_id=eq.${rows[0].organization_id}`,
+          );
+          const documents = await rest(
+            `documents?select=id,title,verification_status,document_types!inner(code)&tenant_id=eq.${scope.tenant}&owner_person_id=eq.${metadata.entity_id}&document_types.code=eq.WAIVER&verification_status=eq.verified&or=(expires_at.is.null,expires_at.gt.${encodeURIComponent(new Date().toISOString())})&limit=100`,
+          );
+          return reply({ policy: policies[0] || null, documents });
+        }
+        if (metadata.kind === "lease") {
+          if (!hasAdminContextPermission(ctx, role, "record.read"))
+            throw new TriageError("Contract review denied.", 403);
+          const contracts = await rest(
+            `contracts?select=*&id=eq.${metadata.entity_id}&tenant_id=eq.${scope.tenant}&organization_id=in.(${scope.orgs.join(",")})`,
+          );
+          if (!contracts.length)
+            throw new TriageError("Contract is no longer available.", 404);
+          const versions = await rest(
+            `contract_versions?select=id,version_no,terms,created_at&contract_id=eq.${metadata.entity_id}&order=version_no.desc&limit=5`,
+          );
+          return reply({ contract: contracts[0], versions });
+        }
+        if (metadata.kind === "fee_voucher") {
+          if (
+            !hasAdminContextPermission(ctx, role, "record.read") ||
+            !["org_admin", "treasurer"].includes(role)
+          )
+            throw new TriageError("Voucher review denied.", 403);
+          const vouchers = await rest(
+            `triage_fee_vouchers?select=*&id=eq.${metadata.entity_id}&tenant_id=eq.${scope.tenant}&organization_id=eq.${rows[0].organization_id}`,
+          );
+          if (!vouchers.length)
+            throw new TriageError("Voucher is no longer available.", 404);
+          const entities = await rest(
+            `legal_entities?select=id&organization_id=eq.${rows[0].organization_id}`,
+          );
+          const ids = entities.map((e: { id: string }) => e.id);
+          const voucher = vouchers[0];
+          const bills = ids.length
+            ? await rest(
+                `vendor_bills?select=id,bill_number,total,currency,status&legal_entity_id=in.(${ids.join(",")})&total=eq.${Number(voucher.snapshot.amount)}&currency=eq.${encodeURIComponent(voucher.snapshot.currency)}&status=neq.cancelled&order=bill_date.desc&limit=100`,
+              )
+            : [];
+          return reply({ voucher, bills });
+        }
+        throw new TriageError("Use the linked record controls for this task.");
+      }
       const history = await rest(
         `audit_events?select=id,action,occurred_at,reason&tenant_id=eq.${scope.tenant}&entity_type=eq.${source}&entity_id=eq.${id}&order=occurred_at.desc&limit=30`,
       );
@@ -179,11 +270,154 @@ export async function POST(request: NextRequest) {
       String(b.role || "org_admin"),
       b.team || null,
     );
+    if (b.action === "sync") {
+      if (!taskPermission(ctx, scope.role, "operational_tasks", false))
+        throw new TriageError("Task access denied.", 403);
+      return reply(
+        await rest("rpc/admin_triage_sync", {
+          p_tenant: scope.tenant,
+          p_orgs: scope.orgs,
+        }),
+      );
+    }
     if (
       !scope.team &&
       (scope.role === "team_manager" || !!scope.teamIds?.length)
     )
       throw new TriageError("[DENY: ERR-901] Select your assigned squad.", 403);
+    if (
+      [
+        "authorize_cashbox",
+        "prepare_cashbox",
+        "cancel_cashbox",
+        "set_consent_policy",
+        "consent_override",
+      ].includes(b.action)
+    ) {
+      if (
+        !scope.person ||
+        !hasAdminContextPermission(ctx, scope.role, "workflow.execute") ||
+        !hasAdminContextPermission(ctx, scope.role, "record.update")
+      )
+        throw new TriageError(
+          "Your role lacks authorization for this decision.",
+          403,
+        );
+      if (b.action === "authorize_cashbox") {
+        if (
+          !["org_admin", "competition_manager"].includes(scope.role) ||
+          scope.teamIds?.length
+        )
+          throw new TriageError(
+            "Club-wide competition authorization required.",
+            403,
+          );
+      } else {
+        if (!uuid.test(b.id || "") || !Number.isInteger(b.revision))
+          throw new TriageError("Reload the task before deciding.");
+        const tasks = await rest(`operational_tasks?select=*&id=eq.${b.id}`);
+        if (!tasks[0] || !taskInScope(tasks[0], scope))
+          throw new TriageError(
+            "[DENY: ERR-901] Task is outside your assignment.",
+            403,
+          );
+        if (b.action === "set_consent_policy" && scope.role !== "org_admin")
+          throw new TriageError(
+            "Organization Admin must configure club policy.",
+            403,
+          );
+        if (
+          b.action === "consent_override" &&
+          !hasAdminContextPermission(ctx, scope.role, "waivers.update")
+        )
+          throw new TriageError("Waiver exception authority required.", 403);
+      }
+      const result = await rest("rpc/admin_triage_authority_action", {
+        p_task: b.id || null,
+        p_revision: b.revision ?? null,
+        p_tenant: scope.tenant,
+        p_orgs: scope.orgs,
+        p_role: scope.role,
+        p_team: scope.team,
+        p_actor_user: ctx.user.id,
+        p_actor_person: scope.person,
+        p_action: b.action,
+        p_values: b.values || {},
+        p_reason: String(b.note || "").trim(),
+      });
+      return reply(result);
+    }
+    if (
+      [
+        "lease_terms",
+        "remind",
+        "broadcast",
+        "verify_fees",
+        "link_bill",
+        "return_voucher",
+      ].includes(b.action)
+    ) {
+      if (!uuid.test(b.id || "") || !Number.isInteger(b.revision))
+        throw new TriageError("Reload the task before changing it.");
+      const rows = await rest(
+        `operational_tasks?select=*&id=eq.${b.id}&limit=1`,
+      );
+      if (
+        !rows[0] ||
+        !taskInScope(rows[0], scope) ||
+        !taskPermission(ctx, scope.role, "operational_tasks", false)
+      )
+        throw new TriageError(
+          "[DENY: ERR-901] Task is outside your assignment.",
+          403,
+        );
+      const permission = ["remind", "broadcast"].includes(b.action)
+        ? "communications.send"
+        : "record.update";
+      if (!hasAdminContextPermission(ctx, scope.role, permission))
+        throw new TriageError("Your role cannot perform this action.", 403);
+      if (b.action === "broadcast" && scope.role !== "org_admin")
+        throw new TriageError(
+          "Organization Admin must authorize a club broadcast.",
+          403,
+        );
+      if (
+        ["link_bill", "return_voucher"].includes(b.action) &&
+        (!["org_admin", "treasurer"].includes(scope.role) ||
+          (b.action === "link_bill" && !uuid.test(b.values?.bill_id || "")))
+      )
+        throw new TriageError(
+          "Select a bill using the authorized Treasurer view.",
+          403,
+        );
+      if (!scope.person)
+        throw new TriageError("A linked person record is required.", 403);
+      const result = await rest("rpc/admin_triage_domain_action", {
+        p_task: b.id,
+        p_revision: b.revision,
+        p_tenant: scope.tenant,
+        p_orgs: scope.orgs,
+        p_role: scope.role,
+        p_team: scope.team,
+        p_actor_user: ctx.user.id,
+        p_actor_person: scope.person,
+        p_action: b.action,
+        p_values: b.values || {},
+        p_reason: String(b.note || "").trim(),
+      });
+      try {
+        await rest("rpc/admin_triage_sync", {
+          p_tenant: scope.tenant,
+          p_orgs: scope.orgs,
+        });
+      } catch {
+        return reply({
+          ...result,
+          message: `${result.message} Refresh the task queue to reconcile its status.`,
+        });
+      }
+      return reply(result);
+    }
     const source = b.source as TriageSource;
     if (!triageSources.includes(source))
       throw new TriageError("Unknown task source.");
@@ -263,6 +497,14 @@ export async function POST(request: NextRequest) {
         throw new TriageError(
           "[DENY: ERR-901] Task is outside your assignment.",
           403,
+        );
+      if (
+        rows[0].origin_key ||
+        ["fee_voucher", "cashbox"].includes(rows[0].metadata?.kind)
+      )
+        throw new TriageError(
+          "Resolve the linked record using this task’s controls. The queue closes it when its condition is cleared.",
+          409,
         );
       if (
         source === "competition_exceptions" &&
