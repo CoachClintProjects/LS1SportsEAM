@@ -65,7 +65,8 @@ export default function TriageTaskHub({
   // Parent keys by role; all requests also carry a generation to discard stale results.
   const [feed, setFeed] = useState<TriageFeed | null>(null),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [refreshing, setRefreshing] = useState(false);
   const [team, setTeam] = useState(""),
     [status, setStatus] = useState("open"),
     [search, setSearch] = useState(""),
@@ -124,6 +125,7 @@ export default function TriageTaskHub({
   );
   const load = useCallback(async () => {
     const current = ++version.current;
+    setRefreshing(true);
     try {
       if (role !== "team_manager" || team) {
         const sync = await authenticatedFetch("/api/admin-triage", {
@@ -136,24 +138,29 @@ export default function TriageTaskHub({
           throw new Error(failure.error || "Unable to refresh source records.");
         }
       }
+      if (current !== version.current || !mounted.current) return;
       const r = await authenticatedFetch(`/api/admin-triage?${params()}`, {
           cache: "no-store",
         }),
         j = await r.json();
       if (current !== version.current || !mounted.current) return;
       if (!r.ok) throw new Error(j.error || "Unable to load tasks.");
-      if (j.total > 0 && page > Math.ceil(j.total / 25)) {
-        setPage(Math.ceil(j.total / 25));
+      const lastPage = Math.max(1, Math.ceil(j.total / 25));
+      if (page > lastPage) {
+        setPage(lastPage);
         return;
       }
       setFeed(j);
       setError("");
     } catch (failure) {
       if (current === version.current && mounted.current) throw failure;
+    } finally {
+      if (current === version.current && mounted.current) setRefreshing(false);
     }
   }, [params, page, role, team]);
   useEffect(() => {
     setFeed(null);
+    setError("");
     setSelected(null);
     setLinked(null);
     detailVersion.current++;
@@ -287,9 +294,9 @@ export default function TriageTaskHub({
           )}
           <button
             onClick={() => void load().catch((e) => setError(e.message))}
-            disabled={busy}
+            disabled={busy || refreshing}
           >
-            Refresh
+            {refreshing ? "🔵 Refreshing…" : "Refresh"}
           </button>
           {feed?.canCreate && (
             <button
@@ -316,6 +323,7 @@ export default function TriageTaskHub({
         <label>
           Show
           <select
+            disabled={busy}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -330,6 +338,7 @@ export default function TriageTaskHub({
           Find a task
           <input
             type="search"
+            disabled={busy}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -338,6 +347,7 @@ export default function TriageTaskHub({
           <label>
             Squad
             <select
+              disabled={busy}
               value={team}
               onChange={(e) => {
                 setTeam(e.target.value);
@@ -426,7 +436,7 @@ export default function TriageTaskHub({
             </small>
             <div className="triage-actions">
               <button
-                disabled={page <= 1}
+                disabled={busy || page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
                 Previous
@@ -435,7 +445,7 @@ export default function TriageTaskHub({
                 Page {page} of {Math.max(1, Math.ceil(feed.total / 25))}
               </span>
               <button
-                disabled={page * 25 >= feed.total}
+                disabled={busy || page * 25 >= feed.total}
                 onClick={() => setPage((p) => p + 1)}
               >
                 Next

@@ -55,3 +55,10 @@ This is a deployed and extended task workflow, not a claim that every Step 02 sc
 - Re-ran TypeScript, targeted ESLint and the isolated tenant/club/role/squad/assignee boundary checks successfully.
 - Live read-only checks found zero task candidates for both clubs. All six triage functions deny direct anonymous/authenticated execution; the three domain tables have RLS and deny direct authenticated reads.
 - Deployment target: existing Admin branch, Vercel Preview under pieify/ls1sportseam. Production is unchanged. Deployment success and signed-in UAT are separate gates.
+
+## 9 October task interaction corrections
+
+- Source refresh now has a visible refreshing state and rejects obsolete requests before fetching the list.
+- Pagination resets to page 1 when the last task disappears from a later page, avoiding a page number greater than the page count.
+- Filters and pagination cannot change while a task save is underway. Existing role, squad, source-record and audit controls remain in force.
+- Re-ran isolated permission/ERR-701/ERR-901 boundary checks and TypeScript successfully. Signed-in UAT remains unverified because the Vercel connector still cannot access pieify/ls1sportseam; no fabricated exceptions or business writes were used for testing.

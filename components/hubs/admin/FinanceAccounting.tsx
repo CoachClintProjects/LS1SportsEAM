@@ -101,8 +101,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
         <PayablesWorkspace role={role} />
       </>
     );
-  if (!data)
-    return <State text={error || "Loading club financial records…"} />;
+  if (!data) return <State text={error || "Loading club financial records…"} />;
   return (
     <main className="p-5 text-white lg:p-7">
       <header className="border-b border-neutral-800 pb-5">
@@ -120,7 +119,13 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
           {error}
         </div>
       )}
-      {!data.invoices?.length && !data.vendorBills?.length && <p className="mt-5 rounded-lg border border-blue-800 bg-blue-950/30 p-4 text-sm text-blue-100">No financial records yet. Start with Finance setup, then enter the club’s invoices and supplier bills. Figures shown are recorded balances, not an assessment of the club’s finances.</p>}
+      {!data.invoices?.length && !data.vendorBills?.length && (
+        <p className="mt-5 rounded-lg border border-blue-800 bg-blue-950/30 p-4 text-sm text-blue-100">
+          No financial records yet. Start with Finance setup, then enter the
+          club’s invoices and supplier bills. Figures shown are recorded
+          balances, not an assessment of the club’s finances.
+        </p>
+      )}
       <section className="mt-5 flex flex-wrap gap-2">
         <button
           onClick={() => setSetup(true)}
@@ -146,13 +151,19 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
               : "rounded-lg border border-neutral-700 px-4 py-2 text-xs"
           }
         >
-          Fees owed to the club · {data.invoices.length ? money(data.metrics?.arBalance, currency) : "No records"}
+          Fees owed to the club ·{" "}
+          {data.invoices.length
+            ? money(data.metrics?.arBalance, currency)
+            : "No records"}
         </button>
         <button
           onClick={() => setTab("payables")}
           className="rounded-lg border border-neutral-700 px-4 py-2 text-xs"
         >
-          Supplier bills · {data.vendorBills.length ? money(data.metrics?.apBalance, currency) : "No records"}
+          Supplier bills ·{" "}
+          {data.vendorBills.length
+            ? money(data.metrics?.apBalance, currency)
+            : "No records"}
         </button>
         <span className="px-3 py-2 text-xs text-neutral-500">
           {data.metrics?.pastDue || 0} overdue invoices
@@ -234,7 +245,8 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
         </div>
         {!rows.length && (
           <div className="p-8 text-sm text-neutral-500">
-            No {tab} records yet. Use the actions above to add your club’s records.
+            No {tab} records yet. Use the actions above to add your club’s
+            records.
           </div>
         )}
       </section>
@@ -790,6 +802,14 @@ export function FinanceAccounting({ role = "org_admin" }: { role?: string }) {
         >
           Billing
         </button>
+        {["org_admin", "treasurer"].includes(role) && (
+          <button
+            onClick={() => setMode("payables")}
+            className={`rounded px-4 py-2 ${mode === "payables" ? "bg-blue-700" : "border border-neutral-600"}`}
+          >
+            Pay bills & vendors
+          </button>
+        )}
         {["org_admin", "treasurer"].includes(role) && (
           <button
             onClick={() => setMode("ledger")}

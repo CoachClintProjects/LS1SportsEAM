@@ -8,6 +8,12 @@ import {
 } from "react";
 import RecordWorkPanel from "./RecordWorkPanel";
 import { RecordLifecycle } from "./RecordLifecycle";
+import dynamic from "next/dynamic";
+const ExecutiveActionDrawer = dynamic(() =>
+  import("./ExecutiveActionDrawer").then(
+    (module) => module.ExecutiveActionDrawer,
+  ),
+);
 import { createPortal } from "react-dom";
 import {
   X,
@@ -131,6 +137,11 @@ export default function PersonRecordDrawer({
     [contact, setContact] = useState<any>(null);
   const panel = useRef<HTMLElement>(null),
     close = useRef(onClose);
+  const saving = useRef(false);
+  const [decision, setDecision] = useState<"waiver" | "cash" | null>(null);
+  useEffect(() => {
+    if (!decision) panel.current?.focus();
+  }, [decision]);
   close.current = onClose;
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -165,7 +176,8 @@ export default function PersonRecordDrawer({
     document.body.style.overflow = "hidden";
     panel.current?.focus();
     function key(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (!panel.current?.contains(document.activeElement)) return;
+      if (e.key === "Escape" && !saving.current) {
         e.preventDefault();
         close.current();
       }
@@ -206,6 +218,7 @@ export default function PersonRecordDrawer({
     };
   }, []);
   function begin(section: string, emergency: any = null) {
+    if (saving.current) return;
     setContact(emergency);
     setEditing(section);
     setNotice("");
@@ -223,7 +236,8 @@ export default function PersonRecordDrawer({
     );
   }
   async function save() {
-    if (!editing) return;
+    if (!editing || saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError("");
     const source =
@@ -240,6 +254,7 @@ export default function PersonRecordDrawer({
     if (!Object.keys(changes).length) {
       setEditing(null);
       setBusy(false);
+      saving.current = false;
       return;
     }
     try {
@@ -264,6 +279,7 @@ export default function PersonRecordDrawer({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
@@ -279,11 +295,23 @@ export default function PersonRecordDrawer({
     ...(data?.authorization.finance ? ["Fees"] : []),
     "Medical & Consent",
   ];
+  if (decision)
+    return (
+      <ExecutiveActionDrawer
+        personId={personId}
+        initialKind={decision}
+        onClose={() => setDecision(null)}
+        onSaved={() => {
+          void load().catch((error) => setError(error.message));
+          onSaved?.();
+        }}
+      />
+    );
   return createPortal(
     <div
       className="fixed inset-0 z-[160] bg-black/65"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !saving.current) onClose();
       }}
     >
       <aside
@@ -315,6 +343,7 @@ export default function PersonRecordDrawer({
             )}
             <button
               aria-label="Close record"
+              disabled={busy}
               onClick={onClose}
               className="rounded p-2 hover:bg-white/15"
             >
@@ -532,6 +561,29 @@ export default function PersonRecordDrawer({
                       </button>
                     </div>
                   </form>
+                )}
+                {role === "org_admin" && !editing && (
+                  <div
+                    className="mb-4 flex flex-wrap gap-2"
+                    aria-label="Record decisions"
+                  >
+                    <button
+                      disabled={busy}
+                      onClick={() => setDecision("waiver")}
+                      className="rounded bg-amber-700 px-3 py-2 text-sm font-semibold"
+                    >
+                      Review waiver clearance
+                    </button>
+                    {data?.authorization.finance && (
+                      <button
+                        disabled={busy}
+                        onClick={() => setDecision("cash")}
+                        className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold"
+                      >
+                        Record cash payment
+                      </button>
+                    )}
+                  </div>
                 )}
                 <div
                   role="tablist"

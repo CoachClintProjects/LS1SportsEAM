@@ -29,6 +29,7 @@ export function AdminFolderNavigation() {
   const params = useSearchParams();
   const role = params.get("role") || "org_admin";
   const view = params.get("view");
+  const activeFolder = params.get("folder");
   const [folders, setFolders] = useState<RoleFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,6 +97,7 @@ export function AdminFolderNavigation() {
           folder={folder}
           activeRole={role}
           activeView={view}
+          activeFolder={activeFolder}
         />
       ))}
     </div>
@@ -106,10 +108,12 @@ function RoleDirectory({
   folder,
   activeRole,
   activeView,
+  activeFolder,
 }: {
   folder: RoleFolder;
   activeRole: string;
   activeView: string | null;
+  activeFolder: string | null;
 }) {
   const [open, setOpen] = useState(true);
   const [preferences, setPreferences] = useState<Preferences>({
@@ -144,7 +148,11 @@ function RoleDirectory({
   });
   function hrefFor(href: string) {
     const url = new URL(href, "https://ls1.invalid");
-    url.searchParams.set("role", folder.role);
+    url.searchParams.set(
+      "role",
+      activeRole === "org_admin" ? "org_admin" : folder.role,
+    );
+    url.searchParams.set("folder", folder.role);
     return url.pathname + url.search;
   }
   function save(event: React.FormEvent) {
@@ -181,7 +189,9 @@ function RoleDirectory({
           {items.map((item) => {
             const href = hrefFor(item.href!);
             const active =
-              activeRole === folder.role &&
+              (activeFolder
+                ? activeFolder === folder.role
+                : activeRole === folder.role) &&
               new URL(href, "https://ls1.invalid").searchParams.get("view") ===
                 activeView;
             return (

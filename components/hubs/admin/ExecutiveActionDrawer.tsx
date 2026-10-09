@@ -15,11 +15,15 @@ const input =
 export function ExecutiveActionDrawer({
   onClose,
   onSaved,
+  personId,
+  initialKind = "waiver",
 }: {
   onClose: () => void;
   onSaved: () => void;
+  personId?: string;
+  initialKind?: "waiver" | "cash";
 }) {
-  const [kind, setKind] = useState("waiver"),
+  const [kind, setKind] = useState<string>(initialKind),
     [page, setPage] = useState(0),
     [entity, setEntity] = useState("");
   const [data, setData] = useState<Row | null>(null),
@@ -41,7 +45,7 @@ export function ExecutiveActionDrawer({
     setError("");
     try {
       const r = await authenticatedFetch(
-        `/api/admin-executive-actions?${new URLSearchParams({ kind, role: "org_admin", page: String(page), ...(entity ? { entity } : {}) })}`,
+        `/api/admin-executive-actions?${new URLSearchParams({ kind, role: "org_admin", page: String(page), ...(entity ? { entity } : {}), ...(personId ? { personId } : {}) })}`,
         { cache: "no-store" },
       );
       const j = await r.json();
@@ -55,7 +59,7 @@ export function ExecutiveActionDrawer({
     } finally {
       if (current === version.current) setLoading(false);
     }
-  }, [kind, page, entity]);
+  }, [kind, page, entity, personId]);
   useEffect(() => {
     setData(null);
     setRecord("");
@@ -141,17 +145,19 @@ export function ExecutiveActionDrawer({
   return (
     <AdminDrawerShell title="Club decisions" onClose={onClose} busy={busy}>
       <div className="mb-5 flex flex-wrap gap-2">
-        {actions.map(([id, title, color]) => (
-          <button
-            key={id}
-            disabled={busy}
-            aria-pressed={kind === id}
-            onClick={() => reset(id)}
-            className={`rounded px-3 py-2 text-sm font-semibold text-white ${color} ${kind === id ? "ring-2 ring-white" : "opacity-80"} disabled:opacity-40`}
-          >
-            {title}
-          </button>
-        ))}
+        {actions
+          .filter(([id]) => !personId || ["waiver", "cash"].includes(id))
+          .map(([id, title, color]) => (
+            <button
+              key={id}
+              disabled={busy}
+              aria-pressed={kind === id}
+              onClick={() => reset(id)}
+              className={`rounded px-3 py-2 text-sm font-semibold text-white ${color} ${kind === id ? "ring-2 ring-white" : "opacity-80"} disabled:opacity-40`}
+            >
+              {title}
+            </button>
+          ))}
       </div>
       <ol
         aria-label="Decision progress"
@@ -160,7 +166,7 @@ export function ExecutiveActionDrawer({
         {["Intake", "Checked", "Approved", "Live"].map((step, index) => (
           <li
             key={step}
-            className={`rounded border px-2 py-2 text-center text-sm ${notice && index === 3 ? "border-emerald-400 bg-emerald-900" : !notice && index === (busy ? 2 : (selected || kind === "release_escrow") && reason.trim().length >= 5 ? 1 : 0) ? "border-blue-400 bg-blue-950" : "border-[#30363D] text-slate-400"}`}
+            className={`rounded border px-2 py-2 text-center text-sm ${notice && index === 3 ? "border-emerald-400 bg-emerald-900" : !notice && index === ((selected || kind === "release_escrow") && reason.trim().length >= 5 ? 1 : 0) ? "border-blue-400 bg-blue-950" : "border-[#30363D] text-slate-400"}`}
           >
             {step}
           </li>

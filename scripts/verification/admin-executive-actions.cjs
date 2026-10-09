@@ -26,5 +26,12 @@ const post=async(extra={})=>{calls=[];return m.exports.POST({json:async()=>({kin
  for(const kind of ['cover_entry_fee','release_escrow','reverse']){assert.equal((await post({kind,values:{date:'2026-10-06'}})).status,200);assert.equal(calls[0].path,'rpc/admin_club_finance_action');assert.equal(JSON.parse(calls[0].init.body).p_operation,kind);}
  calls=[];const page=await m.exports.GET({nextUrl:{searchParams:new URLSearchParams({page:'2'})}});assert.equal(page.status,200);assert.equal(page.body.rows.length,25);assert.equal(page.body.hasMore,true);assert.ok(calls[0].path.includes('organization_id=eq.real-club'));assert.ok(calls[0].path.includes('offset=50&limit=26'));assert.ok(calls.at(-1).path.includes('organization_id.eq.real-club'));
  calls=[];assert.equal((await m.exports.GET({nextUrl:{searchParams:new URLSearchParams({page:'-1'})}})).status,400);assert.equal(calls.length,0);
+ for (const [kind,filter] of [['waiver', '&person_id=eq.'], ['cash', '&customers.person_id=eq.']]) {
+  calls=[];
+  const result=await m.exports.GET({nextUrl:{searchParams:new URLSearchParams({kind,personId:id})}});
+  assert.equal(result.status,200);
+  assert.ok(calls.some(call=>call.path.includes(filter+id)&&call.path.includes('organization_id=eq.real-club')));
+ }
+ calls=[];assert.equal((await m.exports.GET({nextUrl:{searchParams:new URLSearchParams({personId:'invalid'})}})).status,400);assert.equal(calls.length,0);
  console.log('PASS: club action permissions, actor and club binding, invalid input rejection, RPC routing, scoped history and 25-record pagination. No business records created.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

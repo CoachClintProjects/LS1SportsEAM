@@ -25,6 +25,9 @@ export async function GET(request: NextRequest) {
       role = q.get("role") || "org_admin",
       kind = q.get("kind") || "waiver";
     const { ctx, tenant, org } = await governanceScope(request, role);
+    const personId = q.get("personId");
+    if (personId && !uuid.test(personId))
+      throw new PersonRecordError(400, "Invalid person reference.");
     if (!kinds.includes(kind))
       throw new PersonRecordError(400, "Unknown club action.");
     if (!can(ctx, role, kind === "waiver" ? "waivers.read" : "finance.read"))
@@ -43,7 +46,7 @@ export async function GET(request: NextRequest) {
       methods: any[] = [];
     if (kind === "waiver")
       rows = await rest(
-        `waiver_assignments?select=*,person:people!waiver_assignments_person_id_fkey(first_name,last_name),waivers(name)&organization_id=eq.${org}&status=in.(assigned,pending,waived)${window}`,
+        `waiver_assignments?select=*,person:people!waiver_assignments_person_id_fkey(first_name,last_name),waivers(name)&organization_id=eq.${org}${personId ? `&person_id=eq.${personId}` : ""}&status=in.(assigned,pending,waived)${window}`,
       );
     else {
       entities = await rest(
@@ -64,7 +67,7 @@ export async function GET(request: NextRequest) {
       if (kind === "cash") {
         [rows, methods] = await Promise.all([
           rest(
-            `invoices?select=id,invoice_number,balance_due,currency,status,customers!inner(display_name,organization_id)&customers.organization_id=eq.${org}&balance_due=gt.0${window}`,
+            `invoices?select=id,invoice_number,balance_due,currency,status,customers!inner(display_name,organization_id,person_id)&customers.organization_id=eq.${org}${personId ? `&customers.person_id=eq.${personId}` : ""}&balance_due=gt.0${window}`,
           ),
           rest(
             `payment_methods?select=code,name&organization_id=eq.${org}&tenant_id=eq.${tenant}&status=eq.active&method_type=eq.cash`,

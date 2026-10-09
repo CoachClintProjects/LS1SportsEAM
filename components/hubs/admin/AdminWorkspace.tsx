@@ -127,9 +127,15 @@ const registry: Record<
   ExternalOrganizationDirectory,
   RostersView: TeamManager,
   MembershipView: RegistrarValidation,
-  ProgramsView: OrganizationArchitecture,
-  TeamsView: OrganizationArchitecture,
-  SeasonsView: OrganizationArchitecture,
+  ProgramsView: (props) => (
+    <OrganizationArchitecture {...props} initialDomain="programs" />
+  ),
+  TeamsView: (props) => (
+    <OrganizationArchitecture {...props} initialDomain="teams" />
+  ),
+  SeasonsView: (props) => (
+    <OrganizationArchitecture {...props} initialDomain="seasons" />
+  ),
   BillingView: FinanceAccounting,
   InvoicesView: FinanceAccounting,
   PaymentsView: FinanceAccounting,
@@ -300,7 +306,7 @@ export function AdminWorkspace() {
       <div className="mx-auto max-w-lg bg-[#242529] p-8 text-white">
         <h1 className="text-2xl font-black">Select an organization</h1>
         <p className="mt-2 text-sm text-neutral-300">
-          Choose the canonical organization whose Admin work you are opening.
+          Choose the club whose staff workspace you are opening.
         </p>
         <div className="mt-5 space-y-2">
           {organizations.map((org) => (
@@ -321,7 +327,7 @@ export function AdminWorkspace() {
         </div>
         {!organizations.length && (
           <p className="mt-4 text-sm text-red-300">
-            No canonical organization is available.
+            No club is available for your account.
           </p>
         )}
       </div>
