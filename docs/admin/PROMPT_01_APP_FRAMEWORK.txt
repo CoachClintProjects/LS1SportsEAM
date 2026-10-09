@@ -1,0 +1,64 @@
+Act as a Principal Full-Stack UI/UX Architect and Next.js 15 Component Engineer specializing in high-density corporate SaaS layouts and file explorer systems. Your task is to build the absolute, production-grade Global Workspace Shell and Interface Layout Plane for LS1 Sports EAM on Next 15 branch `work/admin-100pct-from-prod-20260923`.
+
+### 🚫 Core System Engineering Constraints:
+- The database is fully built in Supabase with 300+ tables. DO NOT write placeholder backend schemas, data models, or SQL migrations. Focus 100% on the Frontend Interaction Layer, view state property mutations, and the layout routing.
+- ZERO CODE PLACEHOLDERS ALLOWED. Every folder accordion click, arrow flip, form submit event, and button handler must be completely coded out end-to-end. No shorthand comment lines like "// implement later".
+- Theme Sizing: Exact "HubSpot Slate Dark". Jet black backgrounds (#0A0C10), slate grey components (#161B22), thin dark borders (#30363D), white Lexend Deca typography throughout.
+- Sourcing Vocabulary: Use ultra-simple sports layman language designed so simply that an un-tech-savvy parent volunteer or a 10-year-old child can navigate it blindly. (e.g., Use "Add Staff" instead of "Insert Assignment Row"). Traffic-light signals: 🔴 CRITICAL STOP / BROKEN | 🟡 NEEDS ATTENTION / FIX NEXT | 🟢 GOOD TO GO / COMPLIANT | 🔵 REFRESHING / SYNC DATA.
+
+---
+
+## 🗛 1. THE DOCK-ANCHORED UAT ROLE SWITCHER BAR (TOP BAR)
+
+Render a persistent, fixed horizontal radio button array across the top wrapper of the application:
+`[UAT TESTING CONTROLLER: 🔘 Club President (Org Admin) | ⚪ Team Manager (Squad Logistics) | ⚪ Roster Gatekeeper (Registrar) | ⚪ Money Manager (Treasurer) | ⚪ Game Day Director | ⚪ Volunteer Helper ]`
+
+### 🔄 The Context Execution Rule:
+- Toggling a radio button must execute an immediate client-side view remount of the application.
+- It dynamically updates the Left Sidebar Navigation, the central HubSpot Today's Tasks exception feed, and the data grids to reflect the exact scope, boundaries, and permissions of that targeted volunteer role. Sarah holds unrestricted root override clearance.
+
+---
+
+## 🗂️ 2. THE DYNAMIC WINDOWS FOLDER-TREE SIDEBAR (LEFT COLUMN)
+
+The left navigation menu must structurally function like a Windows File Explorer tree using nested expand/collapse accordion folder categories. The directory structure must morph live based on the active top UAT Selection:
+- **If Active Radio Toggle == "Club President (Org Admin)":** Explode open ALL directories simultaneously, exposing all role categories down the entire cascading infrastructure to test master organizational controls:
+  📂 CLUB PRESIDENT & BOSS DIRECTORY: 🏢 Club Blueprint Builder | 🛡️ Executive Safety Ledger | 👥 Staff Registry & Access | 💰 Master Club Ledger | 📊 Club Health Reports
+  📂 TEAM MANAGER DIRECTORY: 👥 My Team Roster | 🏆 Meet Invitations Hub | ✈️ Team Travel & Hotels | 💸 Collect Team Fees | 🗓️ Practice Timelines
+  📂 ROSTER GATEKEEPER DIRECTORY: 🆔 Verify Birth Certs | 🌐 Governing Body Sync | 📜 Coach Background Checks | 🔄 Swimmer Team Transfers
+  📂 MONEY MANAGER DIRECTORY: 💳 Portal Fees Track | 📉 Pay Bills & Vendors | 💼 Referee Cash Boxes | 📜 Tax & Non-Profit Logs
+  📂 GAME DAY DIRECTOR DIRECTORY: 🏢 Venue Lane Bookings | 🏊 Seed Race Brackets | 🏁 Assign Deck Officials | ⚖️ Rule Protests & Jury
+  📂 VOLUNTEER HELPER DIRECTORY: 🤝 Parent Worker Sign-ups | 📋 Configure Meet Shifts | 🛡️ Deck Zone Clearances | 📦 On-Site Check-In Desk
+
+### 🛠️ THE MODULAR BASELINE UTILITY TRAY (CRITICAL CORE LOGIC):
+Beneath the core operational links of EVERY SINGLE INDIVIDUAL ROLE FOLDER, you must render a standardized, nested sub-folder tray containing these exact three modular utility folders:
+   ├── ⚙️ [Role Name] Settings & Customization
+   ├── ⚡ [Role Name] Automations Center
+   └── 🏪 [Role Name] App Marketplace
+
+- **Universal Sidebar Footer Action:** At the absolute baseline of the sidebar tree, beneath all accordion folders, sits a highly visible bright orange button labeled: `[ ➕ SUBMIT HELP TICKET ]`. Clicking must instantly log a durable, trackable support reference row straight into the local activity state system without flushing workspace memory.
+
+---
+
+## 📋 3. THE MODULAR HUBSPOT COMMAND HUB OVERWATCH (CENTER CANVAS)
+
+The main center section of the dashboard is an asset control plane that always initializes onto a HubSpot-standard "Today's Tasks / What Needs Attention" triage checkbox matrix. The lists are driven entirely by data exceptions inside the state machine.
+- Every task card is highly colorful, uses sports-native layman words, and features a functional checkbox that drills straight into its resolution workflow.
+- **The Visual Click Interaction:** Clicking a task card or an object row inside a data grid must NOT trigger a fullscreen page reload or an obtrusive floating pop-up screen. The center hub remains in place, and a dark slate **3-Column Right-Side Slide-Out Drawer Panel** smoothly slides out from the right margin overlay.
+
+---
+
+## 🗖 4. THE DYNAMIC 3-COLUMN SLIDE-OUT DRAWER MATRIX (RIGHT PANEL)
+
+When any data object is inspected, slide open this exact 3-column HubSpot object card layout:
+- **Top Bar Tracker:** Render progressive lifecycle blocks tracking the asset phase using distinct focus colors (Intake ➔ Checked ➔ Approved ➔ Live).
+- **Column 1 (Left Column - Properties Matrix):** High-density vertical stack of text inputs, select dropdowns, and date pickers mapping live to the following columns: `tenant_id`, `first_name`, `last_name`, `birth_date`, `email`, `phone`, `status`, `organization_id`, `person_id`, `role_definition_id`, `team_id`.
+- **Column 2 (Center Column - Concurrency & Action Engine):** Chronological live activity history feed housing massive colored buttons that compute real business logic:
+  - `[ OVERRIDE WAIVER CLEARANCE ]` | `[ RECORD CASH PAYMENT ]` | `[ CLUB COVERS ENTRY FEE ]` | `[ RELEASE ESCROW FUNDING ]` | `[ REVERSE TRANSACTION ]`
+  - *Critical Control User Intercept (ERR-701):* If Sarah clicks a red button to revoke her own name record (`PPL_SARAH_ROOT`), block erasure, launch an alarming modal, and display code: `[DENY: ERR-701: SELF-TERMINATION FORBIDDEN]`.
+- **Column 3 (Right Column - Associated Extensions):** Relational cross-object lookup links displaying connected guardians, coaches, squads, financial logs, or asset IDs.
+
+---
+
+## 🏁 FINAL EXECUTION DIRECTIVE:
+Compile and mount this global, modular Next.js 15 layout engine inside the active application environment. Build out the persistent top UAT Context Switcher Bar, construct the left Windows folder-tree directory sidebar containing the nested Settings, Automations, and Marketplace sub-folders, populate the central HubSpot triage task widgets using real state exceptions, and hook up the 3-column right drawers with full non-happy-path CRUD workflows. Deliver the fully complete module code now.

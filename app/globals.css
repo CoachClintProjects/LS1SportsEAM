@@ -91,3 +91,8 @@ a {
   background: #fa4616;
   color: #ffffff;
 }
+/* Right-side record panels retain the workspace underneath. */
+.admin-slide-panel { animation: admin-panel-enter 180ms ease-out; color-scheme: dark; }
+@keyframes admin-panel-enter { from { transform: translateX(48px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .admin-slide-panel { animation: none; } }
+.ls1-admin-shell { color-scheme: dark; }

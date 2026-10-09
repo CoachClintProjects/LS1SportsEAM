@@ -447,6 +447,7 @@ export default function TriageTaskHub({
       {(selected || creating) && !linked && (
         <AdminDrawerShell
           title={creating ? "Add a club task" : selected!.title}
+          recordStatus={creating ? undefined : selected?.status}
           busy={busy}
           onClose={close}
         >

@@ -1,16 +1,19 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { RecordLifecycle } from "./RecordLifecycle";
 export function AdminDrawerShell({
   title,
   busy = false,
   onClose,
   children,
+  recordStatus,
 }: {
   title: string;
   busy?: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  recordStatus?: string;
 }) {
   const root = useRef<HTMLElement>(null),
     close = useRef(onClose),
@@ -63,7 +66,7 @@ export function AdminDrawerShell({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="ml-auto h-full w-full max-w-5xl overflow-y-auto border-l border-[#30363D] bg-[#0A0C10] p-6 text-white"
+        className="admin-slide-panel ml-auto h-full w-full max-w-5xl overflow-y-auto border-l border-[#30363D] bg-[#161B22] p-6 text-white"
       >
         <header className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-2xl font-bold">{title}</h2>
@@ -75,6 +78,7 @@ export function AdminDrawerShell({
             Close
           </button>
         </header>
+        {recordStatus && <RecordLifecycle status={recordStatus} />}
         {children}
       </aside>
     </div>,

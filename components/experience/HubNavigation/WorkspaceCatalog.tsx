@@ -1,19 +1,29 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 export default function WorkspaceCatalog({
   hub,
   role,
+  labelPrefix,
 }: {
   hub: string;
   role: string;
+  labelPrefix?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const generation = useRef(0);
+  useEffect(
+    () => () => {
+      generation.current++;
+    },
+    [],
+  );
   const [kind, setKind] = useState("automations"),
     [rows, setRows] = useState<any[]>([]),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   async function open(next: string) {
+    const current = ++generation.current;
     setKind(next);
     setRows([]);
     setError("");
@@ -25,12 +35,14 @@ export default function WorkspaceCatalog({
         { cache: "no-store" },
       );
       const j = await r.json();
+      if (current !== generation.current) return;
       if (!r.ok) throw new Error(j.error);
       setRows(j.rows || []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Catalog unavailable.");
+      if (current === generation.current)
+        setError(e instanceof Error ? e.message : "Catalog unavailable.");
     } finally {
-      setLoading(false);
+      if (current === generation.current) setLoading(false);
     }
   }
   return (
@@ -40,15 +52,23 @@ export default function WorkspaceCatalog({
           <button
             key={k}
             onClick={() => open(k)}
-            className="block w-full rounded px-3 py-2 text-left text-[12px] text-neutral-300 hover:bg-neutral-900"
+            className="block w-full rounded px-3 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-900"
           >
-            {k === "automations" ? "Automations" : "Marketplace"}
+            {labelPrefix
+              ? `${labelPrefix} ${k === "automations" ? "Automations Center" : "App Marketplace"}`
+              : k === "automations"
+                ? "Automations"
+                : "Marketplace"}
           </button>
         ))}
       </div>
       <dialog
         ref={dialog}
-        className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-[min(720px,94vw)] max-w-none border-l border-neutral-600 bg-[#18191c] p-6 text-white backdrop:bg-black/65"
+        aria-label={`${labelPrefix || "Workspace"} ${kind}`}
+        onClose={() => {
+          generation.current++;
+        }}
+        className="admin-slide-panel fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-[min(720px,94vw)] max-w-none border-l border-neutral-600 bg-[#161B22] p-6 text-white backdrop:bg-black/65"
       >
         <div className="flex justify-between">
           <h2 className="text-xl font-semibold">
@@ -73,7 +93,10 @@ export default function WorkspaceCatalog({
         )}
         {error && (
           <p role="alert" className="mt-6 text-red-300">
-            {error}
+            {error}{" "}
+            <button onClick={() => void open(kind)} className="ml-2 underline">
+              Retry
+            </button>
           </p>
         )}
         {!loading && !error && !rows.length && (

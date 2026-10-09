@@ -46,7 +46,7 @@ export default function SubmitTicket() {
         }}
         className="mb-3 w-full rounded-md bg-[#FA4616] px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
       >
-        Submit Ticket
+        ➕ SUBMIT HELP TICKET
       </button>
       <dialog
         ref={dialog}

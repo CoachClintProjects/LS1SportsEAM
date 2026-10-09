@@ -256,6 +256,8 @@ export async function POST(request: NextRequest) {
         );
         source = original?.source;
       }
+      const executiveDecisions = await rest(`work_items?select=id&tenant_id=eq.${tenant}&work_type=eq.CLUB_FINANCE_DECISION&entity_id=eq.${journal.reversal_of || b.id}&limit=1`);
+      if (executiveDecisions.length) throw new PersonRecordError(409, "Reverse this from Club decisions so the entry fee and accounts stay in step.");
       if (["vendor_bill", "vendor_payment"].includes(source))
         throw new PersonRecordError(
           409,

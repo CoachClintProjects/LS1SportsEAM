@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Lexend_Deca } from 'next/font/google';
 const sidebarFont=Lexend_Deca({subsets:['latin'],weight:['400','500','600','700'],display:'swap'});
 import SubmitTicket from '@/components/support/SubmitTicket';
+import { AdminFolderNavigation } from '@/components/hubs/admin/AdminFolderNavigation';
 import WorkspaceCatalog from './WorkspaceCatalog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useHub } from '@/components/hubs/HubContext';
@@ -143,16 +144,17 @@ export function HubNavigation() {
     let cancelled = false;
 
     async function loadNavigation() {
+      if (activeHubId === "admin") { setSections([]); setRefreshing(false); return; }
       setRefreshing(true);
       setSections([]);
       setNavigationError('');
       try {
         const result = await getNavigation(activeHubId, switcherValue);
         if (!cancelled && result.length) setSections(result);
-        if (!cancelled && !result.length) {setSections(activeHubId==='admin'?[]:fallback);if(activeHubId==='admin')setNavigationError('No navigation returned for this role.');}
+        if (!cancelled && !result.length) setSections(fallback);
       } catch (error) {
         console.error('[HubNavigation] navigation load failed', { activeHubId, error });
-        if (!cancelled) {setSections(activeHubId==='admin'?[]:fallback);setNavigationError('Unable to load role navigation.');}
+        if (!cancelled) {setSections(fallback);setNavigationError('Unable to load navigation.');}
       } finally {
         if (!cancelled) setRefreshing(false);
       }
@@ -225,7 +227,7 @@ export function HubNavigation() {
           : 'Select option';
 
   return (
-    <nav style={sidebarFont.style} className={`${sidebarFont.className} flex h-full w-full flex-col bg-[#080909] text-white`}>
+    <nav style={sidebarFont.style} className={`${sidebarFont.className} flex h-full w-full flex-col bg-[#161B22] text-white`}>
       <div className="shrink-0 border-b border-neutral-800/80 px-5 py-5">
         <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#FA4616]">
           {currentHub.codeLane}
@@ -238,7 +240,7 @@ export function HubNavigation() {
         </div>
 
         {navigationError&&<div role="alert" className="mt-3 text-xs text-red-300">{navigationError}<button onClick={()=>setRetry(x=>x+1)} className="ml-2 rounded bg-blue-700 px-2 py-1 text-white">Retry</button></div>}
-        {showSwitcher && (
+        {showSwitcher && activeHubId !== 'admin' && (
           <div className="mt-5 rounded-lg border border-neutral-800 bg-[#0d1010] p-3">
             <div className="mb-2 flex items-center justify-between gap-2 text-[8px] font-black uppercase tracking-[.18em] text-[#FA4616]">
               <span>{switcherLabel}</span>
@@ -270,7 +272,7 @@ export function HubNavigation() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        {sections.map((section) => (
+        {activeHubId === 'admin' ? <AdminFolderNavigation /> : sections.map((section) => (
           <div key={section.id} className="mb-5">
             <div className="mb-1.5 px-3 text-[8px] font-bold tracking-[0.2em] text-neutral-700">
               {section.label}
@@ -306,7 +308,7 @@ export function HubNavigation() {
             </div>
           </div>
         ))}
-        {['admin','coach'].includes(activeHubId)&&<WorkspaceCatalog hub={activeHubId} role={switcherValue||'org_admin'}/>}
+        {activeHubId === 'coach' && <WorkspaceCatalog hub={activeHubId} role={switcherValue||'org_admin'}/>}
       </div>
 
       <div className="shrink-0 border-t border-neutral-800/80 px-4 py-3"><SubmitTicket/>

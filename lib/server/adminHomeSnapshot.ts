@@ -57,6 +57,7 @@ export async function adminHomeSnapshot(
     journalTasks,
     periodTasks,
     payableTasks,
+    waiverRequirements,
   ] = await Promise.all([
     rest(
       `organizations?select=id,name,code,status&tenant_id=eq.${tenant}&id=${orgFilter}`,
@@ -167,6 +168,9 @@ export async function adminHomeSnapshot(
       ? rest(
           `work_items?select=id,entity_id,status,payload&tenant_id=eq.${tenant}&work_type=eq.VENDOR_BILL_REVIEW&status=eq.open&payload->>organization_id=${orgFilter}${executive ? "" : "&payload->>assigned_role=eq.treasurer"}&order=id.desc&limit=200`,
         )
+      : [],
+    executive && can(ctx, role, "waivers.read")
+      ? rest(`waiver_assignments?select=id,status,due_at&tenant_id=eq.${tenant}&organization_id=${orgFilter}&status=in.(assigned,pending)&order=due_at.asc&limit=500`)
       : [],
   ]);
   const [
@@ -290,6 +294,7 @@ export async function adminHomeSnapshot(
     journalTasks,
     periodTasks,
     payableTasks,
+    waiverRequirements,
     competitionReadiness: [],
     authorization: {
       createTask: can(ctx, role, "admin_tasks.create"),

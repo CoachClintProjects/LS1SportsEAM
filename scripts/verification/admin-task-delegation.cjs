@@ -25,5 +25,7 @@ async function post(body){calls=[];return loaded.exports.POST({json:async()=>({a
  assert.equal(task.tenant_id,'tenant');assert.equal(task.payload.assigned_role,'treasurer');assert.equal(task.payload.due_on,'2026-10-20');assert.equal(task.payload.created_by,'actor');
  assert.ok(calls.some(c=>c.url.endsWith('/audit_events')));
  assert.equal((await post({role:'registrar'})).status,200);assert.equal(JSON.parse(calls[0].init.body).payload.assigned_role,'registrar');
+ for(const body of [{action:'archive-master-record',entity:'person',id:'person'},{action:'update-master-record',entity:'person',id:'person',changes:{status:'inactive'}}]){const result=await post(body);assert.equal(result.status,409);assert.ok(result.body.error.includes('ERR-701'));assert.equal(calls.length,0);}
+ console.log('PASS: self-deactivation and archive denied before database mutation.');
  console.log('PASS: task delegation role boundary, valid dates, actor/tenant binding and audit request. No business records created.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

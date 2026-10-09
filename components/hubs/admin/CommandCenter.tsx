@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 const PersonnelSafety = dynamic(() =>
   import("./PersonnelSafety").then((m) => m.PersonnelSafety),
 );
+const ExecutiveActionDrawer = dynamic(() => import("./ExecutiveActionDrawer").then(m => m.ExecutiveActionDrawer));
 const PersonRecordDrawer = dynamic(() => import("./PersonRecordDrawer"));
 
 import { CalendarDays, Settings } from "lucide-react";
@@ -35,6 +36,7 @@ function ClubFollowUp({
   roleLabel?: string;
 }) {
   const router = useRouter();
+  const [executiveActions, setExecutiveActions] = useState(false);
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
@@ -335,6 +337,8 @@ function ClubFollowUp({
         count: pendingRegistrations.length,
         rows: pendingRegistrations,
       });
+    if (role === "org_admin" && data.waiverRequirements?.length)
+      out.push({key:"waiver-requirements", category:"WAIVERS", title:`${data.waiverRequirements.length} waiver requirements need attention`, instruction:"Review the requirement and record an approved exception or restore a requirement.", count:data.waiverRequirements.length, rows:data.waiverRequirements});
     const governance = (data.governanceTasks || []).filter(
       (w: Row) =>
         w.payload?.record_status !== "active" ||
@@ -665,6 +669,7 @@ function ClubFollowUp({
     data.orgAdmin?.organizations?.[0] || data.controls?.organizations?.[0];
   return (
     <main className="org-admin-home">
+      {executiveActions && <ExecutiveActionDrawer onClose={()=>setExecutiveActions(false)} onSaved={()=>{void load().catch(e=>setError(e.message));}} />}
       {governanceId && (
         <GovernanceRecordDrawer
           role={role}
@@ -721,6 +726,7 @@ function ClubFollowUp({
           {error}
         </div>
       )}
+      {role === "org_admin" && <button onClick={()=>setExecutiveActions(true)} className="mb-4 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white">Club decisions · waivers, cash and entry fees</button>}
       {role === "org_admin" && (
         <section aria-label="Manage your club" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
@@ -879,13 +885,11 @@ function ClubFollowUp({
           {taskTab === "open" ? (
             tasks.length ? (
               tasks.map((task) => (
-                <button
-                  key={task.key}
-                  onClick={() => setSelected(task)}
-                  className="flex w-full items-center justify-between gap-4 border-b border-[#e5e8ec] px-4 py-3 text-left last:border-0 hover:bg-[#f3f7fb]"
-                >
+                <div key={task.key} className="flex w-full items-center gap-3 border-b border-[#30363D] bg-[#161B22] px-4 py-3 last:border-0">
+                  <input type="checkbox" checked={selected?.key === task.key} onChange={() => task.key === "waiver-requirements" ? setExecutiveActions(true) : setSelected(task)} aria-label={`Review ${task.title}`} className="h-5 w-5 shrink-0 accent-amber-500" />
+                  <button onClick={() => task.key === "waiver-requirements" ? setExecutiveActions(true) : setSelected(task)} className="flex w-full items-center justify-between gap-4 text-left">
                   <span>
-                    <span className="block text-xs font-semibold text-[#627188]">
+                    <span className="block text-xs font-semibold text-amber-300">
                       {task.category}
                     </span>
                     <strong className="mt-1 block text-sm">{task.title}</strong>
@@ -894,7 +898,8 @@ function ClubFollowUp({
                   <span className="shrink-0 text-xs text-[#145b91]">
                     Review →
                   </span>
-                </button>
+                  </button>
+                </div>
               ))
             ) : (
               <p className="p-5 text-sm text-[#627188]">

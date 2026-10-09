@@ -1,4 +1,6 @@
 ﻿import React, { Suspense } from 'react';
+import { Lexend_Deca } from 'next/font/google';
+const workspaceFont = Lexend_Deca({subsets:['latin'],weight:['400','500','600','700'],display:'swap'});
 import '@/app/globals.css';
 
 import { GlobalShell } from '@/components/experience/GlobalShell/GlobalShell';
@@ -41,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="h-screen w-screen overflow-hidden bg-[#050807]">
+      <body style={workspaceFont.style} className="h-screen w-screen overflow-hidden bg-[#0A0C10]">
         {/* =================================================
             SECTION: HUB CONTEXT
             ================================================= */}
@@ -51,6 +53,7 @@ export default function RootLayout({
               SECTION: GLOBAL APPLICATION SHELL
               =============================================== */}
 
+          <Suspense fallback={<NavigationFallback />}>
           <GlobalShell
             header={<GlobalHeader />}
             navigation={
@@ -65,6 +68,7 @@ export default function RootLayout({
 
             {children}
           </GlobalShell>
+          </Suspense>
         </HubProvider>
       </body>
     </html>

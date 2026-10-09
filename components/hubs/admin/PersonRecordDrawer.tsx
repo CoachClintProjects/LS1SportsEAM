@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import RecordWorkPanel from "./RecordWorkPanel";
+import { RecordLifecycle } from "./RecordLifecycle";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -76,7 +77,7 @@ function Card({
   edit?: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-[#41434a] bg-[#242529] p-4">
+    <section className="rounded-xl border border-[#30363D] bg-[#0A0C10] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         {edit && (
@@ -291,7 +292,7 @@ export default function PersonRecordDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="person-drawer-title"
-        className="absolute right-0 top-0 flex h-full w-[min(1280px,94vw)] flex-col border-l border-[#41434a] bg-[#18191c] text-neutral-100 shadow-2xl outline-none"
+        className="admin-slide-panel absolute right-0 top-0 flex h-full w-[min(1280px,94vw)] flex-col border-l border-[#30363D] bg-[#161B22] text-neutral-100 shadow-2xl outline-none"
         style={{ colorScheme: "dark" }}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-orange-700 bg-[#c63812] px-5 py-3">
@@ -322,6 +323,7 @@ export default function PersonRecordDrawer({
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {p?.status && <RecordLifecycle status={p.status} />}
           {loading && (
             <p role="status">Loading record and linked information…</p>
           )}
@@ -475,7 +477,7 @@ export default function PersonRecordDrawer({
                       e.preventDefault();
                       save();
                     }}
-                    className="rounded-xl border border-blue-500 bg-[#242529] p-4"
+                    className="rounded-xl border border-blue-500 bg-[#0A0C10] p-4"
                   >
                     <h3 className="mb-4 font-semibold">
                       Edit{" "}
@@ -495,7 +497,7 @@ export default function PersonRecordDrawer({
                               onChange={(e) =>
                                 setDraft({ ...draft, [key]: e.target.value })
                               }
-                              className="mt-1 min-h-20 w-full rounded border border-neutral-600 bg-[#18191c] p-2 text-sm text-white"
+                              className="mt-1 min-h-20 w-full rounded border border-neutral-600 bg-[#161B22] p-2 text-sm text-white"
                             />
                           ) : (
                             <input
@@ -507,7 +509,7 @@ export default function PersonRecordDrawer({
                               onChange={(e) =>
                                 setDraft({ ...draft, [key]: e.target.value })
                               }
-                              className="mt-1 w-full rounded border border-neutral-600 bg-[#18191c] p-2 text-sm text-white"
+                              className="mt-1 w-full rounded border border-neutral-600 bg-[#161B22] p-2 text-sm text-white"
                             />
                           )}
                         </label>
