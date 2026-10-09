@@ -20,3 +20,13 @@ Remaining: signed-in end-to-end business actions are unverified. Folders show ac
 - TypeScript passed. Focused ESLint has zero errors (existing loose-type/hook warnings remain). Production compilation passed and page-data collection stops at the existing icons route without local Supabase configuration. Permission, actor binding, self-deactivation and triage boundary checks passed without live business writes.
 
 This is an interaction correction release. It does not supersede the remaining signed-in verification or certify every specialized workflow/menu destination listed in the original prompt. No database schema or business records were changed in this batch.
+
+## 9 October drawer coverage follow-up
+
+- Replaced remaining centered Admin forms in Home, roster onboarding, registration, finance setup/invoice creation, facilities/contracts/bookings/closures and campaign creation with the shared dark right-side drawer. Form fields are disabled during saves, and API errors remain visible inside the form.
+- Converted existing billing, registration, facility and campaign record panels to the shared lifecycle drawer with separate property, action and linked-record columns. Existing Home activity, event and follow-up panels use the shared shell as well.
+- Preserved database-provided nested navigation sections instead of flattening every group. Club President still keeps full authority and all folders when navigating.
+- TypeScript and focused ESLint passed (zero lint errors; legacy warnings remain). A before/after action inventory confirmed all 33 existing mutation action references remain present across the converted workspaces. No centered modal containers remain in components/hubs/admin. These are source-level checks, not signed-in browser UAT.
+- Prior correction release abdefcd deployed successfully to Preview at https://ls1sportseam-5s2dm84of-pieify.vercel.app. This follow-up is based on that exact published commit.
+
+Remaining original specialty menu destinations and business workflow certification are still tracked above. This entry does not claim those workflows were created by converting their surrounding shell.

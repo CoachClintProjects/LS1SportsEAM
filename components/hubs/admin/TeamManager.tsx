@@ -1,4 +1,5 @@
 "use client";
+import { AdminDrawerShell } from "./AdminDrawerShell";
 import PersonRecordDrawer from "./PersonRecordDrawer";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
@@ -250,9 +251,21 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
         </nav>
       </section>
       {creating && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-neutral-700 bg-[#080909] p-5">
-            <h2 className="text-xl font-black">Onboard athlete</h2>
+        <AdminDrawerShell
+          title="Add athlete"
+          busy={busy}
+          onClose={() => setCreating(false)}
+        >
+          <fieldset disabled={busy}>
+            {error && (
+              <p
+                role="alert"
+                className="mb-4 rounded border border-red-700 p-3 text-red-300"
+              >
+                {error}
+              </p>
+            )}
+
             {data.controls.organizations.length > 1 && (
               <select
                 value={form.organizationId}
@@ -358,8 +371,8 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
                 Onboard
               </button>
             </div>
-          </div>
-        </div>
+          </fieldset>
+        </AdminDrawerShell>
       )}{" "}
       {selected && (
         <PersonRecordDrawer

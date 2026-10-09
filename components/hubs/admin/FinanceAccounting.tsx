@@ -1,4 +1,5 @@
 "use client";
+import { AdminDrawerShell } from "./AdminDrawerShell";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
@@ -252,6 +253,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       </section>
       {setup && (
         <FinanceSetup
+          error={error}
           data={data}
           busy={busy}
           onClose={() => setSetup(false)}
@@ -260,6 +262,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       )}{" "}
       {creating && (
         <InvoiceModal
+          error={error}
           legalEntities={data.financeContext?.legalEntities || []}
           people={(data.financeContext?.customers || [])
             .map((x: any) => x.people)
@@ -271,6 +274,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       )}{" "}
       {selected && (
         <Drawer
+          error={error}
           paymentMethods={data.financeContext?.paymentMethods || []}
           row={selected}
           lines={(data.invoiceLines || []).filter(
@@ -324,6 +328,7 @@ function Drawer({
   onCredit,
   onVoid,
   busy,
+  error,
 }: {
   paymentMethods: Row[];
   row: Row;
@@ -336,6 +341,7 @@ function Drawer({
   onCredit: (a: number, r: string) => void;
   onVoid: (r: string) => void;
   busy: boolean;
+  error: string;
 }) {
   const [a, setA] = useState(""),
     [m, setM] = useState(""),
@@ -343,168 +349,192 @@ function Drawer({
     [reason, setReason] = useState(""),
     [key] = useState(() => crypto.randomUUID());
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70" onClick={onClose}>
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        className="ml-auto h-full w-full max-w-2xl overflow-y-auto border-l border-neutral-700 bg-[#080909] p-6"
-      >
-        <button onClick={onClose} className="float-right text-neutral-400">
-          Close
-        </button>
-        <div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">
-          Financial record
-        </div>
-        <h2 className="mt-2 text-2xl font-black">
-          {row.invoice_number || row.bill_number || row.id}
-        </h2>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          {Object.entries(row).map(([k, v]) => (
-            <div key={k} className="border-b border-neutral-800 pb-2">
-              <div className="text-[9px] uppercase text-neutral-600">
-                {k.replaceAll("_", " ")}
-              </div>
-              <div className="mt-1 break-words text-sm">{String(v ?? "—")}</div>
-            </div>
-          ))}
-        </div>
-        {lines.length > 0 && (
-          <section className="mt-6 border-t border-neutral-800 pt-4">
-            <h3 className="font-black">Invoice lines</h3>
-            {lines.map((x) => (
-              <div key={x.id} className="mt-2 flex justify-between text-sm">
-                <span>{x.description}</span>
-                <span>{money(x.line_total, row.currency)}</span>
+    <AdminDrawerShell
+      title={row.invoice_number || row.bill_number || "Financial record"}
+      busy={busy}
+      onClose={onClose}
+      recordStatus={row.status}
+    >
+      {error && (
+        <p role="alert" className="mb-4 text-red-300">
+          {error}
+        </p>
+      )}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="min-w-0">
+          <h3 className="font-semibold">Record details</h3>
+          <div className="mt-6 grid gap-3">
+            {Object.entries(row).map(([k, v]) => (
+              <div key={k} className="border-b border-neutral-800 pb-2">
+                <div className="text-[9px] uppercase text-neutral-600">
+                  {k.replaceAll("_", " ")}
+                </div>
+                <div className="mt-1 break-words text-sm">
+                  {String(v ?? "—")}
+                </div>
               </div>
             ))}
-          </section>
-        )}
-        {payments.length > 0 && (
-          <section className="mt-6 border-t border-neutral-800 pt-4">
-            <h3 className="font-black">Payment history</h3>
-            {payments.map((x) => (
-              <div key={x.id} className="mt-2 grid grid-cols-4 gap-2 text-sm">
-                <span>{x.payment_date}</span>
-                <span>{x.method}</span>
-                <span>{money(x.amount, x.currency)}</span>
-                <span>{x.status}</span>
-              </div>
-            ))}
-            <div className="mt-3 text-xs text-neutral-500">
-              {allocations.length} payment allocation record
-              {allocations.length === 1 ? "" : "s"}
-            </div>
-          </section>
-        )}
-        {credits.length > 0 && (
-          <section className="mt-6 border-t border-neutral-800 pt-4">
-            <h3 className="font-black">Credits</h3>
-            {credits.map((x) => (
-              <div key={x.id} className="mt-2 flex justify-between text-sm">
-                <span>{x.reason}</span>
-                <span>
-                  {money(x.amount, row.currency)} · {x.status}
-                </span>
-              </div>
-            ))}
-          </section>
-        )}
-        {row.due_date && Number(row.balance_due) > 0 && (
-          <div className="mt-4 text-xs font-bold text-amber-300">
-            {Math.max(
-              0,
-              Math.floor(
-                (Date.now() - new Date(row.due_date).getTime()) / 86400000,
-              ),
-            )}{" "}
-            days overdue
           </div>
-        )}
-        {row.balance_due > 0 && row.status !== "void" && (
-          <div className="mt-6 border-t border-neutral-800 pt-4">
-            <h3 className="font-black">Record payment</h3>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={a}
-                onChange={(e) => setA(e.target.value)}
-                type="number"
-                placeholder="Amount"
-                className="rounded border border-neutral-700 bg-black px-3 py-2"
-              />
-              <select
-                value={m}
-                onChange={(e) => setM(e.target.value)}
-                className="rounded border border-neutral-700 bg-black px-3 py-2"
-              >
-                <option value="">Payment method</option>
-                {paymentMethods
-                  .filter((x) => x.status === "active")
-                  .map((x) => (
-                    <option key={x.id} value={x.code}>
-                      {x.name}
-                    </option>
-                  ))}
-              </select>
+        </section>
+        <fieldset disabled={busy} className="min-w-0">
+          <legend className="font-semibold">Actions</legend>
+          {row.due_date && Number(row.balance_due) > 0 && (
+            <div className="mt-4 text-xs font-bold text-amber-300">
+              {Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - new Date(row.due_date).getTime()) / 86400000,
+                ),
+              )}{" "}
+              days overdue
+            </div>
+          )}
+          {row.balance_due > 0 && row.status !== "void" && (
+            <div className="mt-6 border-t border-neutral-800 pt-4">
+              <h3 className="font-black">Record payment</h3>
+              <div className="mt-2 grid gap-2">
+                <input
+                  value={a}
+                  onChange={(e) => setA(e.target.value)}
+                  type="number"
+                  placeholder="Amount"
+                  className="min-w-0 w-full rounded border border-neutral-700 bg-black px-3 py-2"
+                />
+                <select
+                  value={m}
+                  onChange={(e) => setM(e.target.value)}
+                  className="min-w-0 w-full rounded border border-neutral-700 bg-black px-3 py-2"
+                >
+                  <option value="">Payment method</option>
+                  {paymentMethods
+                    .filter((x) => x.status === "active")
+                    .map((x) => (
+                      <option key={x.id} value={x.code}>
+                        {x.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  disabled={busy || !a || !m}
+                  onClick={() => onPayment(Number(a), m, key)}
+                  className="rounded bg-[#FA4616] px-3 py-2 font-black text-black"
+                >
+                  Post payment
+                </button>
+              </div>
+              <div className="mt-4 grid gap-2">
+                <input
+                  value={credit}
+                  onChange={(e) => setCredit(e.target.value)}
+                  type="number"
+                  placeholder="Credit amount"
+                  className="min-w-0 w-full rounded border border-neutral-700 bg-black px-3 py-2"
+                />
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Required reason"
+                  className="min-w-0 w-full rounded border border-neutral-700 bg-black px-3 py-2"
+                />
+                <button
+                  disabled={busy || !credit || !reason}
+                  onClick={() => onCredit(Number(credit), reason)}
+                  className="rounded border border-neutral-600 px-3 py-2 text-xs font-black"
+                >
+                  Issue credit
+                </button>
+              </div>
               <button
-                disabled={busy || !a || !m}
-                onClick={() => onPayment(Number(a), m, key)}
-                className="rounded bg-[#FA4616] px-3 py-2 font-black text-black"
+                disabled={busy || !reason}
+                onClick={() => onVoid(reason)}
+                className="mt-3 rounded border border-red-900 px-3 py-2 text-xs font-black text-red-300"
               >
-                Post payment
+                Void invoice
               </button>
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
-              <input
-                value={credit}
-                onChange={(e) => setCredit(e.target.value)}
-                type="number"
-                placeholder="Credit amount"
-                className="rounded border border-neutral-700 bg-black px-3 py-2"
-              />
-              <input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Required reason"
-                className="rounded border border-neutral-700 bg-black px-3 py-2"
-              />
-              <button
-                disabled={busy || !credit || !reason}
-                onClick={() => onCredit(Number(credit), reason)}
-                className="rounded border border-neutral-600 px-3 py-2 text-xs font-black"
-              >
-                Issue credit
-              </button>
-            </div>
-            <button
-              disabled={busy || !reason}
-              onClick={() => onVoid(reason)}
-              className="mt-3 rounded border border-red-900 px-3 py-2 text-xs font-black text-red-300"
-            >
-              Void invoice
-            </button>
-          </div>
-        )}
-      </aside>
-    </div>
+          )}
+        </fieldset>
+        <section className="min-w-0">
+          <h3 className="font-semibold">Linked records</h3>
+          {lines.length > 0 && (
+            <section className="mt-6 border-t border-neutral-800 pt-4">
+              <h3 className="font-black">Invoice lines</h3>
+              {lines.map((x) => (
+                <div key={x.id} className="mt-2 flex justify-between text-sm">
+                  <span>{x.description}</span>
+                  <span>{money(x.line_total, row.currency)}</span>
+                </div>
+              ))}
+            </section>
+          )}
+          {payments.length > 0 && (
+            <section className="mt-6 border-t border-neutral-800 pt-4">
+              <h3 className="font-black">Payment history</h3>
+              {payments.map((x) => (
+                <div key={x.id} className="mt-2 grid grid-cols-4 gap-2 text-sm">
+                  <span>{x.payment_date}</span>
+                  <span>{x.method}</span>
+                  <span>{money(x.amount, x.currency)}</span>
+                  <span>{x.status}</span>
+                </div>
+              ))}
+              <div className="mt-3 text-xs text-neutral-500">
+                {allocations.length} payment allocation record
+                {allocations.length === 1 ? "" : "s"}
+              </div>
+            </section>
+          )}
+          {credits.length > 0 && (
+            <section className="mt-6 border-t border-neutral-800 pt-4">
+              <h3 className="font-black">Credits</h3>
+              {credits.map((x) => (
+                <div key={x.id} className="mt-2 flex justify-between text-sm">
+                  <span>{x.reason}</span>
+                  <span>
+                    {money(x.amount, row.currency)} · {x.status}
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
+          {!lines.length && !payments.length && !credits.length && (
+            <p className="mt-4 text-sm text-slate-300">
+              No invoice lines, payments or credits recorded.
+            </p>
+          )}
+        </section>
+      </div>
+    </AdminDrawerShell>
   );
 }
 function InvoiceModal({
   legalEntities,
   people,
   busy,
+  error,
   onClose,
   onSave,
 }: {
   legalEntities: any[];
   people: any[];
   busy: boolean;
+  error: string;
   onClose: () => void;
   onSave: (v: any) => void;
 }) {
   const [v, setV] = useState<any>({});
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-neutral-700 bg-[#080909] p-5">
-        <h2 className="text-xl font-black">Issue invoice</h2>
+    <AdminDrawerShell title="Issue invoice" busy={busy} onClose={onClose}>
+      <fieldset disabled={busy}>
+        {error && (
+          <p
+            role="alert"
+            className="mb-4 rounded border border-red-700 p-3 text-red-300"
+          >
+            {error}
+          </p>
+        )}
+
         <label className="mt-3 block text-xs text-neutral-400">
           Legal entity
           <select
@@ -570,30 +600,37 @@ function InvoiceModal({
             Issue
           </button>
         </div>
-      </div>
-    </div>
+      </fieldset>
+    </AdminDrawerShell>
   );
 }
 function FinanceSetup({
   data,
   busy,
+  error,
   onClose,
   onSave,
 }: {
   data: Payload;
   busy: boolean;
+  error: string;
   onClose: () => void;
   onSave: (v: any) => void;
 }) {
   const [v, setV] = useState<any>({});
   const ctx = data.financeContext;
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-neutral-700 bg-[#080909] p-5">
-        <button onClick={onClose} className="float-right text-neutral-400">
-          Close
-        </button>
-        <h2 className="text-xl font-black">Finance setup</h2>
+    <AdminDrawerShell title="Club billing setup" busy={busy} onClose={onClose}>
+      <fieldset disabled={busy}>
+        {error && (
+          <p
+            role="alert"
+            className="mb-4 rounded border border-red-700 p-3 text-red-300"
+          >
+            {error}
+          </p>
+        )}
+
         <p className="mt-1 text-xs text-neutral-500">
           Enter the club’s billing details, country and currency to begin.
         </p>
@@ -768,8 +805,8 @@ function FinanceSetup({
             </button>
           </section>
         )}
-      </div>
-    </div>
+      </fieldset>
+    </AdminDrawerShell>
   );
 }
 const PayablesWorkspace = dynamic(() => import("./PayablesWorkspace"));

@@ -1,4 +1,5 @@
 "use client";
+import { AdminDrawerShell } from "./AdminDrawerShell";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import "./admin-home.css";
@@ -8,7 +9,9 @@ import { useRouter } from "next/navigation";
 const PersonnelSafety = dynamic(() =>
   import("./PersonnelSafety").then((m) => m.PersonnelSafety),
 );
-const ExecutiveActionDrawer = dynamic(() => import("./ExecutiveActionDrawer").then(m => m.ExecutiveActionDrawer));
+const ExecutiveActionDrawer = dynamic(() =>
+  import("./ExecutiveActionDrawer").then((m) => m.ExecutiveActionDrawer),
+);
 const PersonRecordDrawer = dynamic(() => import("./PersonRecordDrawer"));
 
 import { CalendarDays, Settings } from "lucide-react";
@@ -26,7 +29,12 @@ type Task = {
   rows: Row[];
 };
 export function CommandCenter(props: { role?: string; roleLabel?: string }) {
-  return <><TriageTaskHub key={props.role || "org_admin"} role={props.role} /><ClubFollowUp {...props} /></>;
+  return (
+    <>
+      <TriageTaskHub key={props.role || "org_admin"} role={props.role} />
+      <ClubFollowUp {...props} />
+    </>
+  );
 }
 function ClubFollowUp({
   role = "org_admin",
@@ -60,17 +68,25 @@ function ClubFollowUp({
     [openingCompetition, setOpeningCompetition] = useState(false);
   const [taskDueOn, setTaskDueOn] = useState("");
   const [taskRole, setTaskRole] = useState(role);
-  const [taskRoles, setTaskRoles] = useState<{id: string; label: string}[]>([]);
+  const [taskRoles, setTaskRoles] = useState<{ id: string; label: string }[]>(
+    [],
+  );
   useEffect(() => {
     if (!newTask || role !== "org_admin") return;
     let cancelled = false;
-    authenticatedFetch("/api/admin-role-contexts", {cache: "no-store"})
-      .then(async response => {
+    authenticatedFetch("/api/admin-role-contexts", { cache: "no-store" })
+      .then(async (response) => {
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Unable to load staff roles.");
+        if (!response.ok)
+          throw new Error(result.error || "Unable to load staff roles.");
         if (!cancelled) setTaskRoles(result.options || []);
-      }).catch(error => { if (!cancelled) setError(error.message); });
-    return () => { cancelled = true; };
+      })
+      .catch((error) => {
+        if (!cancelled) setError(error.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [newTask, role]);
   const requestVersion = useRef(0);
   const load = useCallback(async () => {
@@ -246,15 +262,14 @@ function ClubFollowUp({
         rows: dupes,
       });
     const approvals = (data.approvals || []).filter(
-        (r: Row) => !r.status || r.status === "pending",
-      );
+      (r: Row) => !r.status || r.status === "pending",
+    );
     if (approvals.length)
       out.push({
         key: "approvals",
         category: "APPROVALS",
         title: `${approvals.length} approval${approvals.length === 1 ? "" : "s"} require a decision`,
-        instruction:
-          "Review the request and record your decision.",
+        instruction: "Review the request and record your decision.",
         count: approvals.length,
         rows: approvals,
       });
@@ -271,7 +286,11 @@ function ClubFollowUp({
     work.forEach((r: Row) =>
       out.push({
         key: `work-${r.id}`,
-        category: r.payload?.due_on && r.payload.due_on < new Date().toLocaleDateString("en-CA") ? "OVERDUE TASK" : "ASSIGNED TASK",
+        category:
+          r.payload?.due_on &&
+          r.payload.due_on < new Date().toLocaleDateString("en-CA")
+            ? "OVERDUE TASK"
+            : "ASSIGNED TASK",
         title: r.payload?.title || "Club task",
         instruction:
           r.payload?.description ||
@@ -338,7 +357,15 @@ function ClubFollowUp({
         rows: pendingRegistrations,
       });
     if (role === "org_admin" && data.waiverRequirements?.length)
-      out.push({key:"waiver-requirements", category:"WAIVERS", title:`${data.waiverRequirements.length} waiver requirements need attention`, instruction:"Review the requirement and record an approved exception or restore a requirement.", count:data.waiverRequirements.length, rows:data.waiverRequirements});
+      out.push({
+        key: "waiver-requirements",
+        category: "WAIVERS",
+        title: `${data.waiverRequirements.length} waiver requirements need attention`,
+        instruction:
+          "Review the requirement and record an approved exception or restore a requirement.",
+        count: data.waiverRequirements.length,
+        rows: data.waiverRequirements,
+      });
     const governance = (data.governanceTasks || []).filter(
       (w: Row) =>
         w.payload?.record_status !== "active" ||
@@ -453,14 +480,25 @@ function ClubFollowUp({
   async function openWorkspace(component: string) {
     setError("");
     try {
-      const response = await authenticatedFetch(`/api/admin-navigation?role=${encodeURIComponent(role)}`, { cache: "no-store" });
+      const response = await authenticatedFetch(
+        `/api/admin-navigation?role=${encodeURIComponent(role)}`,
+        { cache: "no-store" },
+      );
       const nav = await response.json();
-      if (!response.ok) throw new Error(nav.error || "Unable to load club menus.");
-      const link = (nav.rows || []).find((row: Row) => row.component === component);
-      if (!link) throw new Error("This workspace is not enabled for your account. Please contact your club administrator.");
+      if (!response.ok)
+        throw new Error(nav.error || "Unable to load club menus.");
+      const link = (nav.rows || []).find(
+        (row: Row) => row.component === component,
+      );
+      if (!link)
+        throw new Error(
+          "This workspace is not enabled for your account. Please contact your club administrator.",
+        );
       router.push(`/admin?${new URLSearchParams({ role, view: link.nav_id })}`);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to open workspace.");
+      setError(
+        error instanceof Error ? error.message : "Unable to open workspace.",
+      );
     }
   }
   async function openLedger(r: Row, period: boolean, payable = false) {
@@ -669,7 +707,14 @@ function ClubFollowUp({
     data.orgAdmin?.organizations?.[0] || data.controls?.organizations?.[0];
   return (
     <main className="org-admin-home">
-      {executiveActions && <ExecutiveActionDrawer onClose={()=>setExecutiveActions(false)} onSaved={()=>{void load().catch(e=>setError(e.message));}} />}
+      {executiveActions && (
+        <ExecutiveActionDrawer
+          onClose={() => setExecutiveActions(false)}
+          onSaved={() => {
+            void load().catch((e) => setError(e.message));
+          }}
+        />
+      )}
       {governanceId && (
         <GovernanceRecordDrawer
           role={role}
@@ -726,39 +771,72 @@ function ClubFollowUp({
           {error}
         </div>
       )}
-      {role === "org_admin" && <button onClick={()=>setExecutiveActions(true)} className="mb-4 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white">Club decisions · waivers, cash and entry fees</button>}
       {role === "org_admin" && (
-        <section aria-label="Manage your club" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <button
+          onClick={() => setExecutiveActions(true)}
+          className="mb-4 rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white"
+        >
+          Club decisions · waivers, cash and entry fees
+        </button>
+      )}
+      {role === "org_admin" && (
+        <section
+          aria-label="Manage your club"
+          className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        >
           {[
-            ["OrganizationArchitecture", "Staff and club settings", "Manage people, roles and access."],
-            ["GovernanceWorkspace", "Policies, insurance and incidents", "Assign follow-up, add documents and record decisions."],
-            ["BudgetWorkspace", "Budgets", "Prepare and review the club’s spending plan."],
-            ["FinanceAccounting", "Fees and spending", "Review bills, payments and spending approvals."],
+            [
+              "OrganizationArchitecture",
+              "Staff and club settings",
+              "Manage people, roles and access.",
+            ],
+            [
+              "GovernanceWorkspace",
+              "Policies, insurance and incidents",
+              "Assign follow-up, add documents and record decisions.",
+            ],
+            [
+              "BudgetWorkspace",
+              "Budgets",
+              "Prepare and review the club’s spending plan.",
+            ],
+            [
+              "FinanceAccounting",
+              "Fees and spending",
+              "Review bills, payments and spending approvals.",
+            ],
           ].map(([component, title, description]) => (
-            <button key={component} onClick={() => void openWorkspace(component)} className="rounded-xl border border-neutral-700 bg-[#15191c] p-4 text-left hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-blue-400">
-              <span className="block text-sm font-semibold text-blue-300">{title} →</span>
-              <span className="mt-2 block text-sm text-neutral-300">{description}</span>
+            <button
+              key={component}
+              onClick={() => void openWorkspace(component)}
+              className="rounded-xl border border-neutral-700 bg-[#15191c] p-4 text-left hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-blue-400"
+            >
+              <span className="block text-sm font-semibold text-blue-300">
+                {title} →
+              </span>
+              <span className="mt-2 block text-sm text-neutral-300">
+                {description}
+              </span>
             </button>
           ))}
         </section>
       )}
       {newTask && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setNewTask(false);
-          }}
+        <AdminDrawerShell
+          title="Add task"
+          busy={saving}
+          onClose={() => setNewTask(false)}
         >
-          <div className="w-full max-w-lg rounded-xl border border-neutral-700 bg-[#0b0d0d] p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black">New Task</h2>
-              <button
-                onClick={() => setNewTask(false)}
-                className="text-neutral-400"
+          <fieldset disabled={saving}>
+            {error && (
+              <p
+                role="alert"
+                className="mb-4 rounded border border-red-700 p-3 text-red-300"
               >
-                Close
-              </button>
-            </div>
+                {error}
+              </p>
+            )}
+            <div className="flex items-center justify-between"></div>
             <label className="mt-5 block text-xs text-neutral-400">
               Task
               <input
@@ -779,15 +857,34 @@ function ClubFollowUp({
             </label>
             <label className="mt-4 block text-sm text-neutral-300">
               Due date (optional)
-              <input type="date" value={taskDueOn} onChange={event => setTaskDueOn(event.target.value)} className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white" />
+              <input
+                type="date"
+                value={taskDueOn}
+                onChange={(event) => setTaskDueOn(event.target.value)}
+                className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white"
+              />
             </label>
-            {role === "org_admin" && <label className="mt-4 block text-sm text-neutral-300">
-              Responsible role
-              <select value={taskRole} onChange={event => setTaskRole(event.target.value)} className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white">
-                {!taskRoles.length && <option value="org_admin">Organization Administrator</option>}
-                {taskRoles.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-              </select>
-            </label>}
+            {role === "org_admin" && (
+              <label className="mt-4 block text-sm text-neutral-300">
+                Responsible role
+                <select
+                  value={taskRole}
+                  onChange={(event) => setTaskRole(event.target.value)}
+                  className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2 text-white"
+                >
+                  {!taskRoles.length && (
+                    <option value="org_admin">
+                      Organization Administrator
+                    </option>
+                  )}
+                  {taskRoles.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 onClick={() => setNewTask(false)}
@@ -803,8 +900,8 @@ function ClubFollowUp({
                 Create task
               </button>
             </div>
-          </div>
-        </div>
+          </fieldset>
+        </AdminDrawerShell>
       )}
       {pref("show_calendar") && (
         <Meetings
@@ -885,19 +982,50 @@ function ClubFollowUp({
           {taskTab === "open" ? (
             tasks.length ? (
               tasks.map((task) => (
-                <div key={task.key} className="flex w-full items-center gap-3 border-b border-[#30363D] bg-[#161B22] px-4 py-3 last:border-0">
-                  <input type="checkbox" checked={selected?.key === task.key} onChange={() => task.key === "waiver-requirements" ? setExecutiveActions(true) : setSelected(task)} aria-label={`Review ${task.title}`} className="h-5 w-5 shrink-0 accent-amber-500" />
-                  <button onClick={() => task.key === "waiver-requirements" ? setExecutiveActions(true) : setSelected(task)} className="flex w-full items-center justify-between gap-4 text-left">
-                  <span>
-                    <span className="block text-xs font-semibold text-amber-300">
-                      {task.category}
+                <div
+                  key={task.key}
+                  className="flex w-full items-center gap-3 border-b border-[#30363D] bg-[#161B22] px-4 py-3 last:border-0"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected?.key === task.key}
+                    onChange={() =>
+                      task.key === "waiver-requirements"
+                        ? setExecutiveActions(true)
+                        : setSelected(task)
+                    }
+                    aria-label={`Review ${task.title}`}
+                    className="h-5 w-5 shrink-0 accent-amber-500"
+                  />
+                  <button
+                    onClick={() =>
+                      task.key === "waiver-requirements"
+                        ? setExecutiveActions(true)
+                        : setSelected(task)
+                    }
+                    className="flex w-full items-center justify-between gap-4 text-left"
+                  >
+                    <span>
+                      <span className="block text-xs font-semibold text-amber-300">
+                        {task.category}
+                      </span>
+                      <strong className="mt-1 block text-sm">
+                        {task.title}
+                      </strong>
+                      {task.key.startsWith("work-") && (
+                        <span className="mt-1 block text-xs text-neutral-300">
+                          {String(
+                            task.rows[0]?.payload?.assigned_role || role,
+                          ).replaceAll("_", " ")}
+                          {task.rows[0]?.payload?.due_on
+                            ? ` · Due ${task.rows[0].payload.due_on}`
+                            : " · No due date"}
+                        </span>
+                      )}
                     </span>
-                    <strong className="mt-1 block text-sm">{task.title}</strong>
-                    {task.key.startsWith("work-") && <span className="mt-1 block text-xs text-neutral-300">{String(task.rows[0]?.payload?.assigned_role || role).replaceAll("_", " ")}{task.rows[0]?.payload?.due_on ? ` · Due ${task.rows[0].payload.due_on}` : " · No due date"}</span>}
-                  </span>
-                  <span className="shrink-0 text-xs text-[#145b91]">
-                    Review →
-                  </span>
+                    <span className="shrink-0 text-xs text-[#145b91]">
+                      Review →
+                    </span>
                   </button>
                 </div>
               ))
@@ -954,49 +1082,46 @@ function ClubFollowUp({
         </section>
       )}
       {selectedActivity && (
-        <div
-          className="fixed inset-0 z-[135] bg-black/70"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelectedActivity(null);
-          }}
+        <AdminDrawerShell
+          title={"Club activity"}
+          busy={saving}
+          onClose={() => setSelectedActivity(null)}
         >
-          <aside className="ml-auto h-full w-full max-w-xl overflow-y-auto border-l border-neutral-700 bg-[#080909] p-6">
-            <button onClick={() => setSelectedActivity(null)}>Close</button>
-            <div className="mt-5 text-[9px] font-black uppercase text-[#FA4616]">
-              Audit evidence
-            </div>
-            <h2 className="mt-1 text-xl font-black">
-              {humanAction(
-                selectedActivity.action,
-                selectedActivity.entity_type,
-              )}
-            </h2>
-            <div className="mt-2 text-xs text-neutral-500">
-              {selectedActivity.entity_type} · {selectedActivity.entity_id}
-            </div>
-            <div className="mt-5 grid gap-4">
-              <pre className="overflow-auto rounded border border-neutral-800 p-3 text-xs">
-                {JSON.stringify(selectedActivity.before_data, null, 2)}
-              </pre>
-              <pre className="overflow-auto rounded border border-neutral-800 p-3 text-xs">
-                {JSON.stringify(selectedActivity.after_data, null, 2)}
-              </pre>
-            </div>
-          </aside>
-        </div>
+          <div className="mt-5 text-[9px] font-black uppercase text-[#FA4616]">
+            Audit evidence
+          </div>
+          <h2 className="mt-1 text-xl font-black">
+            {humanAction(selectedActivity.action, selectedActivity.entity_type)}
+          </h2>
+          <div className="mt-2 text-xs text-neutral-500">
+            {selectedActivity.entity_type} · {selectedActivity.entity_id}
+          </div>
+          <div className="mt-5 grid gap-4">
+            <pre className="overflow-auto rounded border border-neutral-800 p-3 text-xs">
+              {JSON.stringify(selectedActivity.before_data, null, 2)}
+            </pre>
+            <pre className="overflow-auto rounded border border-neutral-800 p-3 text-xs">
+              {JSON.stringify(selectedActivity.after_data, null, 2)}
+            </pre>
+          </div>
+        </AdminDrawerShell>
       )}{" "}
       {customize && (
-        <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setCustomize(false);
-          }}
+        <AdminDrawerShell
+          title="Customize Home"
+          busy={saving}
+          onClose={() => setCustomize(false)}
         >
-          <div className="w-full max-w-md rounded-xl border border-neutral-700 bg-[#0b0d0d] p-5">
-            <div className="flex justify-between">
-              <h2 className="text-lg font-black">Customize Home</h2>
-              <button onClick={() => setCustomize(false)}>Close</button>
-            </div>
+          <fieldset disabled={saving}>
+            {error && (
+              <p
+                role="alert"
+                className="mb-4 rounded border border-red-700 p-3 text-red-300"
+              >
+                {error}
+              </p>
+            )}
+            <div className="flex justify-between"></div>
             {[
               ["show_calendar", "Meetings & calendar"],
               ["show_activity", "Activity feed"],
@@ -1014,8 +1139,8 @@ function ClubFollowUp({
                 />
               </label>
             ))}
-          </div>
-        </div>
+          </fieldset>
+        </AdminDrawerShell>
       )}
       {selectedEvent &&
         (selectedEvent.event_type === "competition" ? (
@@ -1036,75 +1161,66 @@ function ClubFollowUp({
             }}
           />
         ) : (
-          <div
-            className="fixed inset-0 z-[125] bg-black/40"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setSelectedEvent(null);
-            }}
+          <AdminDrawerShell
+            title={selectedEvent.title || "Calendar event"}
+            busy={saving}
+            onClose={() => setSelectedEvent(null)}
+            recordStatus={selectedEvent.status}
           >
-            <aside className="ml-auto h-full w-full max-w-xl overflow-y-auto border-l border-neutral-700 bg-[#242529] p-6 text-neutral-100">
+            <div className="text-xs font-semibold text-neutral-400">
+              {selectedEvent.event_type || "Event"}
+            </div>
+            <h2 className="mt-2 text-2xl font-bold">
+              {selectedEvent.title || selectedEvent.name}
+            </h2>
+            <p className="mt-3 text-sm text-neutral-300">
+              {selectedEvent.starts_at
+                ? new Date(selectedEvent.starts_at).toLocaleString()
+                : "Date not recorded"}
+              {selectedEvent.ends_at
+                ? ` → ${new Date(selectedEvent.ends_at).toLocaleString()}`
+                : ""}
+            </p>
+            <div className="mt-6 flex gap-2">
               <button
-                onClick={() => setSelectedEvent(null)}
-                className="float-right rounded border border-[#cbd3dd] px-3 py-1 text-sm"
+                disabled={saving}
+                onClick={() =>
+                  updateEvent(selectedEvent.id, { status: "cancelled" })
+                }
+                className="rounded border border-red-300 px-3 py-2 text-sm text-red-700"
               >
-                Close
+                Cancel event
               </button>
-              <div className="text-xs font-semibold text-neutral-400">
-                {selectedEvent.event_type || "Event"}
-              </div>
-              <h2 className="mt-2 text-2xl font-bold">
-                {selectedEvent.title || selectedEvent.name}
-              </h2>
-              <p className="mt-3 text-sm text-neutral-300">
-                {selectedEvent.starts_at
-                  ? new Date(selectedEvent.starts_at).toLocaleString()
-                  : "Date not recorded"}
-                {selectedEvent.ends_at
-                  ? ` → ${new Date(selectedEvent.ends_at).toLocaleString()}`
-                  : ""}
-              </p>
-              <div className="mt-6 flex gap-2">
+              {selectedEvent.status === "cancelled" && (
                 <button
                   disabled={saving}
                   onClick={() =>
-                    updateEvent(selectedEvent.id, { status: "cancelled" })
+                    updateEvent(selectedEvent.id, { status: "scheduled" })
                   }
-                  className="rounded border border-red-300 px-3 py-2 text-sm text-red-700"
+                  className="rounded bg-[#145b91] px-3 py-2 text-sm font-semibold text-white"
                 >
-                  Cancel event
+                  Restore event
                 </button>
-                {selectedEvent.status === "cancelled" && (
-                  <button
-                    disabled={saving}
-                    onClick={() =>
-                      updateEvent(selectedEvent.id, { status: "scheduled" })
-                    }
-                    className="rounded bg-[#145b91] px-3 py-2 text-sm font-semibold text-white"
-                  >
-                    Restore event
-                  </button>
-                )}
-              </div>
-            </aside>
-          </div>
+              )}
+            </div>
+          </AdminDrawerShell>
         ))}
       {newEvent && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setNewEvent(false);
-          }}
+        <AdminDrawerShell
+          title="Add calendar event"
+          busy={saving}
+          onClose={() => setNewEvent(false)}
         >
-          <div className="w-full max-w-lg rounded-xl border border-neutral-700 bg-[#0b0d0d] p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black">Create Event</h2>
-              <button
-                onClick={() => setNewEvent(false)}
-                className="text-neutral-400"
+          <fieldset disabled={saving}>
+            {error && (
+              <p
+                role="alert"
+                className="mb-4 rounded border border-red-700 p-3 text-red-300"
               >
-                Close
-              </button>
-            </div>
+                {error}
+              </p>
+            )}
+            <div className="flex items-center justify-between"></div>
             <label className="mt-5 block text-xs text-neutral-400">
               Event name
               <input
@@ -1163,293 +1279,295 @@ function ClubFollowUp({
                 Create event
               </button>
             </div>
-          </div>
-        </div>
+          </fieldset>
+        </AdminDrawerShell>
       )}
       {selected && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/70"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelected(null);
-          }}
+        <AdminDrawerShell
+          title={selected.title || "Club follow-up"}
+          busy={saving}
+          onClose={() => setSelected(null)}
         >
-          <aside className="absolute right-0 top-0 h-full w-full max-w-4xl overflow-y-auto border-l border-neutral-700 bg-[#080909]">
-            <header className="sticky top-0 z-10 border-b border-neutral-800 bg-[#080909] p-5">
-              <button
-                onClick={() => setSelected(null)}
-                className="float-right rounded border border-neutral-700 px-3 py-1 text-xs"
-              >
-                Close
-              </button>
-              <div className="text-[10px] font-black uppercase tracking-[.16em] text-[#FA4616]">
-                {selected.category}
-              </div>
-              <h2 className="mt-1 text-2xl font-black">{selected.title}</h2>
-              <p className="mt-2 max-w-2xl text-sm text-neutral-400">
-                {selected.instruction}
+          <header className="sticky top-0 z-10 border-b border-neutral-800 bg-[#0A0C10] p-5">
+            <button
+              onClick={() => setSelected(null)}
+              className="float-right rounded border border-neutral-700 px-3 py-1 text-xs"
+            >
+              Close
+            </button>
+            <div className="text-[10px] font-black uppercase tracking-[.16em] text-[#FA4616]">
+              {selected.category}
+            </div>
+            <h2 className="mt-1 text-2xl font-black">{selected.title}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-400">
+              {selected.instruction}
+            </p>
+          </header>
+          <div className="p-5">
+            {error && (
+              <p role="alert" className="mb-4 text-red-300">
+                {error}
               </p>
-            </header>
-            <div className="p-5">
-              {error && (
-                <p role="alert" className="mb-4 text-red-300">
-                  {error}
-                </p>
-              )}
-              {selected.key === "journal-review" ||
-              selected.key === "period-close" ||
-              selected.key === "payable-review" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <article
-                      key={r.id}
-                      className="rounded border border-neutral-600 p-4"
+            )}
+            {selected.key === "journal-review" ||
+            selected.key === "period-close" ||
+            selected.key === "payable-review" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <article
+                    key={r.id}
+                    className="rounded border border-neutral-600 p-4"
+                  >
+                    <h3 className="font-semibold">{r.payload?.title}</h3>
+                    <button
+                      className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm"
+                      onClick={() =>
+                        void openLedger(
+                          r,
+                          selected.key === "period-close",
+                          selected.key === "payable-review",
+                        )
+                      }
                     >
-                      <h3 className="font-semibold">{r.payload?.title}</h3>
-                      <button
-                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm"
-                        onClick={() =>
-                          void openLedger(
-                            r,
-                            selected.key === "period-close",
-                            selected.key === "payable-review",
-                          )
-                        }
-                      >
-                        Open{" "}
-                        {selected.key === "period-close"
-                          ? "fiscal period"
-                          : selected.key === "payable-review" ? "vendor bill" : "journal"}
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              ) : selected.key === "personnel-safety" ? (
-                <PersonnelSafety onChanged={() => void load()} />
-              ) : selected.key === "compliance-review" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded border border-neutral-600 p-4"
-                    >
-                      <h3 className="font-semibold">{r.payload?.title}</h3>
-                      <p className="text-sm text-neutral-400">
-                        {r.payload?.record_status}
-                      </p>
-                      <button
-                        disabled={saving}
-                        onClick={() => void openCompliance(r)}
-                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm font-bold"
-                      >
-                        Review evidence
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key === "budget-review" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded border border-neutral-600 p-4"
-                    >
-                      <h3 className="font-semibold">{r.payload?.title}</h3>
-                      <p className="mt-1 text-sm text-neutral-400">
-                        {r.payload?.budget_status}
-                      </p>
-                      <button
-                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
-                        onClick={() =>
-                          router.push(
-                            `/admin?${new URLSearchParams({ view: "budgets", role, record: r.entity_id })}`,
-                          )
-                        }
-                      >
-                        Open budget
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key === "governance" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded border border-neutral-600 p-4"
-                    >
-                      <h3 className="font-semibold">{r.payload?.title}</h3>
-                      <p className="mt-1 text-sm text-neutral-400">
-                        {r.payload?.kind} · {r.payload?.record_status}{" "}
-                        {r.payload?.due_on ? `· Due ${r.payload.due_on}` : ""}
-                      </p>
-                      <button
-                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
-                        onClick={() => {
-                          setSelected(null);
-                          setGovernanceId(r.entity_id);
-                        }}
-                      >
-                        Open club record
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key === "registration-review" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded-xl border border-neutral-700 p-4"
-                    >
-                      <h3 className="font-semibold">{r.name}</h3>
-                      <p className="mt-1 text-sm text-neutral-400">
-                        {String(r.status).replaceAll("_", " ")}
-                      </p>
-                      {r.person_id && (
-                        <button
-                          onClick={() => {
-                            setSelected(null);
-                            setRecordPersonId(r.person_id);
-                          }}
-                          className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
-                        >
-                          Review athlete registration
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key === "quality" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => {
-                    const p = people.get(r.entity_id);
-                    return (
-                      <div
-                        key={r.id}
-                        className="rounded-xl border border-neutral-800 p-4"
-                      >
-                        <div className="grid gap-4 md:grid-cols-[1fr_220px_auto] md:items-end">
-                          <div>
-                            <div className="font-black">
-                              {p
-                                ? [
-                                    p.preferred_name || p.first_name,
-                                    p.last_name,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")
-                                : "Person record"}
-                            </div>
-                            <div className="mt-1 text-sm text-neutral-500">
-                              {r.details?.message ||
-                                "This person’s details need review."}
-                            </div>
-                            <div className="mt-1 text-xs text-neutral-700">
-                              {p?.email || ""}
-                            </div>
-                          </div>
-                          <label className="text-xs text-neutral-400">
-                            Birth date
-                            <input
-                              type="date"
-                              value={
-                                birthDates[r.entity_id] ?? p?.birth_date ?? ""
-                              }
-                              onChange={(e) =>
-                                setBirthDates((x) => ({
-                                  ...x,
-                                  [r.entity_id]: e.target.value,
-                                }))
-                              }
-                              className="mt-1 block w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-white"
-                            />
-                          </label>
-                          <button
-                            disabled={
-                              saving ||
-                              !(birthDates[r.entity_id] ?? p?.birth_date)
-                            }
-                            onClick={() => updateBirthDate(r.entity_id)}
-                            className="rounded-lg bg-[#FA4616] px-4 py-2 text-xs font-black text-black disabled:opacity-30"
-                          >
-                            Save correction
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : selected.key === "approvals" ? (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
-                    <div
-                      key={r.id}
-                      className="rounded-xl border border-neutral-800 p-4"
-                    >
-                      <div className="font-bold">
-                        {r.approval_type || r.entity_type}
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          disabled={saving}
-                          onClick={() => decideApproval(r.id, "rejected")}
-                          className="rounded bg-red-800 px-3 py-2 text-xs text-white"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          disabled={saving}
-                          onClick={() => decideApproval(r.id, "approved")}
-                          className="rounded bg-emerald-700 px-3 py-2 text-xs font-bold text-white"
-                        >
-                          Approve
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : selected.key.startsWith("work-") ? (
-                <div className="rounded-xl border border-neutral-800 p-5">
-                  <div className="font-black">{selected.title}</div>
-                  <p className="mt-2 text-sm text-neutral-400">
-                    {selected.instruction}
-                  </p>
-                  <p className="mt-3 text-sm text-neutral-300">Responsible role: {String(selected.rows[0]?.payload?.assigned_role || role).replaceAll("_", " ")} · Due: {selected.rows[0]?.payload?.due_on || "No due date"}</p>
-                  {data.authorization?.updateTask && (
+                      Open{" "}
+                      {selected.key === "period-close"
+                        ? "fiscal period"
+                        : selected.key === "payable-review"
+                          ? "vendor bill"
+                          : "journal"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : selected.key === "personnel-safety" ? (
+              <PersonnelSafety onChanged={() => void load()} />
+            ) : selected.key === "compliance-review" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded border border-neutral-600 p-4"
+                  >
+                    <h3 className="font-semibold">{r.payload?.title}</h3>
+                    <p className="text-sm text-neutral-400">
+                      {r.payload?.record_status}
+                    </p>
                     <button
                       disabled={saving}
-                      onClick={() => complete(selected.rows[0].id)}
-                      className="mt-5 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white"
+                      onClick={() => void openCompliance(r)}
+                      className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm font-bold"
                     >
-                      Complete task
+                      Review evidence
                     </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {selected.rows.map((r: Row) => (
+                  </div>
+                ))}
+              </div>
+            ) : selected.key === "budget-review" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded border border-neutral-600 p-4"
+                  >
+                    <h3 className="font-semibold">{r.payload?.title}</h3>
+                    <p className="mt-1 text-sm text-neutral-400">
+                      {r.payload?.budget_status}
+                    </p>
+                    <button
+                      className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
+                      onClick={() =>
+                        router.push(
+                          `/admin?${new URLSearchParams({ view: "budgets", role, record: r.entity_id })}`,
+                        )
+                      }
+                    >
+                      Open budget
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : selected.key === "governance" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded border border-neutral-600 p-4"
+                  >
+                    <h3 className="font-semibold">{r.payload?.title}</h3>
+                    <p className="mt-1 text-sm text-neutral-400">
+                      {r.payload?.kind} · {r.payload?.record_status}{" "}
+                      {r.payload?.due_on ? `· Due ${r.payload.due_on}` : ""}
+                    </p>
+                    <button
+                      className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
+                      onClick={() => {
+                        setSelected(null);
+                        setGovernanceId(r.entity_id);
+                      }}
+                    >
+                      Open club record
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : selected.key === "registration-review" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border border-neutral-700 p-4"
+                  >
+                    <h3 className="font-semibold">{r.name}</h3>
+                    <p className="mt-1 text-sm text-neutral-400">
+                      {String(r.status).replaceAll("_", " ")}
+                    </p>
+                    {r.person_id && (
+                      <button
+                        onClick={() => {
+                          setSelected(null);
+                          setRecordPersonId(r.person_id);
+                        }}
+                        className="mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white"
+                      >
+                        Review athlete registration
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : selected.key === "quality" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => {
+                  const p = people.get(r.entity_id);
+                  return (
                     <div
                       key={r.id}
                       className="rounded-xl border border-neutral-800 p-4"
                     >
-                      <div className="font-bold">
-                        {r.title ||
-                          r.name ||
-                          r.counterparty_name ||
-                          r.invoice_number ||
-                          r.entity_type ||
-                          "Club record"}
-                      </div>
-                      <div className="mt-1 text-sm text-neutral-500">
-                        {r.match_reason || r.status || ""}
+                      <div className="grid gap-4 md:grid-cols-[1fr_220px_auto] md:items-end">
+                        <div>
+                          <div className="font-black">
+                            {p
+                              ? [p.preferred_name || p.first_name, p.last_name]
+                                  .filter(Boolean)
+                                  .join(" ")
+                              : "Person record"}
+                          </div>
+                          <div className="mt-1 text-sm text-neutral-500">
+                            {r.details?.message ||
+                              "This person’s details need review."}
+                          </div>
+                          <div className="mt-1 text-xs text-neutral-700">
+                            {p?.email || ""}
+                          </div>
+                        </div>
+                        <label className="text-xs text-neutral-400">
+                          Birth date
+                          <input
+                            type="date"
+                            value={
+                              birthDates[r.entity_id] ?? p?.birth_date ?? ""
+                            }
+                            onChange={(e) =>
+                              setBirthDates((x) => ({
+                                ...x,
+                                [r.entity_id]: e.target.value,
+                              }))
+                            }
+                            className="mt-1 block w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-white"
+                          />
+                        </label>
+                        <button
+                          disabled={
+                            saving ||
+                            !(birthDates[r.entity_id] ?? p?.birth_date)
+                          }
+                          onClick={() => updateBirthDate(r.entity_id)}
+                          className="rounded-lg bg-[#FA4616] px-4 py-2 text-xs font-black text-black disabled:opacity-30"
+                        >
+                          Save correction
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </aside>
-        </div>
+                  );
+                })}
+              </div>
+            ) : selected.key === "approvals" ? (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border border-neutral-800 p-4"
+                  >
+                    <div className="font-bold">
+                      {r.approval_type || r.entity_type}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        disabled={saving}
+                        onClick={() => decideApproval(r.id, "rejected")}
+                        className="rounded bg-red-800 px-3 py-2 text-xs text-white"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        disabled={saving}
+                        onClick={() => decideApproval(r.id, "approved")}
+                        className="rounded bg-emerald-700 px-3 py-2 text-xs font-bold text-white"
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : selected.key.startsWith("work-") ? (
+              <div className="rounded-xl border border-neutral-800 p-5">
+                <div className="font-black">{selected.title}</div>
+                <p className="mt-2 text-sm text-neutral-400">
+                  {selected.instruction}
+                </p>
+                <p className="mt-3 text-sm text-neutral-300">
+                  Responsible role:{" "}
+                  {String(
+                    selected.rows[0]?.payload?.assigned_role || role,
+                  ).replaceAll("_", " ")}{" "}
+                  · Due: {selected.rows[0]?.payload?.due_on || "No due date"}
+                </p>
+                {data.authorization?.updateTask && (
+                  <button
+                    disabled={saving}
+                    onClick={() => complete(selected.rows[0].id)}
+                    className="mt-5 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white"
+                  >
+                    Complete task
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selected.rows.map((r: Row) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border border-neutral-800 p-4"
+                  >
+                    <div className="font-bold">
+                      {r.title ||
+                        r.name ||
+                        r.counterparty_name ||
+                        r.invoice_number ||
+                        r.entity_type ||
+                        "Club record"}
+                    </div>
+                    <div className="mt-1 text-sm text-neutral-500">
+                      {r.match_reason || r.status || ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </AdminDrawerShell>
       )}
     </main>
   );

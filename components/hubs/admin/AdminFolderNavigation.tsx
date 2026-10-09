@@ -186,28 +186,33 @@ function RoleDirectory({
       </button>
       {open && (
         <div className="ml-4 border-l border-[#30363D] pb-2 pl-2 pr-1">
-          {items.map((item) => {
-            const href = hrefFor(item.href!);
-            const active =
-              (activeFolder
-                ? activeFolder === folder.role
-                : activeRole === folder.role) &&
-              new URL(href, "https://ls1.invalid").searchParams.get("view") ===
-                activeView;
-            return (
-              <Link
-                key={item.id}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={`block rounded px-2 text-sm leading-5 ${preferences.compact ? "py-1" : "py-2"} ${active ? "bg-orange-500/15 text-orange-300" : "text-white hover:bg-[#30363D]"}`}
+          {folder.sections.map((section) => {
+            const links = (
+              <FolderLinks
+                items={section.items}
+                hrefFor={hrefFor}
+                preferences={preferences}
+                activeView={activeView}
+                active={
+                  activeFolder
+                    ? activeFolder === folder.role
+                    : activeRole === folder.role
+                }
+              />
+            );
+            return section.id === "admin-main" ? (
+              <div key={section.id}>{links}</div>
+            ) : (
+              <details
+                key={section.id}
+                open
+                className="ml-1 border-l border-[#30363D] pl-2"
               >
-                {item.label}
-                {preferences.descriptions && item.description && (
-                  <span className="mt-1 block text-xs text-slate-300">
-                    {item.description}
-                  </span>
-                )}
-              </Link>
+                <summary className="cursor-pointer py-2 text-sm font-semibold text-slate-300">
+                  {section.label}
+                </summary>
+                {links}
+              </details>
             );
           })}
           {!items.length && (
@@ -293,5 +298,68 @@ function RoleDirectory({
         </form>
       </dialog>
     </section>
+  );
+}
+
+function FolderLinks({
+  items,
+  hrefFor,
+  preferences,
+  activeView,
+  active,
+}: {
+  items: NavigationItem[];
+  hrefFor: (href: string) => string;
+  preferences: Preferences;
+  activeView: string | null;
+  active: boolean;
+}) {
+  return (
+    <>
+      {items.map((item) => {
+        const href = item.href ? hrefFor(item.href) : null;
+        const current = Boolean(
+          active &&
+          href &&
+          new URL(href, "https://ls1.invalid").searchParams.get("view") ===
+            activeView,
+        );
+        const link = href ? (
+          <Link
+            href={href}
+            aria-current={current ? "page" : undefined}
+            className={`block rounded px-2 text-sm leading-5 ${preferences.compact ? "py-1" : "py-2"} ${current ? "bg-orange-500/15 text-orange-300" : "text-white hover:bg-[#30363D]"}`}
+          >
+            {item.label}
+            {preferences.descriptions && item.description && (
+              <span className="mt-1 block text-xs text-slate-300">
+                {item.description}
+              </span>
+            )}
+          </Link>
+        ) : null;
+        return item.children?.length ? (
+          <details
+            key={item.id}
+            open
+            className="ml-1 border-l border-[#30363D] pl-2"
+          >
+            <summary className="cursor-pointer py-2 text-sm font-semibold text-slate-300">
+              {item.label}
+            </summary>
+            {link}
+            <FolderLinks
+              items={item.children}
+              hrefFor={hrefFor}
+              preferences={preferences}
+              activeView={activeView}
+              active={active}
+            />
+          </details>
+        ) : (
+          <div key={item.id}>{link}</div>
+        );
+      })}
+    </>
   );
 }

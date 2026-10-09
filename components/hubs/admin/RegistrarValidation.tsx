@@ -1,4 +1,5 @@
 "use client";
+import { AdminDrawerShell } from "./AdminDrawerShell";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 const PersonRecordDrawer = dynamic(() => import("./PersonRecordDrawer"));
@@ -68,8 +69,7 @@ export function RegistrarValidation({ role = "registrar" }: { role?: string }) {
       ),
     [data, domain, q],
   );
-  if (!data)
-    return <State text={error || "Loading canonical registration records…"} />;
+  if (!data) return <State text={error || "Loading registration records…"} />;
   const tabs: [Domain, string][] = [
     ["registrations", "Registration queue"],
     ["memberships", "Membership"],
@@ -151,7 +151,7 @@ export function RegistrarValidation({ role = "registrar" }: { role?: string }) {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Filter canonical records"
+            placeholder="Find a record"
             className="w-full max-w-sm rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm"
           />
         </div>
@@ -200,9 +200,21 @@ export function RegistrarValidation({ role = "registrar" }: { role?: string }) {
         )}
       </section>
       {creating && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-neutral-700 bg-[#080909] p-5">
-            <h2 className="text-xl font-black">Create registration</h2>
+        <AdminDrawerShell
+          title="Create registration"
+          busy={busy}
+          onClose={() => setCreating(false)}
+        >
+          <fieldset disabled={busy}>
+            {error && (
+              <p
+                role="alert"
+                className="mb-4 rounded border border-red-700 p-3 text-red-300"
+              >
+                {error}
+              </p>
+            )}
+
             {error && (
               <p role="alert" className="mt-3 text-red-300">
                 {error}
@@ -295,8 +307,8 @@ export function RegistrarValidation({ role = "registrar" }: { role?: string }) {
                 Create registration
               </button>
             </div>
-          </div>
-        </div>
+          </fieldset>
+        </AdminDrawerShell>
       )}{" "}
       {selected && (
         <Drawer
@@ -341,114 +353,125 @@ function Drawer({
 }) {
   const [reason, setReason] = useState("");
   return (
-    <div className="fixed inset-0 z-[120] bg-black/70" onClick={close}>
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        className="ml-auto h-full w-full max-w-2xl overflow-y-auto border-l border-neutral-700 bg-[#080909] p-6"
-      >
-        <button onClick={close} className="float-right">
-          Close
-        </button>
-        <div className="text-[9px] uppercase tracking-[.2em] text-[#FA4616]">
-          Canonical registrar record
-        </div>
-        {row.person_id && (
-          <button
-            onClick={openPerson}
-            className="mt-5 rounded bg-blue-700 px-3 py-2 text-sm text-white"
-          >
-            Open athlete record & evidence
-          </button>
-        )}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          {Object.entries(row).map(([k, v]) => (
-            <div key={k} className="border-b border-neutral-800 pb-2">
-              <div className="text-[9px] uppercase text-neutral-600">
-                {k.replaceAll("_", " ")}
+    <AdminDrawerShell
+      title={"Registration and eligibility"}
+      busy={busy}
+      onClose={close}
+      recordStatus={row.status}
+    >
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="min-w-0">
+          <h3 className="font-semibold">Record details</h3>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {Object.entries(row).map(([k, v]) => (
+              <div key={k} className="border-b border-neutral-800 pb-2">
+                <div className="text-[9px] uppercase text-neutral-600">
+                  {k.replaceAll("_", " ")}
+                </div>
+                <div className="break-words text-sm">
+                  {typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}
+                </div>
               </div>
-              <div className="break-words text-sm">
-                {typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}
-              </div>
+            ))}
+          </div>
+        </section>
+        <fieldset disabled={busy} className="min-w-0">
+          <legend className="font-semibold">Actions</legend>
+          {error && (
+            <p role="alert" className="mt-4 text-red-300">
+              {error}
+            </p>
+          )}
+          {domain === "registrations" && canDecide && (
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-neutral-800 pt-4">
+              <label className="w-full text-sm">
+                Decision reason
+                <textarea
+                  required
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="mt-1 w-full rounded border border-neutral-600 bg-black p-2"
+                />
+              </label>
+              <button
+                disabled={
+                  busy ||
+                  !reason.trim() ||
+                  !["submitted", "pending", "under_review"].includes(row.status)
+                }
+                onClick={() =>
+                  act({
+                    action: "update-registration-status",
+                    id: row.id,
+                    status: "approved",
+                    expectedStatus: row.status,
+                    reason,
+                  })
+                }
+                className="rounded bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                Approve
+              </button>
+              <button
+                disabled={
+                  busy ||
+                  !reason.trim() ||
+                  !["submitted", "pending", "under_review"].includes(row.status)
+                }
+                onClick={() =>
+                  act({
+                    action: "update-registration-status",
+                    id: row.id,
+                    status: "rejected",
+                    expectedStatus: row.status,
+                    reason,
+                  })
+                }
+                className="rounded bg-red-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                Reject
+              </button>
             </div>
-          ))}
-        </div>
-        {error && (
-          <p role="alert" className="mt-4 text-red-300">
-            {error}
-          </p>
-        )}
-        {domain === "registrations" && canDecide && (
-          <div className="mt-6 flex flex-wrap gap-2 border-t border-neutral-800 pt-4">
-            <label className="w-full text-sm">
-              Decision reason
-              <textarea
-                required
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="mt-1 w-full rounded border border-neutral-600 bg-black p-2"
-              />
-            </label>
+          )}
+          {domain === "teamMemberships" && canUpdateMembership && (
+            <div className="mt-6 flex gap-2 border-t border-neutral-800 pt-4">
+              <button
+                disabled={busy}
+                onClick={() =>
+                  act({
+                    action: "update-team-membership",
+                    id: row.id,
+                    changes: {
+                      status: row.status === "active" ? "inactive" : "active",
+                    },
+                  })
+                }
+                className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+              >
+                {row.status === "active" ? "Deactivate" : "Reactivate"}{" "}
+                membership
+              </button>
+            </div>
+          )}
+        </fieldset>
+        <section className="min-w-0">
+          <h3 className="font-semibold">Linked records</h3>
+          {row.person_id && (
             <button
-              disabled={
-                busy ||
-                !reason.trim() ||
-                !["submitted", "pending", "under_review"].includes(row.status)
-              }
-              onClick={() =>
-                act({
-                  action: "update-registration-status",
-                  id: row.id,
-                  status: "approved",
-                  expectedStatus: row.status,
-                  reason,
-                })
-              }
-              className="rounded bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              onClick={openPerson}
+              className="mt-5 rounded bg-blue-700 px-3 py-2 text-sm text-white"
             >
-              Approve
+              Open athlete record & evidence
             </button>
-            <button
-              disabled={
-                busy ||
-                !reason.trim() ||
-                !["submitted", "pending", "under_review"].includes(row.status)
-              }
-              onClick={() =>
-                act({
-                  action: "update-registration-status",
-                  id: row.id,
-                  status: "rejected",
-                  expectedStatus: row.status,
-                  reason,
-                })
-              }
-              className="rounded bg-red-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-            >
-              Reject
-            </button>
-          </div>
-        )}
-        {domain === "teamMemberships" && canUpdateMembership && (
-          <div className="mt-6 flex gap-2 border-t border-neutral-800 pt-4">
-            <button
-              disabled={busy}
-              onClick={() =>
-                act({
-                  action: "update-team-membership",
-                  id: row.id,
-                  changes: {
-                    status: row.status === "active" ? "inactive" : "active",
-                  },
-                })
-              }
-              className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-            >
-              {row.status === "active" ? "Deactivate" : "Reactivate"} membership
-            </button>
-          </div>
-        )}
-      </aside>
-    </div>
+          )}
+          {!row.person_id && (
+            <p className="mt-4 text-sm text-slate-300">
+              No person is linked to this record.
+            </p>
+          )}
+        </section>
+      </div>
+    </AdminDrawerShell>
   );
 }
 function State({ text }: { text: string }) {
