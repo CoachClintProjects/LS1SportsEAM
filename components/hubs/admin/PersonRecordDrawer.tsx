@@ -9,6 +9,9 @@ import {
 import RecordWorkPanel from "./RecordWorkPanel";
 import { RecordLifecycle } from "./RecordLifecycle";
 import dynamic from "next/dynamic";
+const TransactionEngine = dynamic(() =>
+  import("../superuser/TransactionEngine").then((m) => m.TransactionEngine),
+);
 const ExecutiveActionDrawer = dynamic(() =>
   import("./ExecutiveActionDrawer").then(
     (module) => module.ExecutiveActionDrawer,
@@ -138,7 +141,9 @@ export default function PersonRecordDrawer({
   const panel = useRef<HTMLElement>(null),
     close = useRef(onClose);
   const saving = useRef(false);
-  const [decision, setDecision] = useState<"waiver" | "cash" | null>(null);
+  const [decision, setDecision] = useState<"waiver" | "cash" | "engine" | null>(
+    null,
+  );
   useEffect(() => {
     if (!decision) panel.current?.focus();
   }, [decision]);
@@ -295,6 +300,18 @@ export default function PersonRecordDrawer({
     ...(data?.authorization.finance ? ["Fees"] : []),
     "Medical & Consent",
   ];
+  if (decision === "engine")
+    return (
+      <TransactionEngine
+        role={role}
+        personId={personId}
+        onClose={() => setDecision(null)}
+        onSaved={() => {
+          void load().catch((e) => setError(e.message));
+          onSaved?.();
+        }}
+      />
+    );
   if (decision)
     return (
       <ExecutiveActionDrawer
@@ -577,10 +594,10 @@ export default function PersonRecordDrawer({
                     {data?.authorization.finance && (
                       <button
                         disabled={busy}
-                        onClick={() => setDecision("cash")}
+                        onClick={() => setDecision("engine")}
                         className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold"
                       >
-                        Record cash payment
+                        Club balance & squad changes
                       </button>
                     )}
                   </div>

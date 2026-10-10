@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import dynamic from "next/dynamic";
+const TransactionEngine = dynamic(() =>
+  import("../superuser/TransactionEngine").then((m) => m.TransactionEngine),
+);
 const workspaceLoading = () => (
   <div className="p-8 text-sm text-neutral-300">Opening workspace…</div>
 );
@@ -159,6 +162,8 @@ type OrganizationOption = {
   code: string;
 };
 export function AdminWorkspace() {
+  const [engineOpen, setEngineOpen] = useState(false);
+  const [engineRevision, setEngineRevision] = useState(0);
   const searchParams = useSearchParams(),
     role = searchParams.get("role") || "org_admin";
   const [Component, setComponent] = useState<React.ComponentType<{
@@ -354,7 +359,24 @@ export function AdminWorkspace() {
           </button>
         </div>
       )}
-      <C key={role} role={role} roleLabel={roleLabel} />
+      {["org_admin", "treasurer"].includes(role) && (
+        <div className="px-6 py-3">
+          <button
+            className="rounded bg-emerald-800 px-4 py-2 text-sm"
+            onClick={() => setEngineOpen(true)}
+          >
+            Club balance & squad changes
+          </button>
+        </div>
+      )}
+      {engineOpen && (
+        <TransactionEngine
+          role={role}
+          onClose={() => setEngineOpen(false)}
+          onSaved={() => setEngineRevision((v) => v + 1)}
+        />
+      )}
+      <C key={`${role}:${engineRevision}`} role={role} roleLabel={roleLabel} />
     </div>
   );
 }
