@@ -95,7 +95,21 @@ export async function GET(request: NextRequest) {
         ),
       ]);
     }
+    const signoffs = await rest("rpc/admin_bill_signoff_states", {
+      method: "POST",
+      body: JSON.stringify({
+        p_tenant: tenant,
+        p_org: org,
+        p_ids: [
+          ...new Set([
+            ...rows.map((r: { id: string }) => r.id),
+            ...(bill ? [bill.id] : []),
+          ]),
+        ],
+      }),
+    });
     return NextResponse.json({
+      signoffs,
       entities,
       vendors,
       methods,
@@ -135,6 +149,7 @@ export async function POST(request: NextRequest) {
         "edit",
         "submit",
         "approve",
+        "president_sign",
         "return",
         "cancel",
         "payment",
@@ -156,6 +171,41 @@ export async function POST(request: NextRequest) {
       !can(ctx, role, "workflow.execute")
     )
       throw new PersonRecordError(403, "Bill decision denied.");
+    if (b.operation === "president_sign") {
+      if (
+        role !== "org_admin" ||
+        !ctx.person?.id ||
+        typeof b.signature !== "string" ||
+        b.signature.length > 200
+      )
+        throw new PersonRecordError(403, "Club President signature required.");
+      return NextResponse.json({
+        row: await rest("rpc/admin_president_sign_bill", {
+          method: "POST",
+          body: JSON.stringify({
+            p_tenant: tenant,
+            p_org: org,
+            p_actor_user: ctx.user.id,
+            p_actor_person: ctx.person.id,
+            p_id: b.id,
+            p_version: b.expectedVersion,
+            p_signature: b.signature,
+            p_reason: String(b.reason).trim(),
+          }),
+        }),
+      });
+    }
+    if (["approve", "payment"].includes(b.operation)) {
+      const signoff = await rest("rpc/admin_bill_signoff_state", {
+        method: "POST",
+        body: JSON.stringify({ p_tenant: tenant, p_org: org, p_id: b.id }),
+      });
+      if (signoff.required && !signoff.signed)
+        throw new PersonRecordError(
+          409,
+          "[ 🟡 HOLD - PENDING PRESIDENT SIGN-OFF ]",
+        );
+    }
     // The transaction enforces the authority snapshotted on this bill.
     const row = await rest(
       ["post_ledger", "payment", "reverse_payment", "cancel"].includes(

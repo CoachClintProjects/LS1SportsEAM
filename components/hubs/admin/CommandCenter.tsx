@@ -6,6 +6,9 @@ import "./admin-home.css";
 import dynamic from "next/dynamic";
 import TriageTaskHub from "../superuser/TriageTaskHub";
 import { useRouter } from "next/navigation";
+const OverwatchTelemetry = dynamic(() =>
+  import("../superuser/OverwatchTelemetry").then((m) => m.OverwatchTelemetry),
+);
 const PersonnelSafety = dynamic(() =>
   import("./PersonnelSafety").then((m) => m.PersonnelSafety),
 );
@@ -31,6 +34,7 @@ type Task = {
 export function CommandCenter(props: { role?: string; roleLabel?: string }) {
   return (
     <>
+      {(!props.role || props.role === "org_admin") && <OverwatchTelemetry />}
       <TriageTaskHub key={props.role || "org_admin"} role={props.role} />
       <ClubFollowUp {...props} />
     </>

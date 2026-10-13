@@ -35,6 +35,10 @@ type Line = {
   line_total?: string;
 };
 type Data = {
+  signoffs: Record<
+    string,
+    { required: boolean; signed: boolean; threshold: string | null }
+  >;
   entities: { id: string; legal_name: string; base_currency: string }[];
   vendors: { id: string; name: string; status: string }[];
   methods: { id: string; code: string; name: string }[];
@@ -291,7 +295,15 @@ export default function PayablesWorkspace({
                 <td className="p-3">
                   {b.currency} {b.balance_due}
                 </td>
-                <td className="p-3">{b.status}</td>
+                <td className="p-3">
+                  {b.status}
+                  {data.signoffs?.[b.id]?.required &&
+                    !data.signoffs[b.id].signed && (
+                      <p className="mt-1 text-xs text-amber-300">
+                        [ 🟡 HOLD - PENDING PRESIDENT SIGN-OFF ]
+                      </p>
+                    )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -393,6 +405,7 @@ function BillDrawer({
           })),
     ),
     [reason, setReason] = useState(""),
+    [signature, setSignature] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [payment, setPayment] = useState({
@@ -439,6 +452,7 @@ function BillDrawer({
         values:
           extra || (operation === "payment" ? payment : { ...values, lines }),
         reason,
+        signature,
       });
       await onSaved(j.row.id);
       setReason("");
@@ -459,6 +473,8 @@ function BillDrawer({
       setBusy(false);
     }
   };
+  const signoff = b ? data.signoffs?.[b.id] : null;
+  const held = !!signoff?.required && !signoff.signed;
   const disabled = busy || reason.trim().length < 5;
   return (
     <AdminDrawerShell
@@ -634,6 +650,50 @@ function BillDrawer({
           />
         </label>
       )}
+      {held && (
+        <section className="mt-4 rounded border border-amber-500 bg-amber-950 p-4">
+          <p className="font-semibold">
+            [ 🟡 HOLD - PENDING PRESIDENT SIGN-OFF ]
+          </p>
+          <p className="text-sm">
+            {signoff?.threshold
+              ? `President approval required at ${b?.currency} ${signoff.threshold} or above.`
+              : "No spending threshold is configured. President approval is required."}
+          </p>
+          {role === "org_admin" &&
+          b &&
+          ["submitted", "approved", "partially_paid"].includes(b.status) &&
+          data.authorization.decide ? (
+            <>
+              <label className="mt-3 block text-sm">
+                Electronic signature — type your full account name
+                <input
+                  className={input}
+                  disabled={busy}
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                />
+              </label>
+              <p className="mt-2 text-xs">
+                Signing confirms: I approve this bill for release. Your
+                signed-in account, bill details and approval time are recorded.
+              </p>
+              <button
+                className={`${button} mt-3 bg-amber-700`}
+                disabled={disabled || !signature.trim()}
+                onClick={() => void act("president_sign")}
+              >
+                Sign and authorize release
+              </button>
+            </>
+          ) : (
+            <p className="mt-2 text-sm">
+              An authorized Club President must open this bill in Organization
+              Admin and sign it.
+            </p>
+          )}
+        </section>
+      )}
       <div className="mt-4 flex flex-wrap gap-3">
         {edit && (
           <button
@@ -655,15 +715,17 @@ function BillDrawer({
                 Submit for approval
               </button>
             )}
-            {b?.status === "submitted" && data.authorization.approve && (
-              <button
-                className={`${button} bg-green-700`}
-                disabled={disabled}
-                onClick={() => void act("approve")}
-              >
-                Approve bill
-              </button>
-            )}
+            {b?.status === "submitted" &&
+              !held &&
+              data.authorization.approve && (
+                <button
+                  className={`${button} bg-green-700`}
+                  disabled={disabled}
+                  onClick={() => void act("approve")}
+                >
+                  Approve bill
+                </button>
+              )}
             {!b?.journal_id &&
               (b?.status === "submitted" ||
                 (b?.status === "approved" && data.authorization.approve)) && (
@@ -800,6 +862,7 @@ function BillDrawer({
               className={`${button} mt-4 bg-green-700`}
               disabled={
                 disabled ||
+                held ||
                 !payment.amount ||
                 !payment.cash_account_id ||
                 !payment.journal_number ||
