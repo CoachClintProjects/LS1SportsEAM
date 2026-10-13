@@ -1,3 +1,9 @@
+import { TriageError } from "./adminTriage";
+import {
+  teamManagerScope,
+  squadMembers,
+  squadBoundary,
+} from "./teamManagerScope";
 import { hasAdminContextPermission, type AccessContext } from "./accessControl";
 export type RecordStore = (path: string, init?: RequestInit) => Promise<any>;
 const ids = (values: string[]) =>
@@ -26,6 +32,21 @@ export async function personRecordScope(
     role !== "org_admin"
   )
     throw new PersonRecordError(403, "Roster access denied.");
+  if (role === "team_manager") {
+    const scope = await teamManagerScope(rest, ctx).catch((error: unknown) => {
+      if (error instanceof TriageError)
+        throw new PersonRecordError(error.status, error.message);
+      throw error;
+    });
+    const members = await squadMembers(rest, scope.team);
+    const athleteIds = members.map((m: { athlete_id: string }) => m.athlete_id);
+    const matching = athleteIds.length
+      ? await rest(
+          `athletes?select=id&person_id=eq.${personId}&id=in.(${athleteIds.join(",")})`,
+        )
+      : [];
+    if (!matching.length) throw new PersonRecordError(403, squadBoundary);
+  }
   const people = await rest(
     `people?select=id,first_name,last_name,preferred_name,birth_date,email,phone,address_line1,address_line2,city,region,postal_code,country_code,preferred_contact_method,status,updated_at&tenant_id=eq.${tenant}&id=eq.${personId}`,
   );

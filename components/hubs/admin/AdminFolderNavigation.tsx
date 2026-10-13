@@ -189,7 +189,7 @@ function RoleDirectory({
           {folder.sections.map((section) => {
             const links = (
               <FolderLinks
-                items={section.items}
+                items={section.items.filter((item) => item.id !== "tm-home")}
                 hrefFor={hrefFor}
                 preferences={preferences}
                 activeView={activeView}

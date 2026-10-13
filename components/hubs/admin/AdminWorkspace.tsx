@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import dynamic from "next/dynamic";
+const TeamManagerWorkspace = dynamic(() =>
+  import("./TeamManagerWorkspace").then((m) => m.TeamManagerWorkspace),
+);
 const TransactionEngine = dynamic(() =>
   import("../superuser/TransactionEngine").then((m) => m.TransactionEngine),
 );
@@ -107,6 +110,7 @@ const registry: Record<
   string,
   React.ComponentType<{ role?: string; roleLabel?: string }>
 > = {
+  TeamManagerWorkspace,
   BudgetWorkspace,
   GovernanceWorkspace,
   ContactsDirectory,
@@ -236,7 +240,7 @@ export function AdminWorkspace() {
       try {
         let view = searchParams.get("view");
         const nav = await authenticatedFetch(
-          `/api/admin-navigation?role=${encodeURIComponent(role)}`,
+          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && searchParams.get("folder") === "team_manager" ? "team_manager" : role)}`,
           { cache: "no-store" },
         );
         if (!nav.ok) throw new Error("Admin navigation unavailable.");
@@ -250,8 +254,10 @@ export function AdminWorkspace() {
           );
         if (!view)
           view =
-            (j.rows || []).find((x: any) => x.component === "CommandCenter")
-              ?.nav_id || "";
+            (j.rows || []).find(
+              (x: any) =>
+                x.component === "CommandCenter" || x.nav_id === "tm-home",
+            )?.nav_id || "";
         if (!view)
           throw new Error("No authorized Admin workspace is available.");
         const selected = (j.rows || []).find(
@@ -376,7 +382,11 @@ export function AdminWorkspace() {
           onSaved={() => setEngineRevision((v) => v + 1)}
         />
       )}
-      <C key={`${role}:${engineRevision}`} role={role} roleLabel={roleLabel} />
+      <C
+        key={`${role}:${selectedOrganization}:${engineRevision}`}
+        role={role}
+        roleLabel={roleLabel}
+      />
     </div>
   );
 }

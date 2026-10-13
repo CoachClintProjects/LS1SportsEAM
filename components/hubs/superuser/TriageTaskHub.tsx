@@ -59,15 +59,17 @@ function signal(task: TriageTask) {
 }
 export default function TriageTaskHub({
   role = "org_admin",
+  fixedTeam,
 }: {
   role?: string;
+  fixedTeam?: string;
 }) {
   // Parent keys by role; all requests also carry a generation to discard stale results.
   const [feed, setFeed] = useState<TriageFeed | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [refreshing, setRefreshing] = useState(false);
-  const [team, setTeam] = useState(""),
+  const [team, setTeam] = useState(fixedTeam || ""),
     [status, setStatus] = useState("open"),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
@@ -347,7 +349,7 @@ export default function TriageTaskHub({
           <label>
             Squad
             <select
-              disabled={busy}
+              disabled={busy || !!fixedTeam}
               value={team}
               onChange={(e) => {
                 setTeam(e.target.value);

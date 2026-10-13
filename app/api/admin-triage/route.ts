@@ -1,3 +1,4 @@
+import { teamManagerScope } from "@/lib/server/teamManagerScope";
 import { NextRequest, NextResponse } from "next/server";
 import {
   resolveAccess,
@@ -68,7 +69,10 @@ async function context(
   if (team && !uuid.test(team)) throw new TriageError("Select a valid squad.");
   const ctx = await resolveAccess(request);
   if (!ctx) throw new TriageError("Sign in to view your tasks.", 401);
-  const scope = triageScope(ctx, role, team);
+  const scope =
+    role === "team_manager"
+      ? await teamManagerScope(rest, ctx, team)
+      : triageScope(ctx, role, team);
   const orgFilter = `in.(${scope.orgs.join(",")})`;
   const [organizations, allTeams] = await Promise.all([
     rest(
@@ -80,11 +84,10 @@ async function context(
   ]);
   const teams = (
     allTeams as { id: string; name: string; organization_id: string }[]
-  ).filter(
-    (t) =>
-      !scope.teamIds ||
-      (role !== "team_manager" && !scope.teamIds.length) ||
-      scope.teamIds.includes(t.id),
+  ).filter((t) =>
+    role === "team_manager"
+      ? t.id === scope.team
+      : !scope.teamIds || !scope.teamIds.length || scope.teamIds.includes(t.id),
   );
   if (team && !teams.some((t) => t.id === team))
     throw new TriageError(
