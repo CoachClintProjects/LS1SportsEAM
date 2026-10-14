@@ -2,9 +2,8 @@
 
 import React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Lexend_Deca } from 'next/font/google';
+import { workspaceFont as workspaceFont } from "@/app/fonts";
 import { AdminRoleBar } from '@/components/hubs/admin/AdminRoleBar';
-const workspaceFont = Lexend_Deca({subsets: ['latin'], weight: ['400','500','600','700'], display: 'swap'});
 
 interface GlobalShellProps {
   children: React.ReactNode;

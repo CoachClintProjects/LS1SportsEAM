@@ -26,3 +26,7 @@ The prompt expressly forbids schemas and migrations and says to focus on the fro
 ## Verification
 
 TypeScript no-emit and focused ESLint checks, isolated permission regressions (not UAT), source diff inspection, and Preview deployment status. No signed-in browser/UAT completion is asserted.
+
+## Preview build repair
+
+Vercel build ebebe99 failed in Next.js Google font URL parsing. Lexend Deca is now bundled from the official Google Fonts distribution with its SIL Open Font License. All four font consumers share `next/font/local`, removing external font downloads during compilation while retaining the requested typography.

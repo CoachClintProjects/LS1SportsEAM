@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Lexend_Deca } from 'next/font/google';
-const sidebarFont=Lexend_Deca({subsets:['latin'],weight:['400','500','600','700'],display:'swap'});
+import { workspaceFont as sidebarFont } from "@/app/fonts";
 import SubmitTicket from '@/components/support/SubmitTicket';
 import { AdminFolderNavigation } from '@/components/hubs/admin/AdminFolderNavigation';
 import WorkspaceCatalog from './WorkspaceCatalog';

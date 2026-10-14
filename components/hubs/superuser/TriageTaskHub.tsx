@@ -13,12 +13,7 @@ import CashboxAuthorizationDrawer from "@/components/hubs/admin/CashboxAuthoriza
 import TriageResolutionPanel from "@/components/hubs/admin/TriageResolutionPanel";
 import PersonRecordDrawer from "@/components/hubs/admin/PersonRecordDrawer";
 import { TaskBillDrawer } from "@/components/hubs/admin/PayablesWorkspace";
-import { Lexend_Deca } from "next/font/google";
-const triageFont = Lexend_Deca({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
+import { workspaceFont as triageFont } from "@/app/fonts";
 type History = {
   id: string;
   action: string;

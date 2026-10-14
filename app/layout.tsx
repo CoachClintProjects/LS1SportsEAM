@@ -1,6 +1,5 @@
 ﻿import React, { Suspense } from 'react';
-import { Lexend_Deca } from 'next/font/google';
-const workspaceFont = Lexend_Deca({subsets:['latin'],weight:['400','500','600','700'],display:'swap'});
+import { workspaceFont as workspaceFont } from "@/app/fonts";
 import '@/app/globals.css';
 
 import { GlobalShell } from '@/components/experience/GlobalShell/GlobalShell';
