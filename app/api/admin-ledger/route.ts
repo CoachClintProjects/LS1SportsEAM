@@ -1,3 +1,4 @@
+import { verifiedLedgerReport } from "@/lib/server/verifiedLedgerReport";
 import { NextRequest, NextResponse } from "next/server";
 import { financeScope } from "@/lib/server/adminFinanceScope";
 import { hasAdminContextPermission as can } from "@/lib/server/accessControl";
@@ -69,12 +70,12 @@ export async function GET(request: NextRequest) {
       )
         throw new PersonRecordError(400, "Select a ledger and report dates.");
       return NextResponse.json(
-        await rpc("admin_ledger_report", {
+        await verifiedLedgerReport({
           p_tenant: tenant,
           p_org: org,
-          p_ledger: ledger,
-          p_from: from,
-          p_to: to,
+          p_ledger: ledger!,
+          p_from: from!,
+          p_to: to!,
         }),
       );
     }
@@ -256,8 +257,14 @@ export async function POST(request: NextRequest) {
         );
         source = original?.source;
       }
-      const executiveDecisions = await rest(`work_items?select=id&tenant_id=eq.${tenant}&work_type=eq.CLUB_FINANCE_DECISION&entity_id=eq.${journal.reversal_of || b.id}&limit=1`);
-      if (executiveDecisions.length) throw new PersonRecordError(409, "Reverse this from Club decisions so the entry fee and accounts stay in step.");
+      const executiveDecisions = await rest(
+        `work_items?select=id&tenant_id=eq.${tenant}&work_type=eq.CLUB_FINANCE_DECISION&entity_id=eq.${journal.reversal_of || b.id}&limit=1`,
+      );
+      if (executiveDecisions.length)
+        throw new PersonRecordError(
+          409,
+          "Reverse this from Club decisions so the entry fee and accounts stay in step.",
+        );
       if (["vendor_bill", "vendor_payment"].includes(source))
         throw new PersonRecordError(
           409,

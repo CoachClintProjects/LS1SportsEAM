@@ -91,6 +91,7 @@ async function request(path: string, body?: Record<string, unknown>) {
   );
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || "Accounting request failed.");
+  if (body) window.dispatchEvent(new Event("ls1:finance-saved"));
   return j;
 }
 export function LedgerWorkspace({ role = "treasurer" }: { role?: string }) {
@@ -187,7 +188,7 @@ export function LedgerWorkspace({ role = "treasurer" }: { role?: string }) {
               className={`${button} bg-[#FA4616]`}
               onClick={() => setCreating(true)}
             >
-              New journal
+              WRITE MANUAL JOURNAL ENTRY
             </button>
           )}
         </div>
@@ -813,7 +814,7 @@ function JournalDrawer({
               disabled={busy}
               onClick={() => setReversing(!reversing)}
             >
-              Reverse journal
+              REVERSE TRANSACTION
             </button>
           )}
       </div>
@@ -1112,7 +1113,7 @@ function PeriodDrawer({
   };
   return (
     <AdminDrawerShell
-      title={`Fiscal period ${period.period_no}`}
+      title={`Fiscal Period Lockout Control · period ${period.period_no}`}
       onClose={onClose}
       busy={busy}
     >
@@ -1147,7 +1148,7 @@ function PeriodDrawer({
                 disabled={busy || reason.trim().length < 5}
                 onClick={() => void act("review")}
               >
-                Submit for close
+                CLOSE ACCOUNTING PERIOD — REQUEST APPROVAL
               </button>
             )}
             {role === "org_admin" && period.status === "review" && (
@@ -1219,6 +1220,7 @@ function Statements({
   const load = async () => {
     setBusy(true);
     setError("");
+    setReport(null);
     try {
       setReport(
         await request(

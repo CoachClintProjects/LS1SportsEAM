@@ -1,3 +1,4 @@
+import { cashPacket, treasurerBoundary } from "@/lib/treasurerPolicy";
 import { teamManagerScope } from "@/lib/server/teamManagerScope";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -149,6 +150,11 @@ export async function GET(request: NextRequest) {
           "[DENY: ERR-901] Task is outside your assignment.",
           403,
         );
+      if (
+        role === "treasurer" &&
+        ["lease", "waiver", "safesport"].includes(rows[0].metadata?.kind)
+      )
+        throw new TriageError(treasurerBoundary, 403);
       if (q.get("domain") === "1") {
         const metadata = rows[0].metadata || {};
         if (
@@ -273,6 +279,16 @@ export async function POST(request: NextRequest) {
       String(b.role || "org_admin"),
       b.team || null,
     );
+    if (
+      scope.role === "treasurer" &&
+      [
+        "lease_terms",
+        "set_consent_policy",
+        "consent_override",
+        "authorize_cashbox",
+      ].includes(b.action)
+    )
+      throw new TriageError(treasurerBoundary, 403);
     if (b.action === "sync") {
       if (!taskPermission(ctx, scope.role, "operational_tasks", false))
         throw new TriageError("Task access denied.", 403);
@@ -334,6 +350,19 @@ export async function POST(request: NextRequest) {
           !hasAdminContextPermission(ctx, scope.role, "waivers.update")
         )
           throw new TriageError("Waiver exception authority required.", 403);
+      }
+      if (b.action === "prepare_cashbox") {
+        if (String(b.note || "").trim().length < 10) throw new TriageError("Enter a custody note of at least ten characters.");
+        let packet;
+        try {
+          packet = cashPacket(b.values || {});
+        } catch (e) {
+          throw new TriageError(
+            e instanceof Error ? e.message : "Invalid cash packet.",
+          );
+        }
+        b.values = { ...b.values, counted_amount: packet.amount };
+        b.note = `${String(b.note || "").trim()} ${packet.note}`;
       }
       const result = await rest("rpc/admin_triage_authority_action", {
         p_task: b.id || null,

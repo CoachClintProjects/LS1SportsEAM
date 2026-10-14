@@ -81,7 +81,18 @@ export default function TriageResolutionPanel({
       policy_reference: "",
     }),
     [consentDocument, setConsentDocument] = useState(""),
-    [counted, setCounted] = useState("");
+    [counts, setCounts] = useState<Record<string, string>>({
+      20: "0",
+      10: "0",
+      5: "0",
+    }),
+    [handoffTo, setHandoffTo] = useState(""),
+    [handoffConfirmed, setHandoffConfirmed] = useState(false);
+  const counted = (
+    Number(counts[20]) * 20 +
+    Number(counts[10]) * 10 +
+    Number(counts[5]) * 5
+  ).toFixed(2);
   const [terms, setTerms] = useState(""),
     [note, setNote] = useState(""),
     [bill, setBill] = useState(""),
@@ -294,16 +305,44 @@ export default function TriageResolutionPanel({
         </>
       )}
       {kind === "cashbox" && (
-        <label>
-          Cash physically counted
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={counted}
-            onChange={(e) => setCounted(e.target.value)}
-          />
-        </label>
+        <section>
+          <h3>Cash packet counts</h3>
+          {[20, 10, 5].map((unit) => (
+            <label key={unit}>
+              {unit} denomination notes
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={counts[unit]}
+                onChange={(e) =>
+                  setCounts({ ...counts, [unit]: e.target.value })
+                }
+              />
+            </label>
+          ))}
+          <p>Counted total: {counted}</p>
+          <label>
+            Handed to
+            <input
+              value={handoffTo}
+              onChange={(e) => setHandoffTo(e.target.value)}
+              maxLength={200}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={handoffConfirmed}
+              onChange={(e) => setHandoffConfirmed(e.target.checked)}
+            />
+            I confirm this packet was counted and handed over.
+          </label>
+          <p>
+            This records custody preparation, not official payouts or a bank
+            withdrawal.
+          </p>
+        </section>
       )}
       {kind === "lease" && contract && (
         <>
@@ -463,12 +502,23 @@ export default function TriageResolutionPanel({
               )}
             {kind === "cashbox" && (
               <button
-                disabled={busy || note.trim().length < 10 || !counted}
+                disabled={
+                  busy ||
+                  note.trim().length < 10 ||
+                  !handoffConfirmed ||
+                  handoffTo.trim().length < 3 ||
+                  Number(counted) <= 0
+                }
                 onClick={() =>
-                  void act("prepare_cashbox", { counted_amount: counted })
+                  void act("prepare_cashbox", {
+                    counted_amount: counted,
+                    denominations: counts,
+                    handoff_to: handoffTo,
+                    handoff_confirmed: handoffConfirmed,
+                  })
                 }
               >
-                Confirm physical cash prepared
+                DISPATCH REFEREE CASH BOX
               </button>
             )}
             {kind === "cashbox" && role === "org_admin" && (

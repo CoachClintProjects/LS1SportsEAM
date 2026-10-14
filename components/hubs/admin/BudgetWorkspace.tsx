@@ -213,6 +213,7 @@ export function BudgetWorkspace({ role = "org_admin" }: { role?: string }) {
         budget_amount: "",
       });
       setNotice("Budget saved. Audit history and review work updated.");
+      window.dispatchEvent(new Event("ls1:finance-saved"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Budget save failed.");
     } finally {

@@ -91,6 +91,7 @@ async function request(path: string, body?: Record<string, unknown>) {
     ),
     j = await r.json();
   if (!r.ok) throw new Error(j.error || "Payables request failed.");
+  if (body) window.dispatchEvent(new Event("ls1:finance-saved"));
   return j;
 }
 export default function PayablesWorkspace({

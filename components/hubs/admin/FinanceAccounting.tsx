@@ -11,6 +11,7 @@ type Payload = {
   payments: Row[];
   paymentAllocations: Row[];
   credits: Row[];
+  refunds?: Row[];
   vendorBills: Row[];
   metrics: any;
   authorization: any;
@@ -33,7 +34,7 @@ const money = (v: any, currency?: string) =>
         Number(v || 0),
       )
     : Number(v || 0).toLocaleString();
-function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
+export function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
   const [data, setData] = useState<Payload | null>(null),
     [error, setError] = useState(""),
     [query, setQuery] = useState(""),
@@ -62,6 +63,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       setSelected(null);
       setCreating(false);
       await load();
+      window.dispatchEvent(new Event("ls1:finance-saved"));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -71,7 +73,9 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
   const load = useCallback(async () => {
     setError("");
     const r = await authenticatedFetch(
-      `/api/admin-command?role=${encodeURIComponent(role)}`,
+      role === "treasurer"
+        ? "/api/admin-treasurer?mode=billing"
+        : `/api/admin-command?role=${encodeURIComponent(role)}`,
       { cache: "no-store" },
     );
     const j = await r.json();
@@ -154,7 +158,12 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
         >
           Fees owed to the club ·{" "}
           {data.invoices.length
-            ? money(data.metrics?.arBalance, currency)
+            ? data.metrics?.arBalance == null
+              ? "Multiple currencies — inspect invoices"
+              : money(
+                  data.metrics?.arBalance,
+                  data.metrics?.arCurrency || currency,
+                )
             : "No records"}
         </button>
         <button
@@ -163,7 +172,12 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
         >
           Supplier bills ·{" "}
           {data.vendorBills.length
-            ? money(data.metrics?.apBalance, currency)
+            ? data.metrics?.apBalance == null
+              ? "Multiple currencies — inspect bills"
+              : money(
+                  data.metrics?.apBalance,
+                  data.metrics?.apCurrency || currency,
+                )
             : "No records"}
         </button>
         <span className="px-3 py-2 text-xs text-neutral-500">
@@ -253,6 +267,7 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
       </section>
       {setup && (
         <FinanceSetup
+          role={role}
           error={error}
           data={data}
           busy={busy}
@@ -307,6 +322,10 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
               reason,
             })
           }
+          refunds={(data.refunds || []).filter(
+            (x) => x.invoice_id === selected.id,
+          )}
+          canVoid={role !== "treasurer"}
           onVoid={(reason) =>
             act({ action: "void-invoice", invoiceId: selected.id, reason })
           }
@@ -317,6 +336,8 @@ function BillingWorkspace({ role = "org_admin" }: { role?: string }) {
   );
 }
 function Drawer({
+  refunds,
+  canVoid,
   paymentMethods,
   row,
   lines,
@@ -330,6 +351,8 @@ function Drawer({
   busy,
   error,
 }: {
+  refunds: Row[];
+  canVoid: boolean;
   paymentMethods: Row[];
   row: Row;
   lines: Row[];
@@ -444,13 +467,15 @@ function Drawer({
                   Issue credit
                 </button>
               </div>
-              <button
-                disabled={busy || !reason}
-                onClick={() => onVoid(reason)}
-                className="mt-3 rounded border border-red-900 px-3 py-2 text-xs font-black text-red-300"
-              >
-                Void invoice
-              </button>
+              {canVoid && (
+                <button
+                  disabled={busy || !reason}
+                  onClick={() => onVoid(reason)}
+                  className="mt-3 rounded border border-red-900 px-3 py-2 text-xs font-black text-red-300"
+                >
+                  Void invoice
+                </button>
+              )}
             </div>
           )}
         </fieldset>
@@ -495,6 +520,19 @@ function Drawer({
                   </span>
                 </div>
               ))}
+            </section>
+          )}
+          {refunds.length > 0 && (
+            <section className="mt-6 border-t border-neutral-800 pt-4">
+              <h3 className="font-bold">Linked refund records</h3>
+              {refunds.map((r) => (
+                <p key={r.id} className="mt-2 text-sm">
+                  {money(r.amount, row.currency)} · {r.status} · {r.reason}
+                </p>
+              ))}
+              <p className="mt-2 text-xs text-neutral-400">
+                A recorded refund is not proof of a bank transfer.
+              </p>
             </section>
           )}
           {!lines.length && !payments.length && !credits.length && (
@@ -605,12 +643,14 @@ function InvoiceModal({
   );
 }
 function FinanceSetup({
+  role,
   data,
   busy,
   error,
   onClose,
   onSave,
 }: {
+  role: string;
   data: Payload;
   busy: boolean;
   error: string;
@@ -719,55 +759,57 @@ function FinanceSetup({
             Create customer
           </button>
         </section>
-        <section className="mt-5 border-t border-neutral-800 pt-4">
-          <b>Payment method</b>
-          <select
-            value={v.organizationId || ""}
-            onChange={(e) => setV({ ...v, organizationId: e.target.value })}
-            className="mt-2 w-full rounded border border-neutral-700 bg-black px-3 py-2"
-          >
-            <option value="">Select organization</option>
-            {(ctx?.organizations || []).map((o: any) => (
-              <option key={o.id} value={o.id}>
-                {o.name || o.code}
-              </option>
+        {role === "org_admin" && (
+          <section className="mt-5 border-t border-neutral-800 pt-4">
+            <b>Payment method</b>
+            <select
+              value={v.organizationId || ""}
+              onChange={(e) => setV({ ...v, organizationId: e.target.value })}
+              className="mt-2 w-full rounded border border-neutral-700 bg-black px-3 py-2"
+            >
+              <option value="">Select organization</option>
+              {(ctx?.organizations || []).map((o: any) => (
+                <option key={o.id} value={o.id}>
+                  {o.name || o.code}
+                </option>
+              ))}
+            </select>
+            {[
+              ["paymentMethodCode", "Code"],
+              ["paymentMethodName", "Name"],
+              ["paymentMethodType", "Method type"],
+            ].map(([k, n]) => (
+              <input
+                key={k}
+                placeholder={n}
+                value={v[k] || ""}
+                onChange={(e) => setV({ ...v, [k]: e.target.value })}
+                className="mt-2 w-full rounded border border-neutral-700 bg-black px-3 py-2 text-sm"
+              />
             ))}
-          </select>
-          {[
-            ["paymentMethodCode", "Code"],
-            ["paymentMethodName", "Name"],
-            ["paymentMethodType", "Method type"],
-          ].map(([k, n]) => (
-            <input
-              key={k}
-              placeholder={n}
-              value={v[k] || ""}
-              onChange={(e) => setV({ ...v, [k]: e.target.value })}
-              className="mt-2 w-full rounded border border-neutral-700 bg-black px-3 py-2 text-sm"
-            />
-          ))}
-          <button
-            disabled={
-              busy ||
-              !v.organizationId ||
-              !v.paymentMethodCode ||
-              !v.paymentMethodName ||
-              !v.paymentMethodType
-            }
-            onClick={() =>
-              onSave({
-                action: "create-payment-method",
-                organizationId: v.organizationId,
-                code: v.paymentMethodCode,
-                name: v.paymentMethodName,
-                methodType: v.paymentMethodType,
-              })
-            }
-            className="mt-3 rounded border border-neutral-600 px-3 py-2 text-xs font-black"
-          >
-            Create payment method
-          </button>
-        </section>
+            <button
+              disabled={
+                busy ||
+                !v.organizationId ||
+                !v.paymentMethodCode ||
+                !v.paymentMethodName ||
+                !v.paymentMethodType
+              }
+              onClick={() =>
+                onSave({
+                  action: "create-payment-method",
+                  organizationId: v.organizationId,
+                  code: v.paymentMethodCode,
+                  name: v.paymentMethodName,
+                  methodType: v.paymentMethodType,
+                })
+              }
+              className="mt-3 rounded border border-neutral-600 px-3 py-2 text-xs font-black"
+            >
+              Create payment method
+            </button>
+          </section>
+        )}
         {!!ctx?.customers?.length && (
           <section className="mt-5 border-t border-neutral-800 pt-4">
             <b>Billing account</b>
