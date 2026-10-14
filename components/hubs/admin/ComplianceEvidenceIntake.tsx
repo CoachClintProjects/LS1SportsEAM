@@ -51,7 +51,9 @@ export function ComplianceEvidenceIntake({
   domain,
   onClose,
   onSaved,
+  initialPerson,
 }: {
+  initialPerson?: Person;
   role: string;
   domain: EvidenceDomain;
   onClose: () => void;
@@ -59,13 +61,42 @@ export function ComplianceEvidenceIntake({
 }) {
   const [query, setQuery] = useState(""),
     [people, setPeople] = useState<Person[]>([]),
-    [person, setPerson] = useState<Person | null>(null),
+    [person, setPerson] = useState<Person | null>(initialPerson || null),
     [values, setValues] = useState<Record<string, string>>({}),
     [reason, setReason] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(false),
     [allowed, setAllowed] = useState(false);
+  const [documents, setDocuments] = useState<
+    { id: string; title: string; verification_status: string }[]
+  >([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setDocuments([]);
+    setValues((v) => ({ ...v, document_id: "" }));
+    if (!person) return;
+    setDocumentsLoading(true);
+    authenticatedFetch(
+      `/api/admin-compliance?${new URLSearchParams({ role, personId: person.id })}`,
+      { cache: "no-store" },
+    )
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw Error(j.error);
+        if (current) setDocuments(j.documents);
+      })
+      .catch((e) => {
+        if (current) setError(e.message);
+      })
+      .finally(() => {
+        if (current) setDocumentsLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [person, role]);
   const [recordId] = useState(() => crypto.randomUUID());
   const root = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -178,7 +209,7 @@ export function ComplianceEvidenceIntake({
         role="dialog"
         aria-modal="true"
         aria-labelledby="intake-heading"
-        className="ml-auto h-full w-full max-w-3xl overflow-y-auto border-l border-neutral-600 bg-[#242529] p-6 text-white"
+        className="ml-auto h-full w-full max-w-3xl overflow-y-auto border-l border-neutral-600 bg-[#161B22] p-6 text-white"
       >
         <button
           disabled={busy}
@@ -264,6 +295,29 @@ export function ComplianceEvidenceIntake({
               ))}
             </div>
             <label className="mt-5 block text-sm">
+              Reviewed supporting document {role === "registrar" ? "*" : ""}
+              <select
+                required={role === "registrar"}
+                disabled={documentsLoading}
+                value={values.document_id || ""}
+                onChange={(e) =>
+                  setValues({ ...values, document_id: e.target.value })
+                }
+                className="mt-1 block w-full rounded border border-neutral-600 bg-black p-2"
+              >
+                <option value="">
+                  {documentsLoading
+                    ? "Loading documents…"
+                    : "Select stored evidence"}
+                </option>
+                {documents.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.title} · {d.verification_status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-5 block text-sm">
               Intake reason
               <textarea
                 required
@@ -275,10 +329,21 @@ export function ComplianceEvidenceIntake({
             </label>
           </fieldset>
           <button
-            disabled={busy || !allowed || !person || reason.trim().length < 5}
+            disabled={
+              busy ||
+              !allowed ||
+              !person ||
+              documentsLoading ||
+              (role === "registrar" && !values.document_id) ||
+              reason.trim().length < 5
+            }
             className="rounded bg-[#FA4616] px-4 py-2 font-bold text-black disabled:opacity-40"
           >
-            {busy ? "Saving…" : "Save for review"}
+            {busy
+              ? "Saving…"
+              : role === "registrar"
+                ? "FORWARD COMPLIANCE FOR APPROVAL"
+                : "Save for review"}
           </button>
           {!loading && !allowed && (
             <p className="text-sm text-amber-200">

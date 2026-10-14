@@ -115,7 +115,7 @@ export async function readPersonRecord(
   const canEdit =
     hasAdminContextPermission(ctx, role, "record.update") &&
     ["org_admin", "registrar", "team_manager"].includes(role);
-  const canFinance = hasAdminContextPermission(ctx, role, "finance.read");
+  const canFinance = role !== "registrar" && hasAdminContextPermission(ctx, role, "finance.read");
   const [
     familyLinks,
     authorities,

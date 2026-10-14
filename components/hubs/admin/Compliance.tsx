@@ -260,23 +260,29 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
         Compliance is a function, not a role.
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
-        {tabs.map(([k, n]) => (
-          <button
-            key={k}
-            onClick={() => {
-              setDomain(k);
-              setPage(0);
-              setQ("");
-            }}
-            className={
-              domain === k
-                ? "rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-                : "rounded-lg border border-neutral-700 px-3 py-2 text-xs"
-            }
-          >
-            {n}
-          </button>
-        ))}
+        {tabs
+          .filter(
+            ([k]) =>
+              role !== "registrar" ||
+              ["credentials", "backgroundChecks", "safeSport"].includes(k),
+          )
+          .map(([k, n]) => (
+            <button
+              key={k}
+              onClick={() => {
+                setDomain(k);
+                setPage(0);
+                setQ("");
+              }}
+              className={
+                domain === k
+                  ? "rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+                  : "rounded-lg border border-neutral-700 px-3 py-2 text-xs"
+              }
+            >
+              {n}
+            </button>
+          ))}
       </div>
       {error && (
         <p
@@ -421,6 +427,25 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
                 </button>
               )}
             </div>
+            {role === "registrar" &&
+              ["credentials", "backgroundChecks", "safeSport"].includes(
+                domain,
+              ) && (
+                <div className="mt-5">
+                  <p className="text-sm text-amber-200">
+                    Final clearance requires executive approval.
+                  </p>
+                  <button
+                    className="mt-3 rounded border border-[#30363D] px-3 py-2"
+                    onClick={() => {
+                      setIntake(domain as EvidenceDomain);
+                      setSelected(null);
+                    }}
+                  >
+                    Submit renewed evidence for approval
+                  </button>
+                </div>
+              )}
             {details && (
               <section className="mt-5 rounded border border-neutral-700 p-3">
                 <h3 className="font-bold">
@@ -480,121 +505,146 @@ export function Compliance({ role = "org_admin" }: { role?: string }) {
             )}
             {(
               ["credentials", "backgroundChecks", "safeSport"] as string[]
-            ).includes(domain) && (
-              <div className="mt-6 border-t border-neutral-800 pt-4">
-                <label className="block text-sm">
-                  Decision reason
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    className="mt-2 block w-full rounded border border-neutral-700 bg-black p-2"
-                  />
-                </label>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {(domain === "credentials"
-                    ? ["issuer", "credential_number", "issued_on", "expires_on"]
-                    : domain === "backgroundChecks"
+            ).includes(domain) &&
+              role === "org_admin" && (
+                <div className="mt-6 border-t border-neutral-800 pt-4">
+                  <label className="block text-sm">
+                    Decision reason
+                    <textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      className="mt-2 block w-full rounded border border-neutral-700 bg-black p-2"
+                    />
+                  </label>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {(domain === "credentials"
                       ? [
-                          "provider",
-                          "reference_number",
-                          "completed_at",
+                          "issuer",
+                          "credential_number",
+                          "issued_on",
                           "expires_on",
-                          "result_classification",
                         ]
-                      : [
-                          "certificate_id",
-                          "completed_on",
-                          "expires_on",
-                          "source",
-                        ]
-                  ).map((field) => (
-                    <label key={field} className="text-xs text-neutral-300">
-                      {field.replaceAll("_", " ")}
-                      <input
-                        type={field.endsWith("_on") ? "date" : "text"}
-                        value={edits[field] ?? selected[field] ?? ""}
-                        onChange={(e) =>
-                          setEdits({ ...edits, [field]: e.target.value })
+                      : domain === "backgroundChecks"
+                        ? [
+                            "provider",
+                            "reference_number",
+                            "completed_at",
+                            "expires_on",
+                            "result_classification",
+                          ]
+                        : [
+                            "certificate_id",
+                            "completed_on",
+                            "expires_on",
+                            "source",
+                          ]
+                    ).map((field) => (
+                      <label key={field} className="text-xs text-neutral-300">
+                        {field.replaceAll("_", " ")}
+                        <input
+                          type={field.endsWith("_on") ? "date" : "text"}
+                          value={edits[field] ?? selected[field] ?? ""}
+                          onChange={(e) =>
+                            setEdits({ ...edits, [field]: e.target.value })
+                          }
+                          className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    disabled={
+                      busy ||
+                      reason.trim().length < 5 ||
+                      !Object.keys(edits).length
+                    }
+                    onClick={() => update(edits)}
+                    className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm font-bold disabled:opacity-40"
+                  >
+                    Save evidence details
+                  </button>
+                  <div className="mt-5 text-xs font-black uppercase text-neutral-500">
+                    Lifecycle actions
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      disabled={busy || reason.trim().length < 5}
+                      onClick={() => update({ status: "active" })}
+                      className="rounded bg-green-700 px-3 py-2 text-xs font-bold disabled:opacity-40"
+                    >
+                      Mark active
+                    </button>
+                    <button
+                      disabled={busy || reason.trim().length < 5}
+                      onClick={() => update({ status: "expired" })}
+                      className="rounded bg-red-700 px-3 py-2 text-xs font-bold disabled:opacity-40"
+                    >
+                      Mark expired
+                    </button>
+                    {domain === "credentials" && (
+                      <button
+                        disabled={busy || reason.trim().length < 5}
+                        onClick={() =>
+                          update({
+                            verification_status: "verified",
+                            verified_at: new Date().toISOString(),
+                          })
                         }
-                        className="mt-1 block w-full rounded border border-neutral-700 bg-black p-2"
-                      />
-                    </label>
-                  ))}
+                        className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+                      >
+                        Verify credential
+                      </button>
+                    )}
+                    {domain === "safeSport" && (
+                      <button
+                        disabled={busy || reason.trim().length < 5}
+                        onClick={() =>
+                          update({
+                            status: "active",
+                            verified_at: new Date().toISOString(),
+                          })
+                        }
+                        className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+                      >
+                        Verify Safe Sport
+                      </button>
+                    )}
+                    {domain === "backgroundChecks" && (
+                      <button
+                        disabled={busy || reason.trim().length < 5}
+                        onClick={() =>
+                          update({
+                            status: "completed",
+                            completed_at: new Date().toISOString(),
+                          })
+                        }
+                        className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+                      >
+                        Complete check
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  disabled={
-                    busy ||
-                    reason.trim().length < 5 ||
-                    !Object.keys(edits).length
-                  }
-                  onClick={() => update(edits)}
-                  className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm font-bold disabled:opacity-40"
-                >
-                  Save evidence details
-                </button>
-                <div className="mt-5 text-xs font-black uppercase text-neutral-500">
-                  Lifecycle actions
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+              )}
+            {role === "registrar" &&
+              ["credentials", "backgroundChecks", "safeSport"].includes(
+                domain,
+              ) && (
+                <div className="mt-5">
+                  <p className="text-sm text-amber-200">
+                    Final clearance requires executive approval.
+                  </p>
                   <button
-                    disabled={busy || reason.trim().length < 5}
-                    onClick={() => update({ status: "active" })}
-                    className="rounded bg-green-700 px-3 py-2 text-xs font-bold disabled:opacity-40"
+                    className="mt-3 rounded border border-[#30363D] px-3 py-2"
+                    onClick={() => {
+                      setIntake(domain as EvidenceDomain);
+                      setSelected(null);
+                    }}
                   >
-                    Mark active
+                    Submit renewed evidence for approval
                   </button>
-                  <button
-                    disabled={busy || reason.trim().length < 5}
-                    onClick={() => update({ status: "expired" })}
-                    className="rounded bg-red-700 px-3 py-2 text-xs font-bold disabled:opacity-40"
-                  >
-                    Mark expired
-                  </button>
-                  {domain === "credentials" && (
-                    <button
-                      disabled={busy || reason.trim().length < 5}
-                      onClick={() =>
-                        update({
-                          verification_status: "verified",
-                          verified_at: new Date().toISOString(),
-                        })
-                      }
-                      className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-                    >
-                      Verify credential
-                    </button>
-                  )}
-                  {domain === "safeSport" && (
-                    <button
-                      disabled={busy || reason.trim().length < 5}
-                      onClick={() =>
-                        update({
-                          status: "active",
-                          verified_at: new Date().toISOString(),
-                        })
-                      }
-                      className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-                    >
-                      Verify Safe Sport
-                    </button>
-                  )}
-                  {domain === "backgroundChecks" && (
-                    <button
-                      disabled={busy || reason.trim().length < 5}
-                      onClick={() =>
-                        update({
-                          status: "completed",
-                          completed_at: new Date().toISOString(),
-                        })
-                      }
-                      className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-                    >
-                      Complete check
-                    </button>
-                  )}
                 </div>
-              </div>
-            )}
+              )}
             {details && (
               <section className="mt-6 border-t border-neutral-700 pt-4">
                 <h3 className="font-bold">Decision history</h3>

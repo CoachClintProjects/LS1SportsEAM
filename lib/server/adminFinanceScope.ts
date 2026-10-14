@@ -1,3 +1,4 @@
+import { registrarBoundary } from "@/lib/registrarPolicy";
 import type { NextRequest } from "next/server";
 import {
   resolveAccess,
@@ -19,7 +20,10 @@ export async function financeScope(
     !can(ctx, role, "finance.read") ||
     !can(ctx, role, permission)
   )
-    throw new PersonRecordError(403, "Financial authority denied.");
+    throw new PersonRecordError(
+      403,
+      role === "registrar" ? registrarBoundary : "Financial authority denied.",
+    );
   const tenant = ctx.adminScope?.tenantId || ctx.person?.tenant_id;
   const codes =
     role === "org_admin"

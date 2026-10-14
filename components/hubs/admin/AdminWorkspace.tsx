@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import dynamic from "next/dynamic";
+const RegistrarWorkspace = dynamic(() => import("./RegistrarWorkspace"));
 const TeamManagerWorkspace = dynamic(() =>
   import("./TeamManagerWorkspace").then((m) => m.TeamManagerWorkspace),
 );
@@ -111,6 +112,7 @@ const registry: Record<
   React.ComponentType<{ role?: string; roleLabel?: string }>
 > = {
   TeamManagerWorkspace,
+  RegistrarWorkspace,
   BudgetWorkspace,
   GovernanceWorkspace,
   ContactsDirectory,
@@ -240,7 +242,7 @@ export function AdminWorkspace() {
       try {
         let view = searchParams.get("view");
         const nav = await authenticatedFetch(
-          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && searchParams.get("folder") === "team_manager" ? "team_manager" : role)}`,
+          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
           { cache: "no-store" },
         );
         if (!nav.ok) throw new Error("Admin navigation unavailable.");
@@ -256,7 +258,8 @@ export function AdminWorkspace() {
           view =
             (j.rows || []).find(
               (x: any) =>
-                x.component === "CommandCenter" || x.nav_id === "tm-home",
+                x.component === "CommandCenter" ||
+                ["tm-home", "rg-home"].includes(x.nav_id),
             )?.nav_id || "";
         if (!view)
           throw new Error("No authorized Admin workspace is available.");
@@ -271,7 +274,9 @@ export function AdminWorkspace() {
         );
         if (!selected)
           throw new Error(
-            "Admin view is not authorized for this role context.",
+            role === "registrar"
+              ? "[DENY: ERR-501: INSUFFICIENT ACCESS TIER - REGISTRAR ACCOUNT RESTRICTED FROM LEASES/FINANCE]"
+              : "Admin view is not authorized for this role context.",
           );
         const name = selected.component || "",
           C = registry[name];
@@ -365,16 +370,17 @@ export function AdminWorkspace() {
           </button>
         </div>
       )}
-      {["org_admin", "treasurer"].includes(role) && (
-        <div className="px-6 py-3">
-          <button
-            className="rounded bg-emerald-800 px-4 py-2 text-sm"
-            onClick={() => setEngineOpen(true)}
-          >
-            Club balance & squad changes
-          </button>
-        </div>
-      )}
+      {["org_admin", "treasurer"].includes(role) &&
+        searchParams.get("folder") !== "registrar" && (
+          <div className="px-6 py-3">
+            <button
+              className="rounded bg-emerald-800 px-4 py-2 text-sm"
+              onClick={() => setEngineOpen(true)}
+            >
+              Club balance & squad changes
+            </button>
+          </div>
+        )}
       {engineOpen && (
         <TransactionEngine
           role={role}

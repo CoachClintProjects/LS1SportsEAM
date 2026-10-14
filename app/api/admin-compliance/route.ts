@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         total: rows[0]?.total_count || 0,
         authorization: {
           create: can(ctx, role, "record.create"),
-          edit: can(ctx, role, "record.update"),
+          edit: role === "org_admin" && can(ctx, role, "record.update"),
         },
       });
     }
@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
         400,
         "Evidence category, person and intake reason required.",
       );
+    if (role === "registrar" && !b.values?.document_id) throw new PersonRecordError(400, "Select the reviewed supporting document before forwarding for approval.");
     if (b.values?.document_id) {
       if (!uuid.test(b.values.document_id))
         throw new PersonRecordError(400, "Valid supporting document required.");
