@@ -19,7 +19,7 @@ const names: Record<string, string> = {
   competition_manager: "Game Day Director",
   volunteer_coordinator: "Volunteer Helper",
   communications_media: "Club Announcer",
-  fundraising_coordinator: "Fundraising",
+  fundraising_coordinator: "Fundraising Chief",
   facilities_equipment_manager: "Facilities",
 };
 type RoleFolder = { role: string; sections: NavigationSection[] };
@@ -189,7 +189,7 @@ function RoleDirectory({
           {folder.sections.map((section) => {
             const links = (
               <FolderLinks
-                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home", "cm-home"].includes(item.id))}
+                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home", "cm-home", "fr-home"].includes(item.id))}
                 hrefFor={hrefFor}
                 preferences={preferences}
                 activeView={activeView}

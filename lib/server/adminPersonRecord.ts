@@ -1,3 +1,4 @@
+import { fundraisingBoundary } from "@/lib/fundraisingPolicy";
 import { communicationsBoundary } from "@/lib/communicationsPolicy";
 import { volunteerBoundary } from "@/lib/volunteerPolicy";
 import { competitionBoundary } from "@/lib/competitionPolicy";
@@ -28,6 +29,8 @@ export async function personRecordScope(
   orgs: string[],
   personId: string,
 ) {
+  if (role === "fundraising_coordinator")
+    throw new PersonRecordError(403, fundraisingBoundary);
   if (role === "communications_media")
     throw new PersonRecordError(403, communicationsBoundary);
   if (role === "volunteer_coordinator")
