@@ -18,7 +18,7 @@ const names: Record<string, string> = {
   treasurer: "Money Manager",
   competition_manager: "Game Day Director",
   volunteer_coordinator: "Volunteer Helper",
-  communications_media: "Communications",
+  communications_media: "Club Announcer",
   fundraising_coordinator: "Fundraising",
   facilities_equipment_manager: "Facilities",
 };
@@ -189,7 +189,7 @@ function RoleDirectory({
           {folder.sections.map((section) => {
             const links = (
               <FolderLinks
-                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home"].includes(item.id))}
+                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home", "cm-home"].includes(item.id))}
                 hrefFor={hrefFor}
                 preferences={preferences}
                 activeView={activeView}

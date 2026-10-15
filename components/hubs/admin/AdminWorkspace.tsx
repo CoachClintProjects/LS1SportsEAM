@@ -246,7 +246,7 @@ export function AdminWorkspace() {
       try {
         let view = searchParams.get("view");
         const nav = await authenticatedFetch(
-          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
+          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator", "communications_media"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
           { cache: "no-store" },
         );
         if (!nav.ok) throw new Error("Admin navigation unavailable.");
@@ -269,6 +269,7 @@ export function AdminWorkspace() {
                   "tr-home",
                   "gd-home",
                   "vl-home",
+                  "cm-home",
                 ].includes(x.nav_id),
             )?.nav_id || "";
         if (!view)
@@ -292,7 +293,9 @@ export function AdminWorkspace() {
                   ? "[DENY: ERR-601: INSUFFICIENT ACCESS TIER - COMPETITION MANAGER ACCOUNT RESTRICTED FROM STRUCTURE/LEASES/MEDICALS]"
                   : role === "volunteer_coordinator"
                     ? "[DENY: ERR-301: INSUFFICIENT ACCESS TIER - VOLUNTEER COORDINATOR RESTRICTED FROM FINANCE/LEASES/BRACKET_MUTATIONS]"
-                    : "Admin view is not authorized for this role context.",
+                    : role === "communications_media"
+                      ? "[DENY: ERR-201: INSUFFICIENT ACCESS TIER - COMMUNICATIONS COORDINATOR RESTRICTED FROM FINANCE/LEASES/WORKFORCE/IDENTITY]"
+                      : "Admin view is not authorized for this role context.",
           );
         const name = selected.component || "",
           C = registry[name];
@@ -392,6 +395,7 @@ export function AdminWorkspace() {
           "treasurer",
           "competition_manager",
           "volunteer_coordinator",
+          "communications_media",
         ].includes(searchParams.get("folder") || "") && (
           <div className="px-6 py-3">
             <button

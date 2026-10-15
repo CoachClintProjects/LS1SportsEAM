@@ -1,3 +1,4 @@
+import { communicationsBoundary } from "@/lib/communicationsPolicy";
 import { volunteerBoundary } from "@/lib/volunteerPolicy";
 import { competitionBoundary } from "@/lib/competitionPolicy";
 import { TriageError } from "./adminTriage";
@@ -27,6 +28,8 @@ export async function personRecordScope(
   orgs: string[],
   personId: string,
 ) {
+  if (role === "communications_media")
+    throw new PersonRecordError(403, communicationsBoundary);
   if (role === "volunteer_coordinator")
     throw new PersonRecordError(403, volunteerBoundary);
   if (role === "competition_manager")

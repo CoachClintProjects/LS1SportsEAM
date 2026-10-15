@@ -1,3 +1,4 @@
+import { communicationsBoundary } from "@/lib/communicationsPolicy";
 import { volunteerBoundary } from "@/lib/volunteerPolicy";
 import { competitionBoundary } from "@/lib/competitionPolicy";
 import { registrarBoundary } from "@/lib/registrarPolicy";
@@ -24,13 +25,15 @@ export async function financeScope(
   )
     throw new PersonRecordError(
       403,
-      role === "volunteer_coordinator"
-        ? volunteerBoundary
-        : role === "competition_manager"
-          ? competitionBoundary
-          : role === "registrar"
-            ? registrarBoundary
-            : "Financial authority denied.",
+      role === "communications_media"
+        ? communicationsBoundary
+        : role === "volunteer_coordinator"
+          ? volunteerBoundary
+          : role === "competition_manager"
+            ? competitionBoundary
+            : role === "registrar"
+              ? registrarBoundary
+              : "Financial authority denied.",
     );
   const tenant = ctx.adminScope?.tenantId || ctx.person?.tenant_id;
   const codes =
