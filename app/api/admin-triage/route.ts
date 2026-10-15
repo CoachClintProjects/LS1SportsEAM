@@ -1,3 +1,4 @@
+import { competitionBoundary } from "@/lib/competitionPolicy";
 import { cashPacket, treasurerBoundary } from "@/lib/treasurerPolicy";
 import { teamManagerScope } from "@/lib/server/teamManagerScope";
 import { NextRequest, NextResponse } from "next/server";
@@ -289,6 +290,18 @@ export async function POST(request: NextRequest) {
       ].includes(b.action)
     )
       throw new TriageError(treasurerBoundary, 403);
+    if (
+      scope.role === "competition_manager" &&
+      [
+        "lease_terms",
+        "set_consent_policy",
+        "consent_override",
+        "prepare_cashbox",
+        "link_bill",
+        "verify_fees",
+      ].includes(b.action)
+    )
+      throw new TriageError(competitionBoundary, 403);
     if (b.action === "sync") {
       if (!taskPermission(ctx, scope.role, "operational_tasks", false))
         throw new TriageError("Task access denied.", 403);
@@ -352,7 +365,10 @@ export async function POST(request: NextRequest) {
           throw new TriageError("Waiver exception authority required.", 403);
       }
       if (b.action === "prepare_cashbox") {
-        if (String(b.note || "").trim().length < 10) throw new TriageError("Enter a custody note of at least ten characters.");
+        if (String(b.note || "").trim().length < 10)
+          throw new TriageError(
+            "Enter a custody note of at least ten characters.",
+          );
         let packet;
         try {
           packet = cashPacket(b.values || {});

@@ -1,3 +1,4 @@
+import { competitionBoundary } from "@/lib/competitionPolicy";
 import { TriageError } from "./adminTriage";
 import {
   teamManagerScope,
@@ -25,6 +26,7 @@ export async function personRecordScope(
   orgs: string[],
   personId: string,
 ) {
+  if (role === "competition_manager") throw new PersonRecordError(403, competitionBoundary);
   if (!uuid.test(personId))
     throw new PersonRecordError(400, "A valid person record is required.");
   if (

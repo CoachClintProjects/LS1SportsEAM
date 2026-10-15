@@ -28,7 +28,7 @@ export function AdminCompetitionOperations({
     [creating, setCreating] = useState(false),
     [busy, setBusy] = useState(false);
   const load = () =>
-    authenticatedFetch(`/api/admin-command?role=${encodeURIComponent(role)}`, {
+    authenticatedFetch(role === "competition_manager" ? "/api/admin-game-day" : `/api/admin-command?role=${encodeURIComponent(role)}`, {
       cache: "no-store",
     })
       .then(async (r) => {
@@ -65,6 +65,7 @@ export function AdminCompetitionOperations({
       if (!r.ok) throw new Error(j.error || "Operation failed");
       setCreating(false);
       setSelected(null);
+      window.dispatchEvent(new Event("ls1:competition-saved"));
       await load();
       return true;
     } catch (e: any) {
@@ -82,7 +83,7 @@ export function AdminCompetitionOperations({
       </div>
       <div className="flex items-center justify-between">
         <h1 className="mt-1 text-3xl font-black">
-          Admin Competition Operations
+          Competition planning
         </h1>
         <div className="flex gap-2">
           <button
@@ -112,7 +113,7 @@ export function AdminCompetitionOperations({
         </div>
       </div>
       {error && <p className="mt-4 text-red-300">{error}</p>}
-      <section className="mt-5 overflow-hidden rounded-2xl border border-neutral-800 bg-[#090b0b]">
+      <section className="mt-5 overflow-hidden rounded-2xl border border-neutral-800 bg-[#0A0C10]">
         <div className="divide-y divide-neutral-800">
           {data.map((r: any) => (
             <button
@@ -170,7 +171,7 @@ export function AdminCompetitionOperations({
           }
         />
       )}
-      <section className="mt-4 rounded-2xl border border-neutral-800 bg-[#090b0b] p-4">
+      <section className="mt-4 rounded-2xl border border-neutral-800 bg-[#0A0C10] p-4">
         <div className="text-xs font-black uppercase text-neutral-500">
           Entries
         </div>
@@ -230,7 +231,7 @@ export function AdminCompetitionOperations({
           }
         />
       )}
-      <section className="mt-4 rounded-2xl border border-neutral-800 bg-[#090b0b] p-4">
+      <section className="mt-4 rounded-2xl border border-neutral-800 bg-[#0A0C10] p-4">
         <div className="text-xs font-black uppercase text-neutral-500">
           Deadlines
         </div>
