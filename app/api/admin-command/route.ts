@@ -1,3 +1,4 @@
+import { volunteerBoundary } from '@/lib/volunteerPolicy';
 import { competitionBoundary, competitionCommands, hasCurrentEligibility } from '@/lib/competitionPolicy';
 import { treasurerBoundary, treasurerCommands } from '@/lib/treasurerPolicy';
 import { registrarBoundary, registrarCommands, registrarSections } from '@/lib/registrarPolicy';
@@ -22,6 +23,7 @@ export async function GET(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
   const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
   if(roleName==='team_manager')return deny(403,'[DENY: ERR-901: SECURITY BOUNDARY VIOLATION - ACCESS RESTRICTED TO ASSIGNED SQUAD] Use the assigned-squad workspace.');
+  if(roleName==='volunteer_coordinator')return deny(403,volunteerBoundary+' Use the volunteer workspace.');
   if(roleName==='competition_manager')return deny(403,competitionBoundary+' Use the Game Day workspace.');
   if(roleName==='treasurer')return deny(403,treasurerBoundary+' Use the financial workspace.');
   const canTasks=roleHas(ctx,roleName,'admin_tasks.read'),canFinance=roleHas(ctx,roleName,'finance.read'),canRoster=roleHas(ctx,roleName,'rosters.read');
@@ -170,6 +172,7 @@ export async function POST(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
   const body=await request.json();const action=String(body.action||''),roleName=String(body.role||'org_admin').trim(),tenant=tenantId(ctx);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');if(!tenant)return deny(403,'Your account is not linked to a club. Contact your club administrator.');const correlationId=crypto.randomUUID();
   if(roleName==='team_manager')return deny(403,'[DENY: ERR-901: SECURITY BOUNDARY VIOLATION - ACCESS RESTRICTED TO ASSIGNED SQUAD] Use the assigned-squad resolution controls.');
+  if(roleName==='volunteer_coordinator')return deny(403,volunteerBoundary+' Use the volunteer workspace.');
   if(roleName==='competition_manager'&&!competitionCommands.includes(action))return deny(403,competitionBoundary);
   if(roleName==='treasurer'&&!treasurerCommands.includes(action))return deny(403,treasurerBoundary);
   if(roleName==='registrar'&&!registrarCommands.includes(action))return deny(403,action==='update-compliance-record'?'Executive approval is required. Forward evidence for Organization Administrator review.':registrarBoundary);

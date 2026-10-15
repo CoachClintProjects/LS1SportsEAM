@@ -1,3 +1,4 @@
+import { volunteerBoundary } from "@/lib/volunteerPolicy";
 import { competitionBoundary } from "@/lib/competitionPolicy";
 import { TriageError } from "./adminTriage";
 import {
@@ -26,7 +27,10 @@ export async function personRecordScope(
   orgs: string[],
   personId: string,
 ) {
-  if (role === "competition_manager") throw new PersonRecordError(403, competitionBoundary);
+  if (role === "volunteer_coordinator")
+    throw new PersonRecordError(403, volunteerBoundary);
+  if (role === "competition_manager")
+    throw new PersonRecordError(403, competitionBoundary);
   if (!uuid.test(personId))
     throw new PersonRecordError(400, "A valid person record is required.");
   if (
@@ -117,7 +121,9 @@ export async function readPersonRecord(
   const canEdit =
     hasAdminContextPermission(ctx, role, "record.update") &&
     ["org_admin", "registrar", "team_manager"].includes(role);
-  const canFinance = role !== "registrar" && hasAdminContextPermission(ctx, role, "finance.read");
+  const canFinance =
+    role !== "registrar" &&
+    hasAdminContextPermission(ctx, role, "finance.read");
   const [
     familyLinks,
     authorities,
