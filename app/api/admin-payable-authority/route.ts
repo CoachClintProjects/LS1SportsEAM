@@ -1,3 +1,4 @@
+import {gmBoundary} from "@/lib/generalManagerPolicy";
 import { NextRequest, NextResponse } from "next/server";
 import { financeScope } from "@/lib/server/adminFinanceScope";
 import { recordRest as rest } from "@/lib/server/adminRecordAccess";
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       role,
       "record.update",
     );
+    if(ctx.activeAdminRole === "general_manager" || role === "general_manager") throw new PersonRecordError(403,gmBoundary);
     if (role !== "org_admin" || !can(ctx, role, "workflow.execute"))
       throw new PersonRecordError(
         403,

@@ -1,3 +1,4 @@
+import {gmBoundary,gmClubActions} from "@/lib/generalManagerPolicy";
 import { NextRequest, NextResponse } from "next/server";
 import { financeScope } from "@/lib/server/adminFinanceScope";
 import { governanceUuid as uuid } from "@/lib/server/adminGovernance";
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
     const b = await req.json(),
       role = String(b.role || "org_admin");
     const { ctx, tenant, org } = await financeScope(req, role, "record.update");
+    if ((role === "general_manager" || ctx.activeAdminRole === "general_manager") && !gmClubActions.includes(b.operation)) throw new PersonRecordError(403,gmBoundary);
     const allowed = [
       "settings",
       "squad_settings",
@@ -149,7 +151,7 @@ export async function POST(req: NextRequest) {
     if (
       !ctx.person?.id ||
       !can(ctx, role, "workflow.execute") ||
-      (role !== "org_admin" &&
+      (!["org_admin","general_manager"].includes(role) &&
         !["deposit", "approve_credit"].includes(b.operation))
     )
       throw new PersonRecordError(403, "Club decision authority required.");

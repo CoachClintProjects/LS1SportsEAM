@@ -13,6 +13,7 @@ import WorkspaceCatalog from "@/components/experience/HubNavigation/WorkspaceCat
 
 const names: Record<string, string> = {
   org_admin: "Club President",
+  general_manager: "General Manager",
   team_manager: "Team Manager",
   registrar: "Roster Gatekeeper",
   treasurer: "Money Manager",
@@ -43,7 +44,7 @@ export function AdminFolderNavigation() {
       const config = await getSwitcherConfig("admin");
       const visibleRoles = config.options.filter(
         (option) =>
-          names[option.id] && (role === "org_admin" || option.id === role),
+          names[option.id] && (role === "org_admin" || (role === "general_manager" && option.id !== "org_admin") || option.id === role),
       );
       if (!visibleRoles.length)
         throw new Error("No staff menus are available for this role.");
@@ -150,7 +151,7 @@ function RoleDirectory({
     const url = new URL(href, "https://ls1.invalid");
     url.searchParams.set(
       "role",
-      activeRole === "org_admin" ? "org_admin" : folder.role,
+      ["org_admin","general_manager"].includes(activeRole) ? activeRole : folder.role,
     );
     url.searchParams.set("folder", folder.role);
     return url.pathname + url.search;
@@ -189,7 +190,7 @@ function RoleDirectory({
           {folder.sections.map((section) => {
             const links = (
               <FolderLinks
-                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home", "cm-home", "fr-home", "eq-home"].includes(item.id))}
+                items={section.items.filter((item) => !["tm-home", "rg-home", "tr-home", "gd-home", "vl-home", "cm-home", "fr-home", "eq-home", "gm-home"].includes(item.id))}
                 hrefFor={hrefFor}
                 preferences={preferences}
                 activeView={activeView}

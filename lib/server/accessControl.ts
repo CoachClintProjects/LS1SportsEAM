@@ -1,10 +1,11 @@
+import {gmSubordinateCodes} from '@/lib/generalManagerPolicy';
 import type { NextRequest } from 'next/server';
 import { supabaseServerConfig } from '@/lib/server/superuserAuth';
 
 export type Scope={organization_id:string|null;sport_id:string|null;site_id:string|null;team_id:string|null;program_id:string|null;competition_id:string|null};
 export type EffectiveRole={id:string;code:string;name:string;privilege_level:number;role_type:string;config:Record<string,unknown>;scope:Scope};
 export type SafetyRestriction={organization_id:string;role_code:string;reasons:string[]};
-export type AccessContext={safetyRestrictions?:SafetyRestriction[];user:{id:string;email:string};person:{id:string;tenant_id:string}|null;adminScope:{tenantId:string;organizationId:string}|null;roles:EffectiveRole[];permissions:string[];rolePermissions:Record<string,string[]>;allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
+export type AccessContext={activeAdminRole?:string;safetyRestrictions?:SafetyRestriction[];user:{id:string;email:string};person:{id:string;tenant_id:string}|null;adminScope:{tenantId:string;organizationId:string}|null;roles:EffectiveRole[];permissions:string[];rolePermissions:Record<string,string[]>;allowedHubs:string[];isPlatformSuperUser:boolean;maxDelegablePrivilege:number};
 const HUB_ORDER=['superuser','admin','coach','athlete','parent','official','scout'];
 const serviceHeadersFor=(key:string)=>({apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'});
 
@@ -38,21 +39,30 @@ export async function resolveAccess(request:NextRequest):Promise<AccessContext|n
   for(let i=roles.length-1;i>=0;i--)if(safetyRestrictions.some(e=>e.organization_id===roles[i].scope.organization_id&&e.role_code===roles[i].code))roles.splice(i,1);
   roleIds.clear();for(const role of roles)roleIds.add(role.id);
  }
+ // GM delegation is computed in the authenticated club scope; it never grants ORGANIZATION_ADMIN.
+ const directors=roles.filter(r=>r.code==='GENERAL_MANAGER');
+ if(directors.length){
+  const dr=await fetch(`${url}/rest/v1/role_definitions?select=id,code,name,privilege_level,role_type,config&is_active=eq.true&code=in.(${gmSubordinateCodes.join(',')})&or=(tenant_id.is.null,tenant_id.eq.${person?.tenant_id})`,{headers:h,cache:'no-store'});
+  if(!dr.ok)throw new Error('Operational role configuration unavailable.');
+  const definitions=await dr.json() as Omit<EffectiveRole,'scope'>[];
+  for(const gm of directors)for(const def of definitions)if(gm.scope.organization_id&&!gm.scope.team_id&&!gm.scope.site_id&&!gm.scope.program_id&&!gm.scope.competition_id&&!gm.scope.sport_id&&!safetyRestrictions.some(e=>e.organization_id===gm.scope.organization_id&&e.role_code===def.code)&&!roles.some(r=>r.code===def.code&&r.scope.organization_id===gm.scope.organization_id&&r.scope.team_id===null)){roles.push({...def,scope:{...gm.scope,team_id:null,site_id:null,program_id:null,competition_id:null}});roleIds.add(def.id);}
+ }
  const permissions=new Set<string>();
  const rolePermissions:Record<string,string[]>={};
  const permissionTenant=adminScope?.tenantId||person?.tenant_id;
  const rr=await fetch(`${url}/rest/v1/role_definitions?select=id,code&is_active=eq.true&${permissionTenant?`or=(tenant_id.is.null,tenant_id.eq.${permissionTenant})`:'tenant_id=is.null'}`,{headers:h,cache:'no-store'});
  if(rr.ok){const defs=await rr.json() as Array<{id:string;code:string}>;const ids=defs.map(x=>x.id);if(ids.length){const gr=await fetch(`${url}/rest/v1/permission_grants?select=effect,role_definition_id,permission_definitions(code,is_active)&role_definition_id=in.(${ids.join(',')})`,{headers:h,cache:'no-store'});if(gr.ok){const rows=await gr.json() as any[];const byId=new Map(defs.map(d=>[d.id,d.code.toUpperCase()]));const denied=new Map<string,Set<string>>();const effectiveDenied=new Set<string>();for(const g of rows){const code=byId.get(g.role_definition_id),p=g.permission_definitions;if(!code||!p?.is_active)continue;if(roleIds.has(g.role_definition_id)){if(g.effect==='deny')effectiveDenied.add(p.code);else if(g.effect==='allow')permissions.add(p.code)}(rolePermissions[code]??=[]);if(g.effect==='deny'){let set=denied.get(code);if(!set){set=new Set<string>();denied.set(code,set)}set.add(p.code)}else rolePermissions[code].push(p.code)}for(const code of effectiveDenied)permissions.delete(code);for(const [code,set] of denied)rolePermissions[code]=[...new Set(rolePermissions[code])].filter(p=>!set.has(p));for(const code of Object.keys(rolePermissions))rolePermissions[code]=[...new Set(rolePermissions[code])].sort();}}}
  const hubs=new Set<string>(); if(isPlatformSuperUser){for(const hub of HUB_ORDER)hubs.add(hub);}else{for(const role of roles){const configured=Array.isArray(role.config?.hub_access)?role.config.hub_access as string[]:[];for(const hub of configured)hubs.add(hub);}}
- return {safetyRestrictions,user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,adminScope,roles,permissions:[...permissions].sort(),rolePermissions,allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
+ return {activeAdminRole:request.headers.get('x-ls1-admin-role')||undefined,safetyRestrictions,user:{id:user.id,email},person:person?.tenant_id?{id:person.id,tenant_id:person.tenant_id}:null,adminScope,roles,permissions:[...permissions].sort(),rolePermissions,allowedHubs:HUB_ORDER.filter(h=>hubs.has(h)),isPlatformSuperUser,maxDelegablePrivilege:isPlatformSuperUser?100:Math.max(0,...roles.map(r=>Number(r.config?.max_delegable_privilege||0)))};
 }
 export const hasPermission=(ctx:AccessContext,code:string)=>ctx.isPlatformSuperUser||ctx.permissions.includes(code);
 export function hasRoleCode(ctx:AccessContext,...codes:string[]){const wanted=new Set(codes.map(code=>code.toUpperCase()));return ctx.roles.some(role=>wanted.has(role.code.toUpperCase()));}
-export function adminRoleCodes(roleName:string){const normalized=roleName.trim().toLowerCase();const aliases:Record<string,string[]>={org_admin:['ORGANIZATION_ADMIN'],team_manager:['TEAM_MANAGER'],registrar:['REGISTRAR','RECORDS_ADMINISTRATOR'],competition_manager:['COMPETITION_MANAGER'],treasurer:['TREASURER','FINANCE'],volunteer_coordinator:['VOLUNTEER_COORDINATOR','VOLUNTEER'],communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']};return aliases[normalized]||[];}
+export function adminRoleCodes(roleName:string){const normalized=roleName.trim().toLowerCase();const aliases:Record<string,string[]>={general_manager:['GENERAL_MANAGER'],org_admin:['ORGANIZATION_ADMIN'],team_manager:['TEAM_MANAGER'],registrar:['REGISTRAR','RECORDS_ADMINISTRATOR'],competition_manager:['COMPETITION_MANAGER'],treasurer:['TREASURER','FINANCE'],volunteer_coordinator:['VOLUNTEER_COORDINATOR','VOLUNTEER'],communications_media:['COMMUNICATIONS_MEDIA','COMMUNICATIONS'],fundraising_coordinator:['FUNDRAISING_COORDINATOR'],facilities_equipment_manager:['FACILITIES_EQUIPMENT_MANAGER']};return aliases[normalized]||[];}
 export function hasAdminContextPermission(ctx:AccessContext,roleName:string,permission:string){if(ctx.isPlatformSuperUser)return true;return adminRoleCodes(roleName).some(code=>(ctx.rolePermissions[code]||[]).includes(permission));}
 export function canUseAdminRoleContext(ctx:AccessContext,roleName:string){
- if(ctx.isPlatformSuperUser)return true;
+ if(ctx.isPlatformSuperUser&&!(ctx.activeAdminRole==='general_manager'&&roleName==='org_admin'))return true;
  const normalized=roleName.trim().toLowerCase();
+ if(normalized==='org_admin'&&ctx.activeAdminRole==='general_manager')return false;
  const targetCodes=adminRoleCodes(normalized);if(!targetCodes.length)return false;
  if(targetCodes.some(code=>hasRoleCode(ctx,code)))return true;
  if(!hasRoleCode(ctx,'ORGANIZATION_ADMIN'))return false;

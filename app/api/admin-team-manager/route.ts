@@ -44,7 +44,7 @@ async function context(req: NextRequest, team?: string) {
 }
 export async function GET(req: NextRequest) {
   try {
-    const { ctx, scope, athletes, athleteIds } = await context(req);
+    const { ctx, scope, athletes, athleteIds } = await context(req, req.nextUrl.searchParams.get("team") || undefined);
     const af = `in.(${athleteIds.join(",")})`;
     const personIds = athletes.map((a: { person_id: string }) => a.person_id);
     const [
@@ -95,6 +95,7 @@ export async function GET(req: NextRequest) {
       : [];
     return reply({
       squad: scope.squad,
+      availableTeams:scope.availableTeams,
       athletes,
       registrations,
       responses,

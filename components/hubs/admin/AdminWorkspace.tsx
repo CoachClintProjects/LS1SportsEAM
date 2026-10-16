@@ -112,10 +112,12 @@ const ExternalOrganizationDirectory = dynamic(
 const EquipmentWorkspace = dynamic(() => import("./EquipmentWorkspace"), {
   loading: workspaceLoading,
 });
+const GeneralManagerWorkspace=dynamic(()=>import('./GeneralManagerWorkspace'),{loading:workspaceLoading});
 const registry: Record<
   string,
   React.ComponentType<{ role?: string; roleLabel?: string }>
 > = {
+  GeneralManagerWorkspace,
   EquipmentWorkspace,
   TeamManagerWorkspace,
   RegistrarWorkspace,
@@ -250,7 +252,7 @@ export function AdminWorkspace() {
       try {
         let view = searchParams.get("view");
         const nav = await authenticatedFetch(
-          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator", "communications_media", "fundraising_coordinator", "facilities_equipment_manager"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
+          `/api/admin-navigation?role=${encodeURIComponent(["org_admin","general_manager"].includes(role) && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator", "communications_media", "fundraising_coordinator", "facilities_equipment_manager", "general_manager"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
           { cache: "no-store" },
         );
         if (!nav.ok) throw new Error("Admin navigation unavailable.");
@@ -276,6 +278,7 @@ export function AdminWorkspace() {
                   "cm-home",
                   "fr-home",
                   "eq-home",
+                  "gm-home",
                 ].includes(x.nav_id),
             )?.nav_id || "";
         if (!view)
@@ -305,7 +308,7 @@ export function AdminWorkspace() {
                         ? "[DENY: ERR-801: INSUFFICIENT ACCESS TIER - FUNDRAISING COORDINATOR RESTRICTED FROM GENERAL_FINANCE/LEASES/COMPLIANCE_FLAGS]"
                         : role === "facilities_equipment_manager"
                           ? "[DENY: ERR-101: INSUFFICIENT ACCESS TIER - FACILITIES MANAGER RESTRICTED FROM BANKING_TOKENS/GOVERNANCE_BYLAWS/COMPLIANCE_STRATEGY/SCHEDULING]"
-                          : "Admin view is not authorized for this role context.",
+                          : role === "general_manager" ? "[DENY: ERR-702: SYSTEM PRIVILEGE EXCEPTION - GENERAL MANAGER ACCOUNT RESTRICTED FROM MASTERS FINANCE POLICIES / SELF-LOCKOUT overrides]" : "Admin view is not authorized for this role context.",
           );
         const name = selected.component || "",
           C = registry[name];

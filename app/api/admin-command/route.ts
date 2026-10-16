@@ -1,3 +1,4 @@
+import {gmBoundary} from '@/lib/generalManagerPolicy';
 import {equipmentBoundary} from '@/lib/equipmentPolicy';
 import { fundraisingBoundary } from '@/lib/fundraisingPolicy';
 import { communicationsBoundary } from '@/lib/communicationsPolicy';
@@ -24,8 +25,9 @@ async function audit(ctx:AccessContext,tenant:string,action:string,entityType:st
 
 export async function GET(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
-  const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
+  const roleName=(request.nextUrl.searchParams.get('role')||'org_admin').trim();if((roleName==='org_admin'||roleName==='general_manager')&&ctx.activeAdminRole==='general_manager')return deny(403,gmBoundary);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');
   if(roleName==='team_manager')return deny(403,'[DENY: ERR-901: SECURITY BOUNDARY VIOLATION - ACCESS RESTRICTED TO ASSIGNED SQUAD] Use the assigned-squad workspace.');
+  if(roleName==='general_manager'||(roleName==='org_admin'&&ctx.activeAdminRole==='general_manager'))return deny(403,gmBoundary+' Use the General Manager workspace.');
   if(roleName==='facilities_equipment_manager')return deny(403,equipmentBoundary+' Use Gear & Field Crew.');
   if(roleName==='fundraising_coordinator')return deny(403,fundraisingBoundary+' Use the Fundraising Chief workspace.');
   if(roleName==='communications_media')return deny(403,communicationsBoundary+' Use the Club Announcer workspace.');
@@ -176,8 +178,9 @@ async function orgAdminEnterprise(orgs:string[],tenant:string){
 
 export async function POST(request:NextRequest){
  try{const ctx=await resolveAccess(request);if(!ctx)return deny(401,'Authentication required.');if(!ctx.allowedHubs.includes('admin'))return deny(403,'Admin access denied.');
-  const body=await request.json();const action=String(body.action||''),roleName=String(body.role||'org_admin').trim(),tenant=tenantId(ctx);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');if(!tenant)return deny(403,'Your account is not linked to a club. Contact your club administrator.');const correlationId=crypto.randomUUID();
+  const body=await request.json();const action=String(body.action||''),roleName=String(body.role||'org_admin').trim(),tenant=tenantId(ctx);if((roleName==='org_admin'||roleName==='general_manager')&&ctx.activeAdminRole==='general_manager')return deny(403,gmBoundary);if(!canUseAdminRoleContext(ctx,roleName))return deny(403,'Admin role context is not assigned or delegable for this user.');if(!tenant)return deny(403,'Your account is not linked to a club. Contact your club administrator.');const correlationId=crypto.randomUUID();
   if(roleName==='team_manager')return deny(403,'[DENY: ERR-901: SECURITY BOUNDARY VIOLATION - ACCESS RESTRICTED TO ASSIGNED SQUAD] Use the assigned-squad resolution controls.');
+  if(roleName==='general_manager'||(roleName==='org_admin'&&ctx.activeAdminRole==='general_manager'))return deny(403,gmBoundary+' Use the General Manager workspace.');
   if(roleName==='facilities_equipment_manager')return deny(403,equipmentBoundary+' Use Gear & Field Crew.');
   if(roleName==='fundraising_coordinator')return deny(403,fundraisingBoundary+' Use the Fundraising Chief workspace.');
   if(roleName==='communications_media')return deny(403,communicationsBoundary+' Use the Club Announcer workspace.');

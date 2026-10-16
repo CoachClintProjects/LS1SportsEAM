@@ -13,13 +13,37 @@ export async function teamManagerScope(
   const scope = triageScope(ctx, "team_manager", null);
   if (!hasAdminContextPermission(ctx, "team_manager", "rosters.read"))
     throw new TriageError(squadBoundary, 403);
+  const director =
+    ctx.activeAdminRole === "general_manager" ||
+    ctx.roles.some(
+      (r) =>
+        r.code === "GENERAL_MANAGER" &&
+        !r.scope.team_id &&
+        !r.scope.site_id &&
+        !r.scope.program_id &&
+        !r.scope.competition_id &&
+        !r.scope.sport_id,
+    );
   const teams = await rest(
-    `teams?select=id,name,code,organization_id&organization_id=in.(${scope.orgs.join(",")})&code=eq.${squadCode}&status=eq.active`,
+    `teams?select=id,name,code,organization_id&organization_id=in.(${scope.orgs.join(",")})${director ? "" : `&code=eq.${squadCode}`}&status=eq.active&order=name.asc&limit=1000`,
   );
   const authorized = teams.filter(
     (t: { id: string }) =>
       scope.teamIds === null || scope.teamIds.includes(t.id),
   );
+  if (director && authorized.length && authorized.length < 1000) {
+    const selected = requested
+      ? authorized.find((t: { id: string }) => t.id === requested)
+      : authorized[0];
+    if (!selected) throw new TriageError(squadBoundary, 403);
+    return {
+      ...scope,
+      team: selected.id as string,
+      org: selected.organization_id as string,
+      squad: selected,
+      availableTeams: authorized,
+    };
+  }
   if (authorized.length !== 1 || (requested && requested !== authorized[0].id))
     throw new TriageError(
       `${squadBoundary} The active Banana Slugs squad and its assignment must be configured by Organization Admin.`,
@@ -30,6 +54,7 @@ export async function teamManagerScope(
     team: authorized[0].id as string,
     org: authorized[0].organization_id as string,
     squad: authorized[0],
+    availableTeams: authorized,
   };
 }
 export async function squadMembers(rest: RecordStore, team: string) {

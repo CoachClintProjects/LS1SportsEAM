@@ -41,10 +41,10 @@ export function triageScope(
   const tenant = ctx.adminScope?.tenantId || ctx.person?.tenant_id;
   const executive =
     ctx.isPlatformSuperUser ||
-    ctx.roles.some((r) => r.code === "ORGANIZATION_ADMIN");
+    ctx.roles.some((r) => ["ORGANIZATION_ADMIN", "GENERAL_MANAGER"].includes(r.code));
   const relevant = ctx.roles.filter((r) =>
     executive
-      ? r.code === "ORGANIZATION_ADMIN"
+      ? ["ORGANIZATION_ADMIN", "GENERAL_MANAGER"].includes(r.code)
       : adminRoleCodes(role).includes(r.code),
   );
   const orgs = ctx.adminScope

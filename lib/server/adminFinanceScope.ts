@@ -19,7 +19,7 @@ export async function financeScope(
   const ctx = await resolveAccess(request);
   if (!ctx) throw new PersonRecordError(401, "Sign in required.");
   if (
-    !["org_admin", "treasurer"].includes(role) ||
+    !["org_admin", "treasurer", "general_manager"].includes(role) ||
     !ctx.allowedHubs.includes("admin") ||
     !canUseAdminRoleContext(ctx, role) ||
     !can(ctx, role, "finance.read") ||
@@ -45,7 +45,9 @@ export async function financeScope(
   const codes =
     role === "org_admin"
       ? ["ORGANIZATION_ADMIN"]
-      : ["TREASURER", "FINANCE", "ORGANIZATION_ADMIN"];
+      : role === "general_manager"
+        ? ["GENERAL_MANAGER", "ORGANIZATION_ADMIN"]
+        : ["TREASURER", "FINANCE", "ORGANIZATION_ADMIN"];
   const orgs = ctx.adminScope
     ? [ctx.adminScope.organizationId]
     : [

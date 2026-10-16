@@ -9,6 +9,7 @@ const TriageTaskHub = dynamic(() => import("../superuser/TriageTaskHub"));
 type Row = Record<string, any>;
 type Feed = {
   squad: Row;
+  availableTeams: Row[];
   athletes: Row[];
   registrations: Row[];
   responses: Row[];
@@ -50,6 +51,7 @@ export function TeamManagerWorkspace() {
     [notice, setNotice] = useState(""),
     [amount, setAmount] = useState(""),
     [reason, setReason] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("");
   const [page, setPage] = useState(1);
   const generation = useRef(0),
     saving = useRef(false),
@@ -58,9 +60,12 @@ export function TeamManagerWorkspace() {
     const seq = ++generation.current;
     setLoading(true);
     try {
-      const r = await authenticatedFetch("/api/admin-team-manager", {
-        cache: "no-store",
-      });
+      const r = await authenticatedFetch(
+        `/api/admin-team-manager${selectedTeam ? `?team=${selectedTeam}` : ""}`,
+        {
+          cache: "no-store",
+        },
+      );
       const j = await r.json();
       if (seq !== generation.current) return;
       if (!r.ok) throw new Error(j.error || "Squad unavailable.");
@@ -74,7 +79,7 @@ export function TeamManagerWorkspace() {
     } finally {
       if (seq === generation.current) setLoading(false);
     }
-  }, []);
+  }, [selectedTeam]);
   useEffect(() => {
     void load();
     return () => {
@@ -87,7 +92,7 @@ export function TeamManagerWorkspace() {
     setSearch("");
     setPage(1);
     setNotice("");
-  }, [view]);
+  }, [view, selectedTeam]);
   async function cash() {
     if (!data || !selected || saving.current) return;
     saving.current = true;
@@ -95,18 +100,21 @@ export function TeamManagerWorkspace() {
     setError("");
     setNotice("");
     try {
-      const r = await authenticatedFetch("/api/admin-team-manager", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "cash",
-          team: data.squad.id,
-          invoiceId: selected.id,
-          requestId: requestId.current,
-          amount,
-          reason,
-        }),
-      });
+      const r = await authenticatedFetch(
+        `/api/admin-team-manager${selectedTeam ? `?team=${selectedTeam}` : ""}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "cash",
+            team: data.squad.id,
+            invoiceId: selected.id,
+            requestId: requestId.current,
+            amount,
+            reason,
+          }),
+        },
+      );
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Receipt failed.");
       setSelected(null);
@@ -190,6 +198,22 @@ export function TeamManagerWorkspace() {
           <h1 className="mt-1 text-2xl font-bold">
             {titles[view] || "Today’s Tasks / What Needs Attention"}
           </h1>
+          {data && data.availableTeams?.length > 1 && (
+            <label className="block mt-3">
+              Squad
+              <select
+                className={control}
+                value={selectedTeam || data.squad.id}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+              >
+                {data.availableTeams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {data && (
             <p className="mt-2 text-sm text-neutral-300">
               {data.squad.name} · {data.squad.code}

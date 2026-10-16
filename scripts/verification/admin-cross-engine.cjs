@@ -4,16 +4,19 @@ class PersonRecordError extends Error{constructor(status,message){super(message)
 let calls=[],allowed=true,workflow=true;
 const id='00000000-0000-0000-0000-000000000001',m={exports:{}};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('app/api/admin-cross-engine/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:m,exports:m.exports,JSON,Array,encodeURIComponent,require(n){
+ if(n.endsWith('generalManagerPolicy'))return {gmBoundary:'ERR-702',gmClubActions:['preview_transfer','transfer','cash','deposit','approve_credit','cover_fee','reverse_fee','squad_settings']};
  if(n==='next/server')return {NextResponse:{json:(body,o={})=>({body,status:o.status||200})}};
  if(n.endsWith('adminPersonRecord'))return {PersonRecordError};
  if(n.endsWith('adminGovernance'))return {governanceUuid:/^[0-9a-f-]{36}$/i};
  if(n.endsWith('accessControl'))return {hasAdminContextPermission:()=>workflow};
- if(n.endsWith('adminFinanceScope'))return {financeScope:async(_,role)=>{if(!allowed||!['org_admin','treasurer'].includes(role))throw new PersonRecordError(403,'Denied');return {ctx:{user:{id:'actor'},person:{id:'person'}},tenant:'tenant',org:'club'}}};
+ if(n.endsWith('adminFinanceScope'))return {financeScope:async(_,role)=>{if(!allowed||!['org_admin','treasurer','general_manager'].includes(role))throw new PersonRecordError(403,'Denied');return {ctx:{user:{id:'actor'},person:{id:'person'}},tenant:'tenant',org:'club'}}};
  if(n.endsWith('adminRecordAccess'))return {recordRest:async(path,init)=>{calls.push({path,init});return {saved:true}}};throw new Error(n);
 }});
 const post=async(extra={})=>{calls=[];return m.exports.POST({json:async()=>({role:'org_admin',operation:'transfer',requestId:id,values:{president_override:true},reason:'Authorized club decision',...extra})})};
 (async()=>{
  for(const extra of [{role:'team_manager'},{role:'treasurer'},{role:'treasurer',operation:'settings'},{role:'treasurer',operation:'cover_fee'}]){assert.equal((await post(extra)).status,403);assert.equal(calls.length,0)}
+ for(const operation of ['settings','deactivate']){assert.equal((await post({role:'general_manager',operation})).status,403);assert.equal(calls.length,0)}
+ assert.equal((await post({role:'general_manager',operation:'transfer'})).status,200);
  allowed=false;assert.equal((await post()).status,403);allowed=true;
  workflow=false;assert.equal((await post()).status,403);workflow=true;
  for(const extra of [{operation:'delete'},{reason:'no'},{requestId:'invalid'},{values:[]}]){assert.equal((await post(extra)).status,400);assert.equal(calls.length,0)}

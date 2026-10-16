@@ -99,9 +99,15 @@ function Table({
     </div>
   );
 }
-export default function EquipmentWorkspace() {
+export default function EquipmentWorkspace({
+  viewOverride,
+}: {
+  viewOverride?: string;
+  role?: string;
+  roleLabel?: string;
+}) {
   const params = useSearchParams(),
-    view = params.get("view") || "eq-home";
+    view = viewOverride || params.get("view") || "eq-home";
   const [data, setData] = useState<Row | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),

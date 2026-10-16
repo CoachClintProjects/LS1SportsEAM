@@ -203,7 +203,7 @@ export function TransactionEngine({
                   setError("");
                 }}
               >
-                {(role === "org_admin"
+                {(["org_admin","general_manager"].includes(role)
                   ? [
                       ["transfer", "Move squad / withdraw"],
                       ["cover_fee", "Club covers entry fee"],
@@ -219,7 +219,7 @@ export function TransactionEngine({
                       ["deposit", "Confirm bank deposit"],
                       ["approve_credit", "Review credit"],
                     ]
-                ).map(([v, l]) => (
+                ).filter(([v])=>role!=="general_manager"||!["settings","deactivate"].includes(v)).map(([v, l]) => (
                   <option value={v} key={v}>
                     {l}
                   </option>
@@ -274,7 +274,7 @@ export function TransactionEngine({
                           change("president_override", e.target.checked)
                         }
                       />
-                      President Override
+                      {role === "general_manager" ? "MANUALLY EXEMPT CAPACITY LIMIT" : "President Override"}
                     </label>
                     {select(
                       "invoice_id",

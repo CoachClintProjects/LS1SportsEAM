@@ -17,6 +17,8 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   headers.set('Authorization', `Bearer ${data.session.access_token}`);
   const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
   if (url.startsWith('/api/admin-') && url !== '/api/admin-context') {
+    const activeRole=new URLSearchParams(window.location.search).get('role');
+    if(activeRole)headers.set('x-ls1-admin-role',activeRole);
     const selected = sessionStorage.getItem(`ls1-admin-organization:${data.session.user.id}`);
     if (selected) headers.set('x-ls1-admin-organization', selected);
   }

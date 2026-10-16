@@ -8,6 +8,7 @@ import {
 } from "@/components/experience/HubNavigation/navigationDefinitions";
 
 const labels: Record<string, string> = {
+  general_manager: "General Manager (Operations)",
   org_admin: "Club President (Org Admin)",
   team_manager: "Team Manager (Squad Logistics)",
   registrar: "Roster Gatekeeper (Registrar)",

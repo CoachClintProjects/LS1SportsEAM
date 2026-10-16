@@ -1,3 +1,4 @@
+import { gmBoundary } from "@/lib/generalManagerPolicy";
 import type { NextRequest } from "next/server";
 import {
   resolveAccess,
@@ -14,6 +15,8 @@ export async function governanceScope(
 ) {
   const ctx = await resolveAccess(request);
   if (!ctx) throw new PersonRecordError(401, "Sign in required.");
+  if (ctx.activeAdminRole === "general_manager" || role === "general_manager")
+    throw new PersonRecordError(403, gmBoundary);
   if (
     role !== "org_admin" ||
     !ctx.allowedHubs.includes("admin") ||
