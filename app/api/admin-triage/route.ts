@@ -1,3 +1,4 @@
+import { equipmentBoundary } from "@/lib/equipmentPolicy";
 import { fundraisingBoundary } from "@/lib/fundraisingPolicy";
 import { communicationsBoundary } from "@/lib/communicationsPolicy";
 import { volunteerBoundary } from "@/lib/volunteerPolicy";
@@ -347,6 +348,20 @@ export async function POST(request: NextRequest) {
       ].includes(b.action)
     )
       throw new TriageError(fundraisingBoundary, 403);
+    if (
+      scope.role === "facilities_equipment_manager" &&
+      [
+        "lease_terms",
+        "set_consent_policy",
+        "consent_override",
+        "authorize_cashbox",
+        "prepare_cashbox",
+        "cancel_cashbox",
+        "link_bill",
+        "verify_fees",
+      ].includes(b.action)
+    )
+      throw new TriageError(equipmentBoundary, 403);
     if (b.action === "sync") {
       if (!taskPermission(ctx, scope.role, "operational_tasks", false))
         throw new TriageError("Task access denied.", 403);

@@ -1,4 +1,5 @@
 "use client";
+import { EquipmentTaskResolution } from "../admin/EquipmentTaskResolution";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 import { AdminDrawerShell } from "@/components/hubs/admin/AdminDrawerShell";
@@ -268,7 +269,15 @@ export default function TriageTaskHub({
   const canResolve =
     selected?.canUpdate &&
     !selected.generated &&
-    !["fee_voucher", "cashbox"].includes(selected.resolutionKind || "") &&
+    ![
+      "fee_voucher",
+      "cashbox",
+      "equipment_hold",
+      "equipment_shutdown",
+      "equipment_crate",
+      "equipment_shutdown_risk",
+      "equipment_shutdown_team",
+    ].includes(selected.resolutionKind || "") &&
     (selected.source !== "competition_exceptions" ||
       ["org_admin", "competition_manager"].includes(role));
   return (
@@ -627,6 +636,15 @@ export default function TriageTaskHub({
                         {selected.recommendedAction && (
                           <p>{selected.recommendedAction}</p>
                         )}
+                        <EquipmentTaskResolution
+                          task={selected}
+                          role={role}
+                          onBusy={setBusy}
+                          onSaved={async () => {
+                            await load();
+                            await open(selected);
+                          }}
+                        />
                         <TriageResolutionPanel
                           key={selected.id}
                           onBusy={(value) => {

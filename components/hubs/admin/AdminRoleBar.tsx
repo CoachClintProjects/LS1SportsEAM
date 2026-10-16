@@ -16,7 +16,7 @@ const labels: Record<string, string> = {
   volunteer_coordinator: "Volunteer Helper",
   communications_media: "Communications",
   fundraising_coordinator: "Fundraising",
-  facilities_equipment_manager: "Facilities",
+  facilities_equipment_manager: "Gear & Field Crew",
 };
 
 export function AdminRoleBar() {

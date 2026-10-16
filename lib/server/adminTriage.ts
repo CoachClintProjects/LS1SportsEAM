@@ -172,7 +172,9 @@ export function mapTriageTask(
     entityType:
       readable(row.entity_type) || readable(metadata.entity_type) || null,
     canUpdate,
-    evidence: row.evidence || metadata.evidence || null,
+    evidence: String(metadata.kind || "").startsWith("equipment_")
+      ? metadata
+      : row.evidence || metadata.evidence || null,
     resolutionKind:
       readable(metadata.kind) ||
       (["vendor_bill", "vendor_bills"].includes(

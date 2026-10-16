@@ -109,10 +109,14 @@ const ExternalOrganizationDirectory = dynamic(
     ),
   { loading: workspaceLoading },
 );
+const EquipmentWorkspace = dynamic(() => import("./EquipmentWorkspace"), {
+  loading: workspaceLoading,
+});
 const registry: Record<
   string,
   React.ComponentType<{ role?: string; roleLabel?: string }>
 > = {
+  EquipmentWorkspace,
   TeamManagerWorkspace,
   RegistrarWorkspace,
   TreasurerWorkspace,
@@ -246,7 +250,7 @@ export function AdminWorkspace() {
       try {
         let view = searchParams.get("view");
         const nav = await authenticatedFetch(
-          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator", "communications_media", "fundraising_coordinator"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
+          `/api/admin-navigation?role=${encodeURIComponent(role === "org_admin" && ["team_manager", "registrar", "treasurer", "competition_manager", "volunteer_coordinator", "communications_media", "fundraising_coordinator", "facilities_equipment_manager"].includes(searchParams.get("folder") || "") ? searchParams.get("folder")! : role)}`,
           { cache: "no-store" },
         );
         if (!nav.ok) throw new Error("Admin navigation unavailable.");
@@ -271,6 +275,7 @@ export function AdminWorkspace() {
                   "vl-home",
                   "cm-home",
                   "fr-home",
+                  "eq-home",
                 ].includes(x.nav_id),
             )?.nav_id || "";
         if (!view)
@@ -298,7 +303,9 @@ export function AdminWorkspace() {
                       ? "[DENY: ERR-201: INSUFFICIENT ACCESS TIER - COMMUNICATIONS COORDINATOR RESTRICTED FROM FINANCE/LEASES/WORKFORCE/IDENTITY]"
                       : role === "fundraising_coordinator"
                         ? "[DENY: ERR-801: INSUFFICIENT ACCESS TIER - FUNDRAISING COORDINATOR RESTRICTED FROM GENERAL_FINANCE/LEASES/COMPLIANCE_FLAGS]"
-                        : "Admin view is not authorized for this role context.",
+                        : role === "facilities_equipment_manager"
+                          ? "[DENY: ERR-101: INSUFFICIENT ACCESS TIER - FACILITIES MANAGER RESTRICTED FROM BANKING_TOKENS/GOVERNANCE_BYLAWS/COMPLIANCE_STRATEGY/SCHEDULING]"
+                          : "Admin view is not authorized for this role context.",
           );
         const name = selected.component || "",
           C = registry[name];
@@ -400,6 +407,7 @@ export function AdminWorkspace() {
           "volunteer_coordinator",
           "communications_media",
           "fundraising_coordinator",
+          "facilities_equipment_manager",
         ].includes(searchParams.get("folder") || "") && (
           <div className="px-6 py-3">
             <button
