@@ -1,9 +1,18 @@
-# Preview entry repair — 2026-10-25
+# Corporate site and sign-in recovery — 2026-10-25
 
-Reported deployment: `685a4f5`, `ls1sportseam-4yd2v2lwj-pieify.vercel.app`, server exception digest `3227098399`.
+The earlier Preview redirect (`c3f200e`) hid the corporate homepage without resolving the backend outage. It has been removed. Preview and Production both render the saved corporate website at `/`; sign-in remains at `/login`.
 
-The root page previously queried Supabase marketing data in both metadata generation and rendering. That helper throws on missing configuration, failed requests or backend errors. The Admin Preview entry now redirects to `/login` before those reads, and its metadata does not depend on marketing. Production's published website behavior is unchanged.
+## Confirmed cause
+Supabase Management API reported project `xedfstgwotzxnztpembv` (LS1SportsEAM) as `INACTIVE`. SQL requests failed with “Database is possibly not accessible at the moment.” The project restore request succeeded and its status transitioned to `COMING_UP`. No account passwords, data or authentication permissions were changed.
 
-Verification: isolated regression check confirms redirect and metadata succeed without any marketing query even when its backend throws; production still renders its published data. TypeScript passes.
+## Repair
+- Restore the existing Supabase project.
+- Restore corporate content at the root URL in every environment.
+- Catch marketing-read failures in metadata and page rendering. An unavailable-content recovery screen is distinct from an unpublished site and provides retry/sign-in links.
+- Only show a credential rejection when Supabase returns `invalid_credentials`; distinguish service/network failures, rate limits and email confirmation.
+- Reset the sign-in form after exceptions and report failed backend access checks as service failures rather than incorrect authorization.
 
-Diagnostic limitation: the Vercel connector denied runtime logs and authenticated deployment fetch with 403. No Vercel CLI is installed in this workspace. Direct HTTP requests reached Vercel Authentication, not the application. The exact cause of the reported digest and the deployed signed-in experience are therefore not verified. This change removes the homepage dependency; it does not certify every server route.
+## Verification
+TypeScript and isolated homepage/login error checks pass. Tests prove both environments render the corporate site, unavailable marketing does not escape as a server exception, and service errors are not labeled bad passwords.
+
+Vercel still denies runtime-log and protected-page access through the connector. A successful Preview build is not signed-in acceptance. Verify restored project health and published content independently; the owner tests their existing password in the deployed application.

@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { signInErrorMessage } from '@/lib/client/signInError';
 import { ArrowLeft, CalendarDays, LogIn } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -34,9 +35,10 @@ export function LoginGate() {
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
 
+    try {
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError || !data.session?.access_token) {
-      setError('Unable to sign in with those credentials.');
+      setError(signInErrorMessage(signInError));
       setBusy(false);
       return;
     }
@@ -48,6 +50,7 @@ export function LoginGate() {
       body: JSON.stringify({ accessToken: data.session.access_token }),
     });
 
+    if (superUserResponse.status >= 500) throw new Error('Access service unavailable');
     if (superUserResponse.ok) {
       if (!requestedNext) destination = '/superuser';
     } else if (next.startsWith('/superuser')) {
@@ -60,6 +63,11 @@ export function LoginGate() {
 
     router.replace(destination);
     router.refresh();
+    } catch {
+      setError(signInErrorMessage(null));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleForgotPassword() {

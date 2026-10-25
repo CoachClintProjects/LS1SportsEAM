@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { cache } from 'react';
+import Link from 'next/link';
 
 import { CorporateWebsite } from '@/components/marketing/CorporateWebsite';
 import { getMarketingSite } from '@/lib/server/marketingSite';
@@ -7,13 +8,18 @@ import { getMarketingSite } from '@/lib/server/marketingSite';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function generateMetadata(): Promise<Metadata> {
-  // Admin previews must not depend on public marketing data to reach sign-in.
-  if (process.env.VERCEL_ENV === 'preview') {
-    return { title: 'LS1Sports Preview', description: 'LS1Sports staff workspace.' };
+// Share one outcome between metadata and rendering, including backend failures.
+const loadCorporateSite = cache(async () => {
+  try {
+    return { data: await getMarketingSite(), unavailable: false };
+  } catch {
+    console.error('Corporate site data is unavailable. Check Supabase project health and server configuration.');
+    return { data: null, unavailable: true };
   }
+});
 
-  const data = await getMarketingSite();
+export async function generateMetadata(): Promise<Metadata> {
+  const { data } = await loadCorporateSite();
 
   if (!data) {
     return {
@@ -29,14 +35,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  if (process.env.VERCEL_ENV === 'preview') redirect('/login');
-
-  const data = await getMarketingSite();
+  const { data, unavailable } = await loadCorporateSite();
 
   if (!data) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#070A09] px-6 text-white">
-        <p className="text-sm text-neutral-400">The LS1Sports corporate site is not currently published.</p>
+        <section className="max-w-xl text-center space-y-5">
+          <h1 className="text-3xl font-bold">LS1Sports</h1>
+          <p className="text-sm text-neutral-400">{unavailable ? 'Our site content is temporarily unavailable. Please try again shortly.' : 'The LS1Sports corporate site is not currently published.'}</p>
+          <div className="flex justify-center gap-5"><a href="/" className="text-orange-400">Try again</a><Link href="/login" className="text-orange-400">Sign in</Link></div>
+        </section>
       </main>
     );
   }

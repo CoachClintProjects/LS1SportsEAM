@@ -9,13 +9,15 @@ export async function POST(request: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Access token is required.' }, { status: 400 });
 
   const userResponse = await fetch(`${url}/auth/v1/user`, { headers: { apikey: publicKey, Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  if (userResponse.status >= 500) return NextResponse.json({ error: 'Authentication service temporarily unavailable.' }, { status: 503 });
   if (!userResponse.ok) return NextResponse.json({ error: 'Supabase session is invalid.' }, { status: 401 });
   const user = await userResponse.json() as { email?: string };
   const email = user.email?.trim().toLowerCase();
   if (!email) return NextResponse.json({ error: 'Authenticated account has no email.' }, { status: 403 });
 
   const operatorResponse = await fetch(`${url}/rest/v1/platform_superuser_operators?select=email,display_name&active=eq.true&email=ilike.${encodeURIComponent(email)}`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }, cache: 'no-store' });
-  const operators = operatorResponse.ok ? await operatorResponse.json() as Array<{ email: string; display_name: string | null }> : [];
+  if (!operatorResponse.ok) return NextResponse.json({ error: 'Account access checks are temporarily unavailable.' }, { status: 503 });
+  const operators = await operatorResponse.json() as Array<{ email: string; display_name: string | null }>;
   if (!operators.length) return NextResponse.json({ error: 'Authenticated account is not an authorized SuperUser operator.' }, { status: 403 });
 
   const response = NextResponse.json({ ok: true, operator: operators[0] });
