@@ -228,7 +228,7 @@ export async function readPersonRecord(
   ] = await Promise.all([
     relatedIds.length
       ? rest(
-          `people?select=id,first_name,last_name,preferred_name,email,phone&tenant_id=eq.${tenant}&id=${ids(relatedIds)}`,
+          `people?select=id,first_name,last_name,preferred_name,email,phone,updated_at&tenant_id=eq.${tenant}&id=${ids(relatedIds)}`,
         )
       : [],
     bookings.length

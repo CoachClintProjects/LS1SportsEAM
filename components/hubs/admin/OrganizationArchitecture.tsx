@@ -28,6 +28,7 @@ type Snapshot = {
   assignments: any[];
   roles: any[];
   audit: any[];
+  authorization?: { edit: boolean; create: boolean; manageRoles: boolean };
 };
 type Domain = "people" | "sites" | "programs" | "seasons" | "teams";
 const label = (p: any) =>
@@ -52,6 +53,12 @@ export function OrganizationArchitecture({
   role?: string;
   initialDomain?: Domain;
 }) {
+  const [workspace, setWorkspace] = useState(
+    initialDomain === "people" ? "club" : "structure",
+  );
+  const [notice, setNotice] = useState("");
+  const [staffQuery, setStaffQuery] = useState("");
+  const [revoke, setRevoke] = useState<any>(null);
   const denial = useRef<HTMLDialogElement>(null);
   const saving = useRef(false);
   const [data, setData] = useState<Snapshot | null>(null),
@@ -99,6 +106,8 @@ export function OrganizationArchitecture({
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Action failed.");
+      setNotice("Changes saved. The records below are up to date.");
+      setRevoke(null);
       setSelected(null);
       setCreating(false);
       setCreatingOrg(false);
@@ -141,7 +150,7 @@ export function OrganizationArchitecture({
   };
   const tabs: [Domain, string, any][] = [
     ["people", "People records", Users],
-    ["sites", "Sites", Building2],
+    ["sites", "Training locations", Building2],
     ["programs", "Programs", Layers3],
     ["seasons", "Seasons", CalendarDays],
     ["teams", "Teams", Network],
@@ -171,29 +180,18 @@ export function OrganizationArchitecture({
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-neutral-800 pb-5">
         <div>
           <div className="text-[10px] font-black uppercase tracking-[.24em] text-[#FA4616]">
-            Organization Administrator · Club settings
+            Organization Administrator · Club & staff settings
           </div>
           <h1 className="mt-1 text-3xl font-black">
             {org?.name || "Organization"}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-neutral-400">
-            Manage club contacts, locations, programs, seasons and teams. Use
-            Staff and permissions below to give people access to their
-            responsibilities.
+            Update club details, manage staff access and organize teams and
+            seasons. Choose a section below to get started.
           </p>
         </div>
-        <div className="text-right text-xs text-neutral-500">
-          <button
-            onClick={() => setCreatingOrg(true)}
-            className="mb-2 rounded border border-neutral-700 px-3 py-2 font-bold text-white"
-          >
-            + Child organization
-          </button>
-          <div className="mb-2 max-w-44">
-            Optional operating unit beneath HPAC
-          </div>
-          <div>{org?.code || "No organization code"}</div>
-          <div>{org?.status || "Unknown status"}</div>
+        <div className="text-sm text-neutral-400">
+          {org?.code} · {org?.status}
         </div>
       </header>
       {error && (
@@ -201,175 +199,343 @@ export function OrganizationArchitecture({
           {error}
         </div>
       )}
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {tabs.map(([key, name, Icon]) => (
+      {notice && (
+        <p role="status" className="mt-4 text-emerald-300">
+          {notice}
+        </p>
+      )}
+      <nav
+        aria-label="Club settings sections"
+        className="mt-5 flex flex-wrap gap-2"
+      >
+        {[
+          ["club", "Club details"],
+          ["staff", "Staff & access"],
+          ["structure", "Teams, seasons & locations"],
+          ["history", "Activity history"],
+        ].map(([key, title]) => (
           <button
             key={key}
+            aria-pressed={workspace === key}
             onClick={() => {
-              setDomain(key);
+              setWorkspace(key);
+              if (key === "structure" && domain === "people")
+                setDomain("teams");
               setSelected(null);
+              setError("");
             }}
-            className={`rounded-xl border p-4 text-left transition ${domain === key ? "border-[#FA4616] bg-[#FA4616]/5" : "border-neutral-800 bg-[#090b0b] hover:border-neutral-600"}`}
+            className={`rounded-lg border px-4 py-3 text-sm font-semibold ${workspace === key ? "border-blue-500 bg-blue-900/30 text-white" : "border-neutral-700 text-neutral-300"}`}
           >
-            <div className="flex items-center justify-between">
-              <Icon className="h-4 w-4 text-[#FA4616]" />
-              <span className="text-2xl font-black">
-                {((data as any)[key] || []).length}
-              </span>
-            </div>
-            <div className="mt-3 text-xs font-bold">{name}</div>
+            {title}
           </button>
         ))}
-      </section>
-      <section className="mt-5 overflow-hidden rounded-2xl border border-neutral-800 bg-[#090b0b]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 p-4">
-          <div>
-            <h2 className="font-black">
-              {tabs.find((x) => x[0] === domain)?.[1]}
-            </h2>
-            <p className="text-xs text-neutral-500">
-              Select a record to view or edit
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCreating(true)}
-              className="rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-            >
-              + Create
-            </button>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-600" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter live records"
-                className="rounded-lg border border-neutral-700 bg-black py-2 pl-9 pr-3 text-sm"
-              />
-            </div>
-          </div>
-        </div>
-        {domain === "people" ? (
-          <PeopleTable
-            key={query}
-            rows={filtered}
-            assignments={data.assignments}
-            roles={roles}
-            onOpen={setSelected}
-          />
-        ) : (
-          <ObjectTable rows={filtered} onOpen={setSelected} />
-        )}
-        {!filtered.length && (
-          <div className="p-8 text-sm text-neutral-500">
-            No records to show. Add a record to get started.
-          </div>
-        )}
-      </section>
-      <section className="mt-5 rounded-2xl border border-neutral-800 bg-[#090b0b] p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="text-[9px] font-black uppercase tracking-[.18em] text-[#FA4616]">
-              Club access
-            </div>
-            <h2 className="mt-1 text-lg font-black">Staff and permissions</h2>
-            <p className="text-sm text-neutral-500">
-              Assign a staff role or remove access. Changes are recorded in the
-              club activity history.
-            </p>
-          </div>
-          <div className="text-sm text-neutral-400">
-            {activeAssignments.length} active assignments
-          </div>
-        </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-neutral-500">
-              <tr>
-                <th className="py-2">Person</th>
-                <th>Role</th>
-                <th>Scope</th>
-                <th>Status</th>
-                <th>Started</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.assignments.map((a: any) => (
-                <tr key={a.id} className="border-t border-neutral-800">
-                  <td className="py-3">
-                    {names.get(a.person_id) || a.person_id}
-                  </td>
-                  <td>
-                    {roles.get(a.role_definition_id) || a.role_definition_id}
-                  </td>
-                  <td>{scopeLabel(a)}</td>
-                  <td>{a.status}</td>
-                  <td className="text-neutral-500">
-                    {a.starts_at
-                      ? new Date(a.starts_at).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td className="text-right">
-                    {a.status === "active" && (
-                      <button
-                        disabled={!!busy}
-                        onClick={() =>
-                          mutate({ action: "revoke-role", id: a.id })
-                        }
-                        className="rounded-lg border border-neutral-700 px-3 py-1.5 hover:border-red-500 disabled:opacity-40"
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Assign
-          people={data.people}
-          roles={data.roles}
-          organizationId={org?.id}
+      </nav>
+      {workspace === "club" && (
+        <ClubDetails
+          key={org?.id}
+          org={org}
           busy={!!busy}
-          onAssign={(personId, roleDefinitionId) =>
+          canEdit={!!data.authorization?.edit}
+          onSave={(changes) =>
             mutate({
-              action: "assign-role",
-              personId,
-              roleDefinitionId,
-              organizationId: org.id,
+              action: "update-master-record",
+              entity: "organization",
+              id: org.id,
+              changes,
+              expected: {
+                name: org.name,
+                legal_name: org.legal_name,
+                organization_type: org.organization_type,
+              },
             })
           }
         />
-      </section>
-      <section className="mt-5 rounded-2xl border border-neutral-800 bg-[#090b0b] p-5">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-[#FA4616]" />
-          <h2 className="font-black">Club activity history</h2>
-        </div>
-        <div className="mt-3 divide-y divide-neutral-800">
-          {data.audit.slice(0, 30).map((a: any) => (
-            <button
-              key={a.id}
-              onClick={() => setSelected({ ...a, __audit: true })}
-              className="flex w-full justify-between gap-4 py-3 text-left text-sm hover:bg-white/[.02]"
-            >
-              <span>
-                <b>{a.action}</b> · {a.entity_type}
-              </span>
-              <span className="text-neutral-500">
-                {new Date(a.occurred_at).toLocaleString()}
-              </span>
-            </button>
-          ))}
-          {!data.audit.length && (
-            <p className="py-4 text-sm text-neutral-500">
-              No authorized audit events available.
+      )}
+      {workspace === "structure" && (
+        <>
+          <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {tabs
+              .filter(([key]) => key !== "people")
+              .map(([key, name, Icon]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setDomain(key);
+                    setSelected(null);
+                  }}
+                  className={`rounded-xl border p-4 text-left transition ${domain === key ? "border-[#FA4616] bg-[#FA4616]/5" : "border-neutral-800 bg-[#090b0b] hover:border-neutral-600"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <Icon className="h-4 w-4 text-[#FA4616]" />
+                    <span className="text-2xl font-black">
+                      {((data as any)[key] || []).length}
+                    </span>
+                  </div>
+                  <div className="mt-3 text-xs font-bold">{name}</div>
+                </button>
+              ))}
+          </section>
+          <section className="mt-5 overflow-hidden rounded-2xl border border-neutral-800 bg-[#090b0b]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 p-4">
+              <div>
+                <h2 className="font-black">
+                  {tabs.find((x) => x[0] === domain)?.[1]}
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  Select a record to view or edit
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  disabled={!data.authorization?.create}
+                  onClick={() => setCreating(true)}
+                  className="rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+                >
+                  + Add{" "}
+                  {domain === "sites"
+                    ? "location"
+                    : domain === "people"
+                      ? "person"
+                      : domain.slice(0, -1)}
+                </button>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-600" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Filter live records"
+                    className="rounded-lg border border-neutral-700 bg-black py-2 pl-9 pr-3 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            {domain === "people" ? (
+              <PeopleTable
+                key={query}
+                rows={filtered}
+                assignments={data.assignments}
+                roles={roles}
+                onOpen={setSelected}
+              />
+            ) : (
+              <ObjectTable rows={filtered} onOpen={setSelected} />
+            )}
+            {!filtered.length && (
+              <div className="p-8 text-sm text-neutral-500">
+                No records to show. Add a record to get started.
+              </div>
+            )}
+          </section>
+        </>
+      )}
+      {workspace === "staff" && (
+        <>
+          <section className="mt-5 rounded-2xl border border-neutral-800 bg-[#090b0b] p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[.18em] text-[#FA4616]">
+                  Club access
+                </div>
+                <h2 className="mt-1 text-lg font-black">
+                  Staff and permissions
+                </h2>
+                <p className="text-sm text-neutral-500">
+                  Add a staff person, assign their responsibilities, or remove a
+                  role. Removing a role retains the person and their history.
+                </p>
+              </div>
+              <div className="text-sm text-neutral-400">
+                {activeAssignments.length} active assignments
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <input
+                aria-label="Search staff"
+                placeholder="Search staff or role"
+                value={staffQuery}
+                onChange={(e) => setStaffQuery(e.target.value)}
+                className="rounded border border-neutral-600 bg-black p-2"
+              />
+              <button
+                disabled={!data.authorization?.create}
+                onClick={() => {
+                  setDomain("people");
+                  setCreating(true);
+                }}
+                className="rounded bg-blue-700 px-4 py-2 disabled:opacity-40"
+              >
+                Add staff person
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-neutral-400">
+              A staff person record is separate from a sign-in account.
+              Assigning a role does not send an invitation or create a password.
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-neutral-500">
+                  <tr>
+                    <th className="py-2">Person</th>
+                    <th>Role</th>
+                    <th>Scope</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.assignments
+                    .filter((a: any) =>
+                      `${names.get(a.person_id) || ""} ${roles.get(a.role_definition_id) || ""}`
+                        .toLowerCase()
+                        .includes(staffQuery.toLowerCase()),
+                    )
+                    .map((a: any) => (
+                      <tr key={a.id} className="border-t border-neutral-800">
+                        <td className="py-3">
+                          <button
+                            onClick={() => {
+                              setDomain("people");
+                              setSelected(
+                                data.people.find(
+                                  (p: any) => p.id === a.person_id,
+                                ),
+                              );
+                            }}
+                            className="text-blue-300 hover:underline"
+                          >
+                            {names.get(a.person_id) || "Person unavailable"}
+                          </button>
+                        </td>
+                        <td>
+                          {roles.get(a.role_definition_id) ||
+                            a.role_definition_id}
+                        </td>
+                        <td>
+                          {a.team_id
+                            ? data.teams.find((t) => t.id === a.team_id)
+                                ?.name || "Team"
+                            : a.site_id
+                              ? data.sites.find((t) => t.id === a.site_id)
+                                  ?.name || "Location"
+                              : a.program_id
+                                ? data.programs.find(
+                                    (t) => t.id === a.program_id,
+                                  )?.name || "Program"
+                                : org?.name || scopeLabel(a)}
+                        </td>
+                        <td>{a.status}</td>
+                        <td className="text-neutral-500">
+                          {a.starts_at
+                            ? new Date(a.starts_at).toLocaleDateString()
+                            : "—"}
+                        </td>
+                        <td className="text-right">
+                          {a.status === "active" &&
+                            data.authorization?.manageRoles && (
+                              <button
+                                disabled={!!busy}
+                                onClick={() => setRevoke(a)}
+                                className="rounded-lg border border-neutral-700 px-3 py-1.5 hover:border-red-500 disabled:opacity-40"
+                              >
+                                Remove role
+                              </button>
+                            )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            {!data.assignments.length && (
+              <p className="mt-4 text-sm text-neutral-400">
+                No staff roles assigned. Choose a person and responsibility
+                below.
+              </p>
+            )}
+            {data.authorization?.manageRoles && (
+              <Assign
+                people={data.people}
+                roles={data.roles}
+                organizationId={org?.id}
+                busy={!!busy}
+                onAssign={(personId, roleDefinitionId) =>
+                  mutate({
+                    action: "assign-role",
+                    personId,
+                    roleDefinitionId,
+                    organizationId: org.id,
+                  })
+                }
+              />
+            )}
+          </section>
+        </>
+      )}
+      {workspace === "history" && (
+        <section className="mt-5 rounded-2xl border border-neutral-800 bg-[#090b0b] p-5">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-[#FA4616]" />
+            <h2 className="font-black">Club activity history</h2>
+          </div>
+          <div className="mt-3 divide-y divide-neutral-800">
+            {data.audit.slice(0, 30).map((a: any) => (
+              <button
+                key={a.id}
+                onClick={() => setSelected({ ...a, __audit: true })}
+                className="flex w-full justify-between gap-4 py-3 text-left text-sm hover:bg-white/[.02]"
+              >
+                <span>
+                  <b>{a.action}</b> · {a.entity_type}
+                </span>
+                <span className="text-neutral-500">
+                  {new Date(a.occurred_at).toLocaleString()}
+                </span>
+              </button>
+            ))}
+            {!data.audit.length && (
+              <p className="py-4 text-sm text-neutral-500">
+                No authorized audit events available.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+      {revoke && (
+        <AdminDrawerShell
+          title="Remove staff role"
+          busy={!!busy}
+          onClose={() => setRevoke(null)}
+        >
+          <p>
+            Remove {roles.get(revoke.role_definition_id)} access from{" "}
+            {names.get(revoke.person_id)}?
+          </p>
+          <p className="mt-3 text-sm text-neutral-400">
+            Their other roles and person record remain. This change is recorded
+            in club activity.
+          </p>
+          {error && (
+            <p role="alert" className="mt-3 text-red-300">
+              {error}
             </p>
           )}
-        </div>
-      </section>
+          <div className="mt-5 flex gap-3">
+            <button
+              disabled={!!busy}
+              onClick={() =>
+                void mutate({ action: "revoke-role", id: revoke.id })
+              }
+              className="rounded bg-red-700 px-4 py-2"
+            >
+              Confirm removal
+            </button>
+            <button disabled={!!busy} onClick={() => setRevoke(null)}>
+              Keep role
+            </button>
+          </div>
+        </AdminDrawerShell>
+      )}
       {creatingOrg && (
         <CreateOrganization
           parent={org}
@@ -427,6 +593,83 @@ export function OrganizationArchitecture({
         )
       )}
     </main>
+  );
+}
+function ClubDetails({
+  org,
+  busy,
+  canEdit,
+  onSave,
+}: {
+  org: any;
+  busy: boolean;
+  canEdit: boolean;
+  onSave: (changes: any) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState({
+    name: org?.name || "",
+    legal_name: org?.legal_name || "",
+    organization_type: org?.organization_type || "",
+  });
+  useEffect(
+    () =>
+      setDraft({
+        name: org?.name || "",
+        legal_name: org?.legal_name || "",
+        organization_type: org?.organization_type || "",
+      }),
+    [org],
+  );
+  if (!org) return <p className="mt-5">No club record is available.</p>;
+  return (
+    <section className="mt-5 max-w-3xl rounded-xl border border-neutral-700 bg-[#0A0C10] p-5">
+      <h2 className="text-xl font-semibold">Club details</h2>
+      <p className="mt-2 text-sm text-neutral-400">
+        The club name shown to your staff and the registered name used in club
+        records. Manage training locations, programs and seasons in Teams,
+        seasons & locations.
+      </p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const changes = Object.fromEntries(
+            Object.entries(draft).filter(([k, v]) => v !== (org[k] || "")),
+          );
+          if (Object.keys(changes).length) await onSave(changes);
+        }}
+        className="mt-5 space-y-4"
+      >
+        <fieldset disabled={busy || !canEdit} className="space-y-4">
+          {[
+            ["name", "Club display name"],
+            ["legal_name", "Registered / legal name"],
+            ["organization_type", "Club type"],
+          ].map(([k, l]) => (
+            <label key={k} className="block text-sm">
+              {l}
+              <input
+                required={k === "name"}
+                maxLength={200}
+                value={draft[k as keyof typeof draft]}
+                onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
+                className="mt-1 w-full rounded border border-neutral-600 bg-[#161B22] p-3"
+              />
+            </label>
+          ))}
+          <p className="text-sm text-neutral-400">
+            Club code: {org.code} · Status: {org.status}
+          </p>
+          <button
+            disabled={
+              !Object.entries(draft).some(([k, v]) => v !== (org[k] || ""))
+            }
+            className="rounded bg-blue-700 px-4 py-2 disabled:opacity-40"
+          >
+            {busy ? "Saving…" : "Save club details"}
+          </button>
+        </fieldset>
+      </form>
+    </section>
   );
 }
 function CreateOrganization({
@@ -1004,7 +1247,9 @@ function Assign({
     [r, setR] = useState("");
   return (
     <div className="mt-5 grid gap-2 border-t border-neutral-800 pt-4 md:grid-cols-[1fr_1fr_auto]">
+      <h3 className="font-semibold md:col-span-3">Assign a responsibility</h3>
       <select
+        aria-label="Staff person"
         value={p}
         onChange={(e) => setP(e.target.value)}
         className="rounded-lg border border-neutral-700 bg-black p-2 text-sm"
@@ -1017,6 +1262,7 @@ function Assign({
         ))}
       </select>
       <select
+        aria-label="Staff responsibility"
         value={r}
         onChange={(e) => setR(e.target.value)}
         className="rounded-lg border border-neutral-700 bg-black p-2 text-sm"
@@ -1035,6 +1281,13 @@ function Assign({
       >
         Assign role
       </button>
+      {r && (
+        <p className="text-sm text-neutral-300 md:col-span-3">
+          {roles.find((x) => x.id === r)?.description ||
+            roles.find((x) => x.id === r)?.name}{" "}
+          · Access applies across this club.
+        </p>
+      )}
     </div>
   );
 }

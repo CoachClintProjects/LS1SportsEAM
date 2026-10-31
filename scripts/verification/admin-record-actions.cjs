@@ -17,6 +17,16 @@ vm.runInNewContext(code,{module:moduleUnderTest,exports:moduleUnderTest.exports,
 const {POST,GET}=moduleUnderTest.exports;
 async function post(b){calls=[];return POST({json:async()=>({personId:base.person.id,...b})})}
 (async()=>{
+
+ permissions=new Set(['record.update']);
+ const guardian={mode:'edit',person_id:base.person.id,first_name:'Existing',last_name:'Contact',reason:'Controlled boundary check'};
+ assert.equal((await post({role:'registrar',kind:'guardian',values:guardian})).status,403);assert.equal(calls.length,0);
+ assert.equal((await post({role:'org_admin',kind:'guardian',values:{...guardian,mode:'new'}})).status,403);assert.equal(calls.length,0);
+ assert.equal((await post({role:'org_admin',kind:'guardian',values:{...guardian,email:'invalid'}})).status,400);assert.equal(calls.length,0);
+ assert.equal((await post({role:'org_admin',kind:'guardian',values:{...guardian,person_id:'invalid'}})).status,400);assert.equal(calls.length,0);
+ assert.equal((await post({role:'org_admin',kind:'guardian',values:guardian})).status,200);assert.equal(calls[0].path,'rpc/admin_save_guardian');
+ permissions.add('record.create');
+ assert.equal((await post({role:'org_admin',kind:'guardian',values:{...guardian,mode:'new'}})).status,200);assert.equal(calls[0].path,'rpc/admin_save_guardian');
  permissions=new Set(['record.update']);
  assert.equal((await post({role:'team_manager',kind:'relationship',operation:'athlete_inactivate',values:{reason:'Review'}})).status,403);assert.equal(calls.length,0);
  assert.equal((await post({role:'org_admin',kind:'relationship',operation:'team_remove',values:{}})).status,400);assert.equal(calls.length,0);

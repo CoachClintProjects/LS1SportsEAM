@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         : [],
       wantsRelationships && role === "org_admin"
         ? rest(
-            `people?select=id,first_name,last_name,preferred_name&tenant_id=eq.${tenant}&status=eq.active&order=last_name.asc&limit=1000`,
+            `people?select=id,first_name,last_name,preferred_name,email,phone&tenant_id=eq.${tenant}&status=eq.active&order=last_name.asc&limit=1000`,
           )
         : [],
       wantsRelationships && role === "org_admin"
@@ -260,6 +260,45 @@ export async function POST(request: NextRequest) {
             p_actor_person: ctx.person?.id || null,
             p_operation: b.operation,
             p_values: b.values || {},
+          }),
+        }),
+      );
+    }
+    if (b.kind === "guardian") {
+      if (
+        role !== "org_admin" ||
+        !can(ctx, role, "record.update") ||
+        orgs.length !== 1 ||
+        !base.athlete
+      )
+        throw new PersonRecordError(
+          403,
+          "Guardian editing requires Organization Administrator access.",
+        );
+      const v = b.values;
+      if (
+        !v ||
+        !["new", "link", "edit"].includes(v.mode) ||
+        !/^[0-9a-f-]{36}$/i.test(v.person_id || "") ||
+        Object.values(v).some(
+          (value) => typeof value !== "string" || value.length > 1000,
+        )
+      )
+        throw new PersonRecordError(400, "Invalid guardian details.");
+      if (v.mode !== "edit" && !can(ctx, role, "record.create"))
+        throw new PersonRecordError(403, "Adding guardians is not permitted.");
+      if (v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email))
+        throw new PersonRecordError(400, "Enter a valid email address.");
+      return NextResponse.json(
+        await rest("rpc/admin_save_guardian", {
+          method: "POST",
+          body: JSON.stringify({
+            p_tenant: tenant,
+            p_org: orgs[0],
+            p_athlete: base.athlete.id,
+            p_actor_user: ctx.user.id,
+            p_actor_person: ctx.person?.id || null,
+            p_values: v,
           }),
         }),
       );

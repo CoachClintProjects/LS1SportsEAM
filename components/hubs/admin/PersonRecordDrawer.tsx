@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import RecordWorkPanel from "./RecordWorkPanel";
+import GuardianEditor from "./GuardianEditor";
 import { RecordLifecycle } from "./RecordLifecycle";
 import dynamic from "next/dynamic";
 const TransactionEngine = dynamic(() =>
@@ -129,6 +130,14 @@ export default function PersonRecordDrawer({
   onSaved?: () => void;
   initialTab?: "Overview" | "Registration" | "Documents";
 }) {
+  const [guardianEditing, setGuardianEditing] = useState(false);
+  function openGuardians() {
+    setGuardianEditing(true);
+    setEditing(null);
+    panel.current
+      ?.querySelector("[data-record-scroll]")
+      ?.scrollTo({ top: 0, behavior: "smooth" });
+  }
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -368,7 +377,23 @@ export default function PersonRecordDrawer({
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div data-record-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
+          {guardianEditing && data && (
+            <GuardianEditor
+              record={data}
+              role={role}
+              onClose={() => setGuardianEditing(false)}
+              onBusy={(value) => {
+                saving.current = value;
+                setBusy(value);
+              }}
+              onSaved={async () => {
+                await load();
+                setNotice("Parent / guardian saved.");
+                onSaved?.();
+              }}
+            />
+          )}
           {p?.status && <RecordLifecycle status={p.status} />}
           {loading && (
             <p role="status">Loading record and linked information…</p>
@@ -664,7 +689,7 @@ export default function PersonRecordDrawer({
                         !data.authorities.length &&
                         a && (
                           <button
-                            onClick={() => setTab("Relationships")}
+                            onClick={openGuardians}
                             className="mb-2 block text-left text-sm text-amber-200 underline"
                           >
                             No guardian recorded — manage relationships
@@ -899,8 +924,8 @@ export default function PersonRecordDrawer({
                 <Card
                   title="Parents & guardians"
                   edit={
-                    data.authorization.edit
-                      ? () => setTab("Relationships")
+                    a && role === "org_admin" && data.authorization.edit
+                      ? openGuardians
                       : undefined
                   }
                 >
