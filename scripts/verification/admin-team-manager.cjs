@@ -8,7 +8,7 @@ const team={id:'team-a',organization_id:'club',code:'SQD_BANANA_01'};
 (async()=>{
  const requests=[];const rest=async q=>{requests.push(q);return [team];};
  assert.equal((await teamManagerScope(rest,ctx)).team,'team-a');
- assert.match(requests[0],/organization_id=in\.\(club\).*code=eq\.SQD_BANANA_01&status=eq.active/);
+ assert.match(requests[0],/organization_id=in\.\(club\)&status=eq.active/);
  await assert.rejects(teamManagerScope(rest,ctx,'team-b'),e=>e.status===403&&e.message.includes('ERR-901'));
  await assert.rejects(teamManagerScope(async()=>[],ctx),e=>e.status===403);
  await assert.rejects(teamManagerScope(async()=>[{...team,id:'team-b'}],ctx),e=>e.status===403);
@@ -16,7 +16,8 @@ const team={id:'team-a',organization_id:'club',code:'SQD_BANANA_01'};
  await assert.rejects(teamManagerScope(rest,{...ctx,rolePermissions:{}}),e=>e.status===403);
  const admin={...ctx,maxDelegablePrivilege:100,roles:[{code:'ORGANIZATION_ADMIN',scope:{organization_id:'club'}}]};
  await assert.rejects(teamManagerScope(rest,admin,'team-b'),e=>e.status===403);
- await assert.rejects(teamManagerScope(async()=>[team,team],admin),e=>e.status===403);
+ assert.equal((await teamManagerScope(async()=>[team,{...team,id:'team-b',code:'OTHER'}],{...admin,isPlatformSuperUser:true,adminScope:{tenantId:'tenant',organizationId:'club'}},'team-b')).team,'team-b');
+ assert.equal(requests[0].includes('code=eq.'),false);
  const gm={...admin,activeAdminRole:'general_manager'};const second={...team,id:'team-b',code:'OTHER'};
  assert.equal((await teamManagerScope(async()=>[team,second],gm,'team-b')).team,'team-b');
  await assert.rejects(teamManagerScope(async()=>[team,second],gm,'forged-team'),e=>e.status===403);

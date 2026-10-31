@@ -4,7 +4,6 @@ import { triageScope, TriageError } from "./adminTriage";
 import type { RecordStore } from "./adminPersonRecord";
 export const squadBoundary =
   "[DENY: ERR-901: SECURITY BOUNDARY VIOLATION - ACCESS RESTRICTED TO ASSIGNED SQUAD]";
-export const squadCode = "SQD_BANANA_01";
 export async function teamManagerScope(
   rest: RecordStore,
   ctx: AccessContext,
@@ -13,25 +12,14 @@ export async function teamManagerScope(
   const scope = triageScope(ctx, "team_manager", null);
   if (!hasAdminContextPermission(ctx, "team_manager", "rosters.read"))
     throw new TriageError(squadBoundary, 403);
-  const director =
-    ctx.activeAdminRole === "general_manager" ||
-    ctx.roles.some(
-      (r) =>
-        r.code === "GENERAL_MANAGER" &&
-        !r.scope.team_id &&
-        !r.scope.site_id &&
-        !r.scope.program_id &&
-        !r.scope.competition_id &&
-        !r.scope.sport_id,
-    );
   const teams = await rest(
-    `teams?select=id,name,code,organization_id&organization_id=in.(${scope.orgs.join(",")})${director ? "" : `&code=eq.${squadCode}`}&status=eq.active&order=name.asc&limit=1000`,
+    `teams?select=id,name,code,organization_id&organization_id=in.(${scope.orgs.join(",")})&status=eq.active&order=name.asc&limit=1000`,
   );
   const authorized = teams.filter(
     (t: { id: string }) =>
       scope.teamIds === null || scope.teamIds.includes(t.id),
   );
-  if (director && authorized.length && authorized.length < 1000) {
+  if (authorized.length && teams.length < 1000) {
     const selected = requested
       ? authorized.find((t: { id: string }) => t.id === requested)
       : authorized[0];
@@ -46,7 +34,7 @@ export async function teamManagerScope(
   }
   if (authorized.length !== 1 || (requested && requested !== authorized[0].id))
     throw new TriageError(
-      `${squadBoundary} The active Banana Slugs squad and its assignment must be configured by Organization Admin.`,
+      `${squadBoundary} No active team is available in your current club and team assignments. Ask Organization Admin to review the assignment.`,
       403,
     );
   return {

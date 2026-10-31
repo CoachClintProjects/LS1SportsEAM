@@ -131,7 +131,10 @@ export default function PersonRecordDrawer({
   initialTab?: "Overview" | "Registration" | "Documents";
 }) {
   const [guardianEditing, setGuardianEditing] = useState(false);
-  function openGuardians() {
+  const [selectedGuardian, setSelectedGuardian] = useState<any>(null);
+  function openGuardians(guardian: any = null) {
+    if (saving.current) return;
+    setSelectedGuardian(guardian);
     setGuardianEditing(true);
     setEditing(null);
     panel.current
@@ -233,6 +236,7 @@ export default function PersonRecordDrawer({
   }, []);
   function begin(section: string, emergency: any = null) {
     if (saving.current) return;
+    setGuardianEditing(false);
     setContact(emergency);
     setEditing(section);
     setNotice("");
@@ -378,22 +382,6 @@ export default function PersonRecordDrawer({
           </div>
         </header>
         <div data-record-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
-          {guardianEditing && data && (
-            <GuardianEditor
-              record={data}
-              role={role}
-              onClose={() => setGuardianEditing(false)}
-              onBusy={(value) => {
-                saving.current = value;
-                setBusy(value);
-              }}
-              onSaved={async () => {
-                await load();
-                setNotice("Parent / guardian saved.");
-                onSaved?.();
-              }}
-            />
-          )}
           {p?.status && <RecordLifecycle status={p.status} />}
           {loading && (
             <p role="status">Loading record and linked information…</p>
@@ -542,6 +530,25 @@ export default function PersonRecordDrawer({
                 </Card>
               </div>
               <div className="min-w-0 space-y-4">
+                {guardianEditing && data && (
+                  <GuardianEditor
+                    key={selectedGuardian?.person_id || "new"}
+                    guardian={selectedGuardian}
+                    record={data}
+                    role={role}
+                    onClose={() => setGuardianEditing(false)}
+                    onBusy={(value) => {
+                      saving.current = value;
+                      setBusy(value);
+                    }}
+                    onSaved={async () => {
+                      await load();
+                      setNotice("Parent / guardian saved.");
+                      onSaved?.();
+                    }}
+                  />
+                )}
+
                 {editing && (
                   <form
                     onSubmit={(e) => {
@@ -689,7 +696,7 @@ export default function PersonRecordDrawer({
                         !data.authorities.length &&
                         a && (
                           <button
-                            onClick={openGuardians}
+                            onClick={() => openGuardians()}
                             className="mb-2 block text-left text-sm text-amber-200 underline"
                           >
                             No guardian recorded — manage relationships
@@ -925,7 +932,7 @@ export default function PersonRecordDrawer({
                   title="Parents & guardians"
                   edit={
                     a && role === "org_admin" && data.authorization.edit
-                      ? openGuardians
+                      ? () => openGuardians()
                       : undefined
                   }
                 >
@@ -942,7 +949,32 @@ export default function PersonRecordDrawer({
                       key={g.person_id}
                       className="mb-3 border-b border-neutral-700 pb-3"
                     >
-                      <p className="text-sm font-semibold">{name(g.person)}</p>
+                      <p className="text-sm font-semibold">
+                        {role === "org_admin" &&
+                          data.authorization.edit &&
+                          data.guardians.some(
+                            (member: any) =>
+                              member.person_id === g.person_id &&
+                              member.family_id === a?.primary_family_id,
+                          ) && (
+                            <button
+                              aria-label={`Edit parent or guardian ${name(g.person)}`}
+                              onClick={() =>
+                                openGuardians(
+                                  data.guardians.find(
+                                    (member: any) =>
+                                      member.person_id === g.person_id &&
+                                      member.family_id === a?.primary_family_id,
+                                  ),
+                                )
+                              }
+                              className="float-right text-blue-300"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                        {name(g.person)}
+                      </p>
                       <p className="text-xs text-neutral-400">
                         {human(g.relationship_type)}
                       </p>

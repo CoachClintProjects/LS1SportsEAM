@@ -1,3 +1,4 @@
+alter table public.people add column if not exists phone_secondary text;
 -- Atomic contact and family relationship edit. Server validates operator permissions.
 create or replace function public.admin_save_guardian(p_tenant uuid,p_org uuid,p_athlete uuid,p_actor_user uuid,p_actor_person uuid,p_values jsonb)
 returns jsonb language plpgsql security invoker set search_path=public as $$
@@ -16,7 +17,7 @@ begin
   if nullif(trim(p_values->>'first_name'),'') is null or nullif(trim(p_values->>'last_name'),'') is null then raise exception 'First and last names are required';end if;
   if exists(select 1 from people where id=related) then raise exception 'This submission may already be saved. Reload before retrying';end if;
   if nullif(trim(p_values->>'email'),'') is not null and exists(select 1 from people where tenant_id=p_tenant and email=trim(p_values->>'email')) then raise exception 'A person with this email exists. Link the existing person';end if;
-  insert into people(id,tenant_id,first_name,last_name,email,phone) values(related,p_tenant,trim(p_values->>'first_name'),trim(p_values->>'last_name'),nullif(trim(p_values->>'email'),''),nullif(trim(p_values->>'phone'),'')) returning * into g;
+  insert into people(id,tenant_id,first_name,last_name,email,phone,phone_secondary) values(related,p_tenant,trim(p_values->>'first_name'),trim(p_values->>'last_name'),nullif(trim(p_values->>'email'),''),nullif(trim(p_values->>'phone'),''),nullif(trim(p_values->>'phone_secondary'),'')) returning * into g;
  else
   select * into g from people where id=related and tenant_id=p_tenant for update;
   if not found then raise exception 'Person outside tenant';end if;
@@ -28,7 +29,7 @@ begin
       (link_before->>'relationship_type') is distinct from (p_values->>'expected_relationship') or
       (link_before->>'is_primary_guardian') is distinct from (p_values->>'expected_primary') then raise exception 'Record changed. Reload before saving';end if;
    if nullif(trim(p_values->>'first_name'),'') is null or nullif(trim(p_values->>'last_name'),'') is null then raise exception 'First and last names are required';end if;
-   update people set first_name=trim(p_values->>'first_name'),last_name=trim(p_values->>'last_name'),email=nullif(trim(p_values->>'email'),''),phone=nullif(trim(p_values->>'phone'),''),updated_at=now() where id=related returning * into g;
+   update people set first_name=trim(p_values->>'first_name'),last_name=trim(p_values->>'last_name'),email=nullif(trim(p_values->>'email'),''),phone=nullif(trim(p_values->>'phone'),''),phone_secondary=nullif(trim(p_values->>'phone_secondary'),''),updated_at=now() where id=related returning * into g;
   elsif p_values->>'mode' is distinct from 'link' then raise exception 'Unsupported guardian action';end if;
  end if;
  result:=admin_athlete_relationship(p_tenant,p_org,p_athlete,p_actor_user,p_actor_person,'guardian_link',p_values);
