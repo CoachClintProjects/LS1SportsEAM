@@ -1,3 +1,4 @@
+import {parentAccess,requireParentGrant,parentRest} from '@/lib/server/parentAccess';
 import { NextRequest, NextResponse } from 'next/server';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL??'https://xedfstgwotzxnztpembv.supabase.co';
@@ -16,11 +17,16 @@ async function rest(path:string,init:RequestInit){const r=await fetch(`${URL}/re
 export async function POST(request:NextRequest){
  try{
   if(!KEY)throw new Error('Supabase server credentials are not configured.');
+  const access=await parentAccess(request);
   const form=await request.formData(); const file=form.get('file');
-  if(!(file instanceof File))throw new Error('A file is required.');
+  if(!(file instanceof File)||!file.size||file.size>4*1024*1024||!['application/pdf','image/jpeg','image/png'].includes(file.type))throw new Error('Choose a PDF, PNG or JPEG up to 4 MB.');
   const title=String(form.get('title')||file.name).trim(); const athleteId=String(form.get('athleteId')||''); let personId=String(form.get('personId')||'');
   if(!title)throw new Error('Document title is required.');
   if(!personId&&athleteId){const people=await rest(`athletes?id=eq.${encodeURIComponent(athleteId)}&select=person_id`,{method:'GET'});personId=people?.[0]?.person_id||'';}
+  if(!athleteId)throw new Error('An authorized athlete is required.');
+  requireParentGrant(access,athleteId,'parent.documents');
+  const [authorizedAthlete]=await parentRest(`athletes?select=person_id&id=eq.${athleteId}`);
+  if(personId!==authorizedAthlete?.person_id)throw new Error('Document owner does not match your athlete.');
   if(!personId)throw new Error('A document owner is required.');
   await ensureBucket();
   const path=`private/${safe(athleteId||personId)}/${crypto.randomUUID()}-${safe(file.name)}`;

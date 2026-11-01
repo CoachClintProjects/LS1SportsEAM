@@ -1,52 +1,1325 @@
-'use client';
-
-import React,{useCallback,useEffect,useMemo,useState}from'react';
-import{AlertTriangle,CalendarDays,Car,CheckCircle2,ChevronRight,FileText,RefreshCw,ShieldCheck,Users,Wallet,X}from'lucide-react';
-import{useRouter,useSearchParams}from'next/navigation';
-
-type Row=Record<string,any>;
-type Payload={family:Row|null;members:Row[];athletes:Row[];tasks:Row[];messages:Row[];invoices:Row[];documents:Row[];trips:Row[];custody:Row[];volunteer:Row[];metrics:Record<string,number>;source:string;error?:string};
-
-const NAV=[['household','Today'],['tasks','Task Center'],['athletes','My Athletes'],['schedule','Family Schedule'],['transport','Transport & Custody'],['documents','Document Vault'],['financial','Financial Center'],['volunteer','Participation'],['members','Family & Permissions'],['messages','Inbox']]as const;
-
-const money=(v:any)=>{const num=Number(v); return new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(isNaN(num)?0:num)};
-
-function Card({children,onClick}:{children:React.ReactNode;onClick?:()=>void}){const C=onClick?'button':'section';return <C onClick={onClick as any} className="w-full rounded-2xl border border-neutral-800 bg-[#090b0b] p-5 text-left">{children}</C>}
-function Empty({title,text}:{title:string;text:string}){return <div className="rounded-xl border border-dashed border-neutral-800 p-7 text-center"><FileText className="mx-auto h-5 w-5 text-neutral-700"/><div className="mt-2 text-sm font-bold text-neutral-400">{title}</div><p className="mx-auto mt-1 max-w-xl text-xs leading-5 text-neutral-600">{text}</p></div>}
-function FamilyCalendar({entries,onOpen}:{entries:Row[];onOpen:(row:Row)=>void}){const start=new Date();start.setHours(0,0,0,0);return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">{Array.from({length:14},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);const hits=entries.filter(e=>{const raw=e.startsAt||e.start;return raw&&new Date(raw).toDateString()===d.toDateString()});return <button key={d.toISOString()} onClick={()=>onOpen({kind:'calendar-day',date:d.toISOString(),entries:hits})} className="min-h-28 rounded-xl border border-neutral-800 bg-[#0d1010] p-3 text-left hover:border-neutral-600"><div className="text-[9px] font-black uppercase tracking-[.15em] text-neutral-600">{d.toLocaleDateString(undefined,{weekday:'short'})}</div><div className="mt-1 text-sm font-black text-white">{d.getDate()}</div><div className="mt-2 space-y-1">{hits.map((e:any,n:number)=><div key={n} className="rounded bg-[#FA4616]/10 px-2 py-1 text-[9px] font-bold text-[#FA4616]">{e.pickup||e.dropoff||'Family event'}</div>)}</div></button>})}</div>}
-
-export default function ParentWorkspace(){
- const router=useRouter(),params=useSearchParams(),view=params.get('view')||'household',family=params.get('family')||'';
- const[data,setData]=useState<(Payload&{setupRequired?:boolean})|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[drawer,setDrawer]=useState<Row|null>(null),[saving,setSaving]=useState(false),[notice,setNotice]=useState('');
- const load=useCallback(async()=>{setLoading(true);try{const r=await fetch('/api/parent'+(family?'?family='+encodeURIComponent(family):''),{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Unable to load Family OS');setData(j);setError('')}catch(e){setError(e instanceof Error?e.message:'Unable to load')}finally{setLoading(false)}},[family]);
- useEffect(()=>{void load()},[load]);
- const action=async(payload:any)=>{setSaving(true);setNotice('');try{const r=await fetch('/api/parent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Save failed');setNotice('Saved to LS1SportsEAM.');setDrawer(null);await load();return j}catch(e){setNotice(e instanceof Error?e.message:'Save failed')}finally{setSaving(false)}};
- const tasks=useMemo(()=>data?.tasks?.filter(x=>x.status!=='COMPLETED')||[],[data]);
- const change=(id:string)=>{const q=new URLSearchParams(params.toString());q.set('view',id);window.dispatchEvent(new CustomEvent('ls1sports:navigation',{detail:id}));router.push('/parent?'+q.toString(),{scroll:false})};
- 
- const safeData = data || { family: null, members: [], athletes: [], tasks: [], messages: [], invoices: [], documents: [], trips: [], custody: [], volunteer: [], metrics: {}, source: '' };
- const familyName = safeData.family?.name || 'My Family';
- const familyStatus = safeData.family?.status || '';
- const familyId = safeData.family?.id || '';
- 
- if(!data&&loading)return <main className="p-8 text-neutral-500">Loading Family OS…</main>;
- if(!data)return <main className="p-8 text-red-300">{error||'Family data unavailable'}</main>;
- if(data.setupRequired)return <main className="mx-auto max-w-2xl p-8"><div className="rounded-2xl border border-neutral-800 bg-[#090b0b] p-6"><div className="text-[9px] font-black uppercase tracking-[.25em] text-[#FA4616]">Parent OS setup</div><h1 className="mt-2 text-3xl font-black text-white">Create the first live family record</h1><p className="mt-3 text-sm leading-6 text-neutral-500">HPAC athletes are loaded, but guardian relationships have not been invented. Create the family explicitly so privacy and minor access remain controlled.</p><form onSubmit={e=>{e.preventDefault();const fd=new FormData(e.currentTarget);void action({action:'create-family',name:fd.get('name'),athlete_ids:fd.getAll('athlete_id').map(String),person_ids:[]})}} className="mt-6 space-y-3"><input name="name" required placeholder="Family name" className="w-full rounded-xl border border-neutral-800 bg-black p-3 text-sm text-white"/><div className="max-h-80 overflow-auto rounded-xl border border-neutral-800 p-3"><div className="mb-2 text-[9px] font-black uppercase tracking-[.2em] text-neutral-600">Select athlete(s) from the live HPAC roster</div>{((data as any).candidates||[]).map((a:any)=><label key={a.id} className="flex cursor-pointer items-center gap-3 border-b border-neutral-900 py-2 text-sm text-white"><input type="checkbox" name="athlete_id" value={a.id}/><span>{a.people?.first_name||''} {a.people?.last_name||''}</span><span className="ml-auto text-[10px] text-neutral-600">{a.athlete_number||''}</span></label>)}</div><button disabled={saving} className="rounded-xl bg-[#FA4616] px-5 py-3 text-sm font-black text-black">{saving?'Creating…':'Create live family'}</button></form><p className="mt-4 text-[10px] text-neutral-600">Next: guardian identities will be linked through the onboarding workflow rather than guessed from athlete roster data.</p>{notice&&<div className="mt-4 text-sm text-emerald-300">{notice}</div>}</div></main>;
- 
- const metric=(label:string,value:any,go:string,detail:string)=><Card onClick={()=>setDrawer({kind:'metric',label,value,detail,go})}><div className="text-[9px] font-black uppercase tracking-[.2em] text-neutral-600">{label}</div><div className="mt-3 text-3xl font-black text-white">{value}</div><div className="mt-2 text-xs text-[#FA4616]">Open details →</div></Card>;
- 
- const workspace=()=>{
-  if(view==='household')return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{metric('Open actions',tasks.length,'tasks','Unified required actions across the family.')}{metric('Family balance',money(safeData.family?.unpaidBalance||0),'financial','Outstanding charges and payment context.')}{metric('Documents expiring',data.metrics?.documentsExpiring||0,'documents','Documents requiring renewal or verification.')}{metric('Upcoming logistics',data.metrics?.upcomingTrips||0,'transport','Transportation and custody obligations.')}</div><div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><Card onClick={()=>setDrawer({kind:'tasks',items:tasks})}><div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">Right now</div><h2 className="mt-1 text-lg font-black text-white">Am I dropping the ball?</h2></div><AlertTriangle className="h-5 w-5 text-[#FA4616]"/></div><div className="mt-4 space-y-2">{tasks.length?tasks.slice(0,5).map(t=><div key={t.id} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-3"><div className="text-sm font-bold text-white">{t.title}</div><div className="mt-1 text-[10px] text-neutral-500">{t.deadline?new Date(t.deadline).toLocaleString():'No deadline'}</div></div>):<Empty title="No open family actions" text="When everything is under control, LS1 should say so clearly."/>}</div></Card><Card onClick={()=>setDrawer({kind:'readiness',documents:data.documents,tasks})}><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">Family readiness</div><h2 className="mt-1 text-lg font-black text-white">Eligibility at a glance</h2><div className="mt-4 space-y-3">{[['Registration','Complete'],['Financial','Current'],['Medical & Documents',data.documents.some(d=>d.verificationStatus==='EXPIRED')?'Attention':'Current'],['Required Sign-offs',tasks.length?'Review':'Complete']].map(([a,b])=><div key={a} className="flex items-center justify-between border-b border-neutral-800 pb-3"><span className="text-xs text-neutral-400">{a}</span><span className="flex items-center gap-1.5 text-xs font-bold text-white"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400"/>{b}</span></div>)}</div></Card></div><Card onClick={()=>setDrawer({kind:'athletes',items:data.athletes})}><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">My athletes</div><div className="mt-4 grid gap-3 md:grid-cols-2">{data.athletes.map(a=><div key={a.athleteId} className="rounded-xl border border-neutral-800 bg-[#0d1010] p-4"><div className="text-base font-black text-white">{a.name}</div><div className="mt-1 text-xs text-neutral-500">Athlete #{a.athleteNumber||'—'} · {a.status||'ACTIVE'}</div></div>)}</div></Card></div>;
-  if(view==='schedule')return <div className="space-y-5"><Card><div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-[#FA4616]"/><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">Family Calendar</div><h2 className="mt-1 text-xl font-black text-white">One family schedule. Conflict-aware by design.</h2></div></div><div className="mt-5"><FamilyCalendar entries={data.trips} onOpen={setDrawer}/></div></Card><Card onClick={()=>setDrawer({kind:'agenda',items:data.trips})}><h3 className="font-black text-white">Agenda</h3><div className="mt-4 space-y-2">{data.trips.length?data.trips.map(t=><div key={t.id} className="rounded-xl border border-neutral-800 p-4"><div className="font-bold text-white">{new Date(t.startsAt).toLocaleString()}</div><div className="mt-1 text-xs text-neutral-500">{t.pickup||'Pickup TBD'} → {t.dropoff||'Destination TBD'}</div></div>):<Empty title="No family schedule records yet" text="The calendar remains visible and ready before records are loaded."/>}</div></Card></div>;
-  if(view==='tasks')return <Card onClick={()=>setDrawer({kind:'tasks',items:tasks})}><h2 className="text-xl font-black text-white">Unified Family Task Center</h2><div className="mt-5 space-y-3">{tasks.length?tasks.map(t=><div key={t.id} className="rounded-xl border border-neutral-800 p-4"><div className="font-bold text-white">{t.title}</div><div className="mt-1 text-xs text-neutral-500">{t.description||'Complete this action from the linked workflow.'}</div></div>):<Empty title="No open tasks" text="Waivers, payments, RSVP requests and compliance actions consolidate here."/>}</div></Card>;
-  if(view==='transport')return <div className="grid gap-5 lg:grid-cols-2"><Card onClick={()=>setDrawer({kind:'trips',items:data.trips})}><Car className="h-5 w-5 text-[#FA4616]"/><h2 className="mt-2 text-xl font-black text-white">Transportation</h2><div className="mt-4 text-sm text-neutral-500">{data.trips.length} scheduled trip records</div></Card><Card onClick={()=>setDrawer({kind:'custody',items:data.custody})}><ShieldCheck className="h-5 w-5 text-[#FA4616]"/><h2 className="mt-2 text-xl font-black text-white">Chain of Custody</h2><div className="mt-4 text-sm text-neutral-500">{data.custody.length} supervision events</div></Card></div>;
-  if(['documents','compliance'].includes(view))return <Card onClick={()=>setDrawer({kind:'documents',items:data.documents})}><ShieldCheck className="h-5 w-5 text-[#FA4616]"/><h2 className="mt-2 text-xl font-black text-white">Secure Document Vault</h2><div className="mt-4">{data.documents.length?<div className="text-sm text-neutral-400">{data.documents.length} document records</div>:<Empty title="Document Vault ready" text="Waivers, medical clearances and required documents appear here."/>}</div></Card>;
-  if(['financial','accounts','invoices','payments'].includes(view))return <Card onClick={()=>setDrawer({kind:'invoices',items:data.invoices})}><Wallet className="h-5 w-5 text-[#FA4616]"/><h2 className="mt-2 text-xl font-black text-white">Family Financial Center</h2><div className="mt-4 text-3xl font-black text-white">{money(data.metrics?.unpaidBalance)}</div><div className="mt-2 text-xs text-neutral-500">Every charge should explain why it exists.</div></Card>;
-  if(view==='members')return <Card onClick={()=>setDrawer({kind:'members',items:data.members})}><Users className="h-5 w-5 text-[#FA4616]"/><h2 className="mt-2 text-xl font-black text-white">Family & Permissions</h2><div className="mt-4 text-sm text-neutral-500">{data.members.length} linked family members</div></Card>;
-  if(view==='volunteer')return <Card onClick={()=>setDrawer({kind:'volunteer',items:data.volunteer})}><h2 className="text-xl font-black text-white">Participation & Volunteer Center</h2><div className="mt-4 text-sm text-neutral-500">{data.volunteer.length} open opportunities</div></Card>;
-  if(view==='messages')return <Card onClick={()=>setDrawer({kind:'messages',items:data.messages})}><h2 className="text-xl font-black text-white">Family Inbox</h2><div className="mt-4 text-sm text-neutral-500">{data.messages.length} messages</div></Card>;
-  return <Card onClick={()=>setDrawer({kind:'athletes',items:data.athletes})}><h2 className="text-xl font-black text-white">Athlete context</h2><div className="mt-4 text-sm text-neutral-500">Support the athlete without turning the parent into the coach.</div></Card>;
- };
- 
- return <main className="mx-auto max-w-[1600px] p-5 lg:p-8"><div className="flex items-start justify-between gap-4"><div><div className="text-[9px] font-black uppercase tracking-[.24em] text-[#FA4616]">Family OS</div><h1 className="mt-2 text-3xl font-black text-white">{familyName}</h1><p className="mt-2 max-w-3xl text-sm text-neutral-500">What needs action, where everyone needs to be, who has the child, what is due, and what is cleared.</p></div><button onClick={()=>void load()} className="rounded-xl border border-neutral-800 p-3 text-neutral-400"><RefreshCw className={loading?'h-4 w-4 animate-spin':'h-4 w-4'}/></button></div>{familyStatus==='DEMO'&&<div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">Family relationships are not yet linked to HPAC. Live athlete context is used safely while family records remain empty.</div>}<div className="mt-6 flex gap-2 overflow-x-auto pb-1">{NAV.map(([id,label])=><button key={id} onClick={()=>change(id)} className={'shrink-0 rounded-full border px-3 py-2 text-[10px] font-bold '+(view===id?'border-[#FA4616] bg-[#FA4616]/10 text-white':'border-neutral-800 text-neutral-500')}>{label}</button>)}</div>{error&&<div className="mt-4 text-sm text-red-300">{error}</div>}{notice&&<div className="mt-4 rounded-xl border border-emerald-900/50 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-300">{notice}</div>}<div className="mt-6">{workspace()}</div>{drawer&&<div className="fixed inset-0 z-50 bg-black/70" onClick={()=>setDrawer(null)}><aside className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-neutral-800 bg-[#080909] p-6" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[.2em] text-[#FA4616]">Family OS detail</div><h2 className="mt-2 text-xl font-black text-white">{String(drawer.label||drawer.kind||'Details').replaceAll('_',' ')}</h2></div><button onClick={()=>setDrawer(null)} className="rounded-lg border border-neutral-800 p-2"><X className="h-4 w-4 text-neutral-400"/></button></div><pre className="mt-6 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-neutral-800 bg-black p-4 text-xs leading-5 text-neutral-400">{JSON.stringify(drawer,null,2)}</pre>{drawer.kind==='tasks'&&Array.isArray(drawer.items)&&drawer.items.map((t:any)=><button key={t.id} onClick={()=>void action({action:'complete-task',id:t.id})} disabled={saving} className="mt-3 mr-2 rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black text-black">Complete: {t.title}</button>)}{drawer.kind==='messages'&&Array.isArray(drawer.items)&&drawer.items.filter((m:any)=>!m.acknowledgedAt&&!m.acknowledged_at).map((m:any)=><button key={m.id} onClick={()=>void action({action:'ack-message',id:m.id})} disabled={saving} className="mt-3 mr-2 rounded-lg bg-[#FA4616] px-3 py-2 text-xs font-black text-black">Acknowledge: {m.title}</button>)}{safeData.family && <div className="mt-5 border-t border-neutral-800 pt-5"><div className="text-xs font-black text-white">Create a live family action</div><div className="mt-3 flex gap-2"><input id="family-action-title" placeholder="Action title" className="flex-1 rounded-lg border border-neutral-800 bg-black p-2 text-xs text-white"/><button onClick={()=>{const el=document.getElementById('family-action-title') as HTMLInputElement;if(el?.value)void action({action:'create-task',family_id:familyId,title:el.value})}} className="rounded-lg bg-[#FA4616] px-3 text-xs font-black text-black">Add</button></div></div>}{drawer.go&&<button onClick={()=>{change(String(drawer.go));setDrawer(null)}} className="mt-4 rounded-lg bg-[#FA4616] px-4 py-2 text-sm font-black text-black">Open workspace</button>}</aside></div>}</main>;
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
+import { parentNavigation, overlappingEvents } from "@/lib/parent/policy";
+import { AdminDrawerShell } from "@/components/hubs/admin/AdminDrawerShell";
+type Row = Record<string, any>;
+const control =
+  "mt-1 w-full rounded border border-neutral-600 bg-[#161B22] p-2 text-white";
+const button =
+  "rounded bg-blue-700 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40";
+const name = (p: Row) =>
+  [p?.preferred_name || p?.first_name, p?.last_name].filter(Boolean).join(" ");
+const label = (v: string) => String(v || "Not recorded").replaceAll("_", " ");
+const date = (v: string, tz?: string) =>
+  v
+    ? new Date(v).toLocaleString(
+        undefined,
+        tz ? { timeZone: tz, timeZoneName: "short" } : undefined,
+      )
+    : "Not scheduled";
+const amount = (v: number, c: string) =>
+  new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: c.trim(),
+  }).format(Number(v));
+function Card({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-neutral-700 bg-[#0A0C10] p-5">
+      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="py-3 text-sm text-neutral-400">{children}</p>;
+}
+export default function ParentWorkspace() {
+  const router = useRouter(),
+    params = useSearchParams(),
+    rawView = params.get("view") || "household",
+    view =
+      (
+        {
+          accounts: "financial",
+          invoices: "financial",
+          payments: "financial",
+          compliance: "documents",
+          registration: "athletes",
+          tasks: "household",
+          transport: "schedule",
+        } as Record<string, string>
+      )[rawView] || rawView,
+    guardian = params.get("guardian") || "";
+  const [data, setData] = useState<Row | null>(null),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [child, setChild] = useState(""),
+    [sport, setSport] = useState(""),
+    [club, setClub] = useState(""),
+    [drawer, setDrawer] = useState<Row | null>(null),
+    [values, setValues] = useState<Row>({});
+  const lock = useRef(false),
+    requestId = useRef("");
+  const query = guardian ? `?guardian=${encodeURIComponent(guardian)}` : "";
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      const r = await authenticatedFetch("/api/parent" + query, {
+        cache: "no-store",
+        signal,
+      });
+      const j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      setData(j);
+    },
+    [query],
+  );
+  useEffect(() => {
+    const c = new AbortController();
+    setData(null);
+    setDrawer(null);
+    setError("");
+    load(c.signal).catch((e) => {
+      if (e.name !== "AbortError") setError(e.message);
+    });
+    return () => c.abort();
+  }, [load]);
+  useEffect(() => {
+    const refresh = () => load().catch((e) => setError(e.message));
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [load]);
+  const go = (next: string) => {
+    const q = new URLSearchParams(params.toString());
+    q.set("view", next);
+    router.push("/parent?" + q.toString());
+  };
+  const open = (d: Row) => {
+    setError("");
+    setValues(
+      d.kind === "contact"
+        ? {
+            phone: data?.viewer?.phone || "",
+            phone_secondary: data?.viewer?.phone_secondary || "",
+          }
+        : {},
+    );
+    requestId.current = crypto.randomUUID();
+    setDrawer(d);
+  };
+  async function action(
+    action: string,
+    athleteId: string,
+    organizationId: string,
+    id: string,
+    payload: Row,
+  ) {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const r = await authenticatedFetch("/api/parent" + query, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          athleteId,
+          organizationId,
+          id,
+          values: payload,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      setDrawer(null);
+      setNotice("Saved.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to save.");
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
+  if (!data)
+    return (
+      <main className="p-8 text-white">
+        <h1 className="text-2xl font-bold">Parent workspace</h1>
+        <p role={error ? "alert" : "status"} className="mt-4">
+          {error || "Loading your family…"}
+        </p>
+        {error && (
+          <button
+            className={button}
+            onClick={() => {
+              setError("");
+              load().catch((e) => setError(e.message));
+            }}
+          >
+            Retry
+          </button>
+        )}
+      </main>
+    );
+  const athletes = data.athletes.filter(
+    (a: Row) =>
+      (!child || a.id === child) &&
+      (!sport || a.sportIds?.includes(sport)) &&
+      (!club ||
+        data.memberships.some(
+          (m: Row) =>
+            m.athlete_id === a.id &&
+            data.teams.some(
+              (t: Row) => t.id === m.team_id && t.organization_id === club,
+            ),
+        ) ||
+        (!child && !sport && !club)),
+  );
+  const athleteIds = athletes.map((a: Row) => a.id),
+    childName = (id: string) =>
+      name(data.athletes.find((a: Row) => a.id === id)?.person),
+    clubName = (id: string) =>
+      data.organizations.find((o: Row) => o.id === id)?.name || "Club",
+    sportName = (id: string) =>
+      data.sports.find((s: Row) => s.id === id)?.name || "Sport not assigned";
+  const orgsFor = (id: string) =>
+    data.organizations.filter(
+      (o: Row) =>
+        data.memberships.some(
+          (m: Row) =>
+            m.athlete_id === id &&
+            data.teams.some(
+              (t: Row) => t.id === m.team_id && t.organization_id === o.id,
+            ),
+        ) ||
+        data.registrations.some(
+          (r: Row) => r.athlete_id === id && r.organization_id === o.id,
+        ),
+    );
+  const allowed = (id: string, scope: string) =>
+    !data.readOnly &&
+    data.grants.some(
+      (g: Row) => g.athlete_id === id && g.scopes.includes(scope),
+    );
+  const competitions = data.competitions.filter(
+    (c: Row) =>
+      athleteIds.includes(c.athlete_id) &&
+      (!sport || c.sport_id === sport) &&
+      (!club || c.organization_id === club),
+  );
+  const events = data.events.filter(
+    (e: Row) =>
+      e.athleteIds.some((id: string) => athleteIds.includes(id)) &&
+      (!sport || e.sport_id === sport) &&
+      (!club || e.organization_id === club),
+  );
+  const calendar = [
+    ...events,
+    ...competitions.map((c: Row) => ({
+      ...c,
+      id: `competition:${c.id}`,
+      title: c.name,
+      athleteIds: [c.athlete_id],
+      event_type: c.competition_type,
+    })),
+  ];
+  const conflicts = overlappingEvents(calendar);
+  const pending = competitions.filter(
+    (c: Row) =>
+      c.response?.invitation_status === "notified" &&
+      c.response.response_status === "awaiting_response",
+  );
+  const docs = data.documents.filter((d: Row) =>
+    athletes.some((a: Row) => a.person_id === d.owner_person_id),
+  );
+  const waivers = data.waivers.filter(
+    (w: Row) =>
+      athleteIds.includes(w.athlete_id) &&
+      (!club || w.organization_id === club),
+  );
+  const actionScope = drawer?.kind === "upload" ? "parent.documents" : drawer?.kind === "contact" ? "parent.contact" : drawer?.requestKind === "billing" ? "parent.finance" : "parent.read";
+  const actionAthletes = athletes.filter((a: Row) => allowed(a.id, actionScope));
+  const visibleInvoices = data.invoices.filter((i: Row) => (!club || i.organization_id === club) && i.athleteIds?.some((id: string) => athleteIds.includes(id)));
+  const selectedAthlete =
+      drawer?.athleteId || values.athleteId || actionAthletes[0]?.id || "",
+    selectedOrg =
+      drawer?.organizationId ||
+      values.organizationId ||
+      orgsFor(selectedAthlete)[0]?.id ||
+      "";
+  const request = (kind: string, athleteId?: string, organizationId?: string) =>
+    open({ kind: "request", requestKind: kind, athleteId, organizationId });
+  const picker = (
+    <>
+      <label className="block">
+        Athlete
+        <select
+          className={control}
+          value={selectedAthlete}
+          disabled={!!drawer?.athleteId}
+          onChange={(e) =>
+            setValues({
+              ...values,
+              athleteId: e.target.value,
+              organizationId: "",
+            })
+          }
+        >
+          {actionAthletes.map((a: Row) => (
+            <option key={a.id} value={a.id}>
+              {name(a.person)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block">
+        Club
+        <select
+          className={control}
+          value={selectedOrg}
+          disabled={!!drawer?.organizationId}
+          onChange={(e) =>
+            setValues({ ...values, organizationId: e.target.value })
+          }
+        >
+          {orgsFor(selectedAthlete).map((o: Row) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
+  );
+  function exportCalendar() {
+    const escape = (s: string) =>
+      String(s || "")
+        .replaceAll("\\", "\\\\")
+        .replaceAll("\n", "\\n")
+        .replaceAll(",", "\\,")
+        .replaceAll(";", "\\;");
+    const stamp = (s: string) =>
+      new Date(s)
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}/, "");
+    const unique = [
+      ...new Map(
+        calendar
+          .filter((e: Row) => e.starts_at && e.ends_at)
+          .map((e: Row) => [e.id, e]),
+      ).values(),
+    ] as Row[];
+    const text = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//LS1Sports//Family calendar//EN",
+      ...unique.flatMap((e) => [
+        "BEGIN:VEVENT",
+        `UID:${escape(e.id)}@ls1sports`,
+        `DTSTAMP:${stamp(new Date().toISOString())}`,
+        `DTSTART:${stamp(e.starts_at)}`,
+        `DTEND:${stamp(e.ends_at)}`,
+        `SUMMARY:${escape(e.title)}`,
+        `DESCRIPTION:${escape(clubName(e.organization_id))}`,
+        "END:VEVENT",
+      ]),
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([text], { type: "text/calendar" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "family-calendar.ics";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  return (
+    <main className="mx-auto max-w-[1500px] p-5 text-white lg:p-8">
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-orange-300">
+            Parent ·{" "}
+            {data.families.map((f: Row) => f.name).join(" / ") || "My family"}
+          </p>
+          <h1 className="mt-1 text-3xl font-bold">
+            {parentNavigation.find(([id]) => id === view)?.[1] || "Home"}
+          </h1>
+          <p className="mt-2 text-sm text-neutral-400">
+            Your children, their sports and what needs your attention.
+          </p>
+        </div>
+        <button
+          className={button}
+          disabled={busy}
+          onClick={() => load().catch((e) => setError(e.message))}
+        >
+          Refresh
+        </button>
+      </header>
+      {(data.previewGuardians.length > 0 || data.readOnly) && (
+        <label className="my-4 block text-sm">
+          Superuser preview · read-only
+          <select
+            className={control}
+            value={guardian}
+            onChange={(e) => router.push("/parent?guardian=" + e.target.value)}
+          >
+            <option value="">My own parent access</option>
+            {data.previewGuardians.map((p: Row) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {error && (
+        <p
+          role="alert"
+          className="my-4 rounded border border-red-700 p-3 text-red-200"
+        >
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="my-3 text-emerald-300">
+          {notice}
+        </p>
+      )}
+      {data.setupRequired ? (
+        <div className="mt-6">
+          <Card title="No athletes linked to this account">
+            <p className="text-sm text-neutral-300">
+              Your club administrator must link your guardian email and grant
+              Parent portal access for each athlete. Emergency contact details
+              alone do not grant access.
+            </p>
+            <p className="mt-3 text-sm text-neutral-400">
+              Organization Admin: open the athlete → edit the saved
+              parent/guardian → Parent portal access. No family records are
+              selected automatically.
+            </p>
+          </Card>
+        </div>
+      ) : (
+        <>
+          <div className="my-6 flex flex-wrap gap-4">
+            {[
+              [
+                "Child",
+                child,
+                setChild,
+                [
+                  { id: "", name: "All children" },
+                  ...data.athletes.map((a: Row) => ({
+                    id: a.id,
+                    name: name(a.person),
+                  })),
+                ],
+              ],
+              [
+                "Sport",
+                sport,
+                setSport,
+                [
+                  { id: "", name: "All sports" },
+                  ...data.sports.filter((s: Row) =>
+                    data.athletes.some((a: Row) => a.sportIds?.includes(s.id)),
+                  ),
+                ],
+              ],
+              [
+                "Club",
+                club,
+                setClub,
+                [{ id: "", name: "All clubs" }, ...data.organizations],
+              ],
+            ].map(([title, value, setter, options]: any) => (
+              <label key={title} className="min-w-44 text-sm">
+                {title}
+                <select
+                  className={control}
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                >
+                  {options.map((o: Row) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          {view === "household" && (
+            <div className="grid gap-5 lg:grid-cols-2">
+              <Card title="Needs your response">
+                {pending.map((c: Row) => (
+                  <button
+                    key={`${c.id}:${c.athlete_id}`}
+                    className="mb-2 block w-full rounded border border-neutral-600 p-3 text-left"
+                    onClick={() => go("competitions")}
+                  >
+                    {childName(c.athlete_id)} · {c.name}
+                    <span className="block text-sm text-orange-300">
+                      Participation response needed
+                    </span>
+                  </button>
+                ))}
+                {waivers
+                  .filter(
+                    (w: Row) => !["completed", "waived"].includes(w.status),
+                  )
+                  .map((w: Row) => (
+                    <button
+                      key={w.id}
+                      onClick={() => go("documents")}
+                      className="mb-2 block w-full rounded border border-neutral-600 p-3 text-left"
+                    >
+                      {childName(w.athlete_id)} ·{" "}
+                      {w.definition?.name || "Assigned waiver"}
+                      <span className="block text-sm text-orange-300">
+                        {label(w.status)}
+                      </span>
+                    </button>
+                  ))}
+                {!pending.length &&
+                  !waivers.some(
+                    (w: Row) => !["completed", "waived"].includes(w.status),
+                  ) && (
+                    <Empty>
+                      No unanswered invitations or open waivers in this view.
+                      Registration and competition clearance are shown
+                      separately.
+                    </Empty>
+                  )}
+              </Card>
+              <Card title="Coming up">
+                {calendar
+                  .sort(
+                    (a: Row, b: Row) =>
+                      Date.parse(a.starts_at) - Date.parse(b.starts_at),
+                  )
+                  .slice(0, 6)
+                  .map((e: Row, i: number) => (
+                    <div
+                      key={`${e.id}:${i}`}
+                      className="mb-3 border-b border-neutral-700 pb-3"
+                    >
+                      <b>{e.title}</b>
+                      <p className="text-sm text-neutral-300">
+                        {date(e.starts_at, e.timezone)} ·{" "}
+                        {sportName(e.sport_id)}
+                      </p>
+                      <p className="text-sm text-neutral-400">
+                        {e.athleteIds.map(childName).join(", ")} ·{" "}
+                        {clubName(e.organization_id)}
+                      </p>
+                    </div>
+                  ))}
+                {!calendar.length && (
+                  <Empty>
+                    No upcoming activities are published for these athletes.
+                  </Empty>
+                )}
+                <button className={button} onClick={() => go("schedule")}>
+                  Open calendar
+                </button>
+              </Card>
+              <Card title="Fees and payments">
+                {visibleInvoices
+                  .filter(
+                    (i: Row) =>
+                      Number(i.balance_due) > 0 &&
+                      (!club || i.organization_id === club),
+                  )
+                  .map((i: Row) => (
+                    <p key={i.id} className="mb-2">
+                      {clubName(i.organization_id)} · {i.invoice_number} ·{" "}
+                      {amount(i.balance_due, i.currency)}
+                    </p>
+                  ))}
+                <button className={button} onClick={() => go("financial")}>
+                  Review fees
+                </button>
+              </Card>
+              <Card title="Requests with the club">
+                {data.requests
+                  .filter((r: Row) => athleteIds.includes(r.payload.athlete_id))
+                  .slice(0, 5)
+                  .map((r: Row) => (
+                    <p className="mb-2" key={r.id}>
+                      {r.payload.title} · {label(r.status)}
+                    </p>
+                  ))}
+                <button className={button} onClick={() => go("messages")}>
+                  Open messages & requests
+                </button>
+              </Card>
+            </div>
+          )}
+          {view === "athletes" && (
+            <div className="grid gap-5 md:grid-cols-2">
+              {athletes.map((a: Row) => (
+                <Card key={a.id} title={name(a.person)}>
+                  <p className="text-sm text-neutral-300">
+                    {a.athlete_number || "Athlete"} · {label(a.athlete_status)}
+                  </p>
+                  <p className="mt-2">
+                    {a.sportIds?.map(sportName).join(" · ") ||
+                      "Sport not assigned"}
+                  </p>
+                  {data.memberships
+                    .filter((m: Row) => m.athlete_id === a.id)
+                    .map((m: Row) => {
+                      const t = data.teams.find((t: Row) => t.id === m.team_id);
+                      return (
+                        <p key={m.id} className="mt-2 text-sm">
+                          {t?.name} · {clubName(t?.organization_id)}
+                        </p>
+                      );
+                    })}
+                  <button
+                    className={button + " mt-4"}
+                    onClick={() => open({ kind: "athlete", athleteId: a.id })}
+                  >
+                    Open athlete
+                  </button>
+                </Card>
+              ))}
+            </div>
+          )}
+          {view === "schedule" && (
+            <Card title="Family calendar">
+              <div className="mb-4 flex gap-3">
+                <button className={button} onClick={exportCalendar}>
+                  Add to my calendar (.ics)
+                </button>
+                <button
+                  className={button}
+                  disabled={data.readOnly}
+                  onClick={() => request("absence")}
+                >
+                  Report an absence
+                </button>
+              </div>
+              {calendar.map((e: Row, i: number) => (
+                <article
+                  key={`${e.id}:${i}`}
+                  className="mb-3 rounded border border-neutral-700 p-4"
+                >
+                  <h3 className="font-semibold">
+                    {e.title} · {label(e.status)}
+                  </h3>
+                  <p>
+                    {date(e.starts_at, e.timezone)} –{" "}
+                    {date(e.ends_at, e.timezone)}
+                  </p>
+                  <p className="text-sm text-neutral-400">
+                    {e.athleteIds.map(childName).join(", ")} ·{" "}
+                    {sportName(e.sport_id)} · {clubName(e.organization_id)}
+                    {e.timezone ? ` · ${e.timezone}` : ""}
+                  </p>
+                  {conflicts.has(e.id) && (
+                    <p className="text-amber-300">
+                      Overlaps another family activity.
+                    </p>
+                  )}
+                </article>
+              ))}
+              {!calendar.length && (
+                <Empty>No activities published for this view.</Empty>
+              )}
+            </Card>
+          )}
+          {view === "competitions" && (
+            <div className="space-y-4">
+              {competitions.map((c: Row) => (
+                <Card
+                  key={`${c.id}:${c.athlete_id}`}
+                  title={`${c.name} · ${childName(c.athlete_id)}`}
+                >
+                  <p>
+                    {sportName(c.sport_id)} · {label(c.competition_type)} ·{" "}
+                    {clubName(c.organization_id)}
+                  </p>
+                  <p className="text-sm text-neutral-400">
+                    {date(c.starts_at, c.timezone)}
+                  </p>
+                  <p
+                    className={`my-3 ${c.assessment.status === "Eligible" ? "text-emerald-300" : "text-amber-300"}`}
+                  >
+                    {c.assessment.status}
+                  </p>
+                  {c.assessment.reason && (
+                    <p className="text-sm">{c.assessment.reason}</p>
+                  )}
+                  {c.assessment.checks.map((x: Row, i: number) => (
+                    <p key={i} className="text-sm">
+                      {x.name}: {label(x.status)}
+                      {x.reason ? ` — ${x.reason}` : ""}
+                    </p>
+                  ))}
+                  {c.response ? (
+                    <>
+                      <p className="my-3">
+                        Your response: {label(c.response.response_status)}
+                      </p>
+                      <div className="flex gap-3">
+                        {[
+                          ["going", "Attending"],
+                          ["not_going", "Not attending"],
+                        ].map(([response, title]) => (
+                          <button
+                            key={response}
+                            disabled={
+                              busy ||
+                              !allowed(c.athlete_id, "parent.respond") ||
+                              c.response.invitation_status !== "notified"
+                            }
+                            className={button}
+                            onClick={() =>
+                              action(
+                                "respond",
+                                c.athlete_id,
+                                c.organization_id,
+                                c.response.id,
+                                {
+                                  response,
+                                  expected_updated_at: c.response.updated_at,
+                                },
+                              )
+                            }
+                          >
+                            {title}
+                          </button>
+                        ))}
+                        {c.response.metadata?.parent_mode === "nomination" && (
+                          <button
+                            disabled={!allowed(c.athlete_id, "parent.respond")}
+                            className={button}
+                            onClick={() =>
+                              request(
+                                "nomination",
+                                c.athlete_id,
+                                c.organization_id,
+                              )
+                            }
+                          >
+                            Request event entries
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-3 text-sm text-neutral-400">
+                        Confirming attendance does not enter the athlete or
+                        establish eligibility. Staff review entry requests.
+                      </p>
+                    </>
+                  ) : (
+                    <Empty>
+                      No invitation addressed to you. Contact the team manager
+                      to request participation.
+                    </Empty>
+                  )}
+                </Card>
+              ))}
+              {!competitions.length && (
+                <Empty>
+                  No competitions match this athlete, sport and club selection.
+                </Empty>
+              )}
+            </div>
+          )}
+          {view === "financial" && (
+            <div className="space-y-4">
+              <p className="text-sm text-neutral-400">
+                Only accounts covered by your billing authority are shown.
+                Balances remain separate by club and currency. Online card
+                payment is not configured.
+              </p>
+              {visibleInvoices
+                .filter((i: Row) => !club || i.organization_id === club)
+                .map((i: Row) => (
+                  <Card
+                    key={i.id}
+                    title={`${clubName(i.organization_id)} · ${i.invoice_number}`}
+                  >
+                    <p>
+                      {label(i.status)} · Due {i.due_date} · Balance{" "}
+                      {amount(i.balance_due, i.currency)}
+                    </p>
+                    {data.invoiceLines
+                      .filter((l: Row) => l.invoice_id === i.id)
+                      .map((l: Row) => (
+                        <p className="mt-2 text-sm" key={l.id}>
+                          {l.description} · {amount(l.line_total, i.currency)}
+                        </p>
+                      ))}
+                    <button
+                      className={button + " mt-3"}
+                      disabled={data.readOnly}
+                      onClick={() =>
+                        request("billing", i.athleteIds?.find((id: string) => athleteIds.includes(id)), i.organization_id)
+                      }
+                    >
+                      Ask Treasurer about this invoice
+                    </button>
+                  </Card>
+                ))}
+              {!visibleInvoices.length && (
+                <Empty>
+                  No invoices available under your billing permissions. This
+                  does not establish financial clearance.
+                </Empty>
+              )}
+            </div>
+          )}
+          {view === "documents" && (
+            <div className="space-y-4">
+              <button
+                className={button}
+                disabled={
+                  data.readOnly ||
+                  !athletes.some((a: Row) => allowed(a.id, "parent.documents"))
+                }
+                onClick={() => open({ kind: "upload" })}
+              >
+                Upload document
+              </button>
+              {waivers.map((w: Row) => (
+                <Card
+                  key={w.id}
+                  title={`${childName(w.athlete_id)} · ${w.definition?.name || "Waiver"}`}
+                >
+                  <p>
+                    {label(w.status)} · Due {date(w.due_at)}
+                  </p>
+                  {w.template ? (
+                    <button
+                      className={button + " mt-3"}
+                      disabled={
+                        !allowed(w.athlete_id, "parent.sign") ||
+                        !["assigned", "pending", "required", "open"].includes(
+                          w.status,
+                        )
+                      }
+                      onClick={() =>
+                        open({
+                          kind: "waiver",
+                          athleteId: w.athlete_id,
+                          organizationId: w.organization_id,
+                          waiver: w,
+                        })
+                      }
+                    >
+                      Read and sign
+                    </button>
+                  ) : (
+                    <Empty>
+                      The club has not published matching waiver text for
+                      signing.
+                    </Empty>
+                  )}
+                </Card>
+              ))}
+              {docs.map((d: Row) => {
+                const a = athletes.find(
+                  (a: Row) => a.person_id === d.owner_person_id,
+                );
+                return (
+                  <Card key={d.id} title={d.title}>
+                    <p>
+                      {name(a.person)} · {label(d.verification_status)}
+                      {d.expires_at ? ` · Expires ${date(d.expires_at)}` : ""}
+                    </p>
+                    <button
+                      className={button + " mt-3"}
+                      onClick={async () => {
+                        try {
+                          const r = await authenticatedFetch(
+                            `/api/parent-document?athleteId=${a.id}&id=${d.id}${guardian ? "&guardian=" + guardian : ""}`,
+                          );
+                          const j = await r.json();
+                          if (!r.ok) throw Error(j.error);
+                          window.open(j.url, "_blank", "noopener,noreferrer");
+                        } catch (e) {
+                          setError(
+                            e instanceof Error
+                              ? e.message
+                              : "Unable to open file",
+                          );
+                        }
+                      }}
+                    >
+                      Open document
+                    </button>
+                  </Card>
+                );
+              })}
+              {!waivers.length && !docs.length && (
+                <Empty>
+                  No forms or documents are available under your permissions.
+                </Empty>
+              )}
+            </div>
+          )}
+          {view === "messages" && (
+            <div className="space-y-4">
+              <button
+                className={button}
+                disabled={data.readOnly}
+                onClick={() => request("message")}
+              >
+                Contact the club
+              </button>
+              {data.messages
+                .filter((m: Row) => athleteIds.includes(m.athlete_id))
+                .map((m: Row) => (
+                  <Card key={m.id} title={m.title}>
+                    <p className="whitespace-pre-wrap">{m.body}</p>
+                    <p className="mt-2 text-sm text-neutral-400">
+                      {childName(m.athlete_id)} · {date(m.created_at)}
+                    </p>
+                  </Card>
+                ))}
+              <Card title="Your requests">
+                {data.requests
+                  .filter((r: Row) => athleteIds.includes(r.payload.athlete_id))
+                  .map((r: Row) => (
+                    <article
+                      key={r.id}
+                      className="mb-4 border-b border-neutral-700 pb-3"
+                    >
+                      <b>{r.payload.title}</b>
+                      <p>
+                        {childName(r.payload.athlete_id)} · {label(r.status)} ·
+                        With {label(r.payload.assigned_role)}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">
+                        {r.payload.description}
+                      </p>
+                      {r.payload.parent_reply && (
+                        <p className="mt-2">
+                          Club reply: {r.payload.parent_reply}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                {!data.requests.length && <Empty>No submitted requests.</Empty>}
+              </Card>
+            </div>
+          )}
+          {view === "volunteer" && (
+            <div className="space-y-4">
+              <p className="text-sm text-neutral-400">
+                Sign-ups are requests pending club review; they do not grant
+                clearance or award hours.
+              </p>
+              {data.opportunities
+                .filter((o: Row) => !club || o.organization_id === club)
+                .map((o: Row) => {
+                  const assignment = data.volunteer.find(
+                    (v: Row) =>
+                      v.opportunity_id === o.id &&
+                      !["cancelled", "declined"].includes(v.status),
+                  );
+                  const athlete = athletes.find((a: Row) =>
+                    orgsFor(a.id).some(
+                      (org: Row) => org.id === o.organization_id,
+                    ),
+                  );
+                  return (
+                    <Card key={o.id} title={o.title}>
+                      <p>
+                        {clubName(o.organization_id)} · {date(o.starts_at)}
+                      </p>
+                      <p>
+                        {assignment
+                          ? `Your status: ${label(assignment.status)}`
+                          : `Capacity: ${o.capacity ?? "Not specified"}`}
+                      </p>
+                      <button
+                        className={button + " mt-3"}
+                        disabled={busy || data.readOnly || !athlete}
+                        onClick={() =>
+                          action(
+                            assignment ? "volunteer_cancel" : "volunteer_join",
+                            athlete.id,
+                            o.organization_id,
+                            o.id,
+                            {},
+                          )
+                        }
+                      >
+                        {assignment ? "Cancel my request" : "Request a place"}
+                      </button>
+                    </Card>
+                  );
+                })}
+              <Card title="Recorded volunteering">
+                {data.volunteer.map((v: Row) => (
+                  <p key={v.id}>
+                    {label(v.status)} · Credits recorded:{" "}
+                    {v.credits_awarded ?? 0}
+                    {v.completed_at ? ` · ${date(v.completed_at)}` : ""}
+                  </p>
+                ))}
+                {!data.opportunities.length && (
+                  <Empty>No open volunteer opportunities published.</Empty>
+                )}
+              </Card>
+            </div>
+          )}
+          {view === "members" && (
+            <Card title="My contact details & access">
+              <p>
+                {name(data.viewer)} · {data.viewer?.email}
+              </p>
+              <p>{data.viewer?.phone || "No telephone recorded"}</p>
+              <button
+                className={button + " mt-3"}
+                disabled={
+                  data.readOnly ||
+                  !athletes.some((a: Row) => allowed(a.id, "parent.contact"))
+                }
+                onClick={() => open({ kind: "contact" })}
+              >
+                Edit my telephone details
+              </button>
+              <button
+                className={button + " ml-3 mt-3"}
+                disabled={data.readOnly}
+                onClick={() => request("family_access")}
+              >
+                Request family access change
+              </button>
+              {athletes.map((a: Row) => (
+                <div
+                  key={a.id}
+                  className="mt-4 border-t border-neutral-700 pt-3"
+                >
+                  <b>{name(a.person)}</b>
+                  <p className="text-sm text-neutral-400">
+                    {data.grants
+                      .filter((g: Row) => g.athlete_id === a.id)
+                      .flatMap((g: Row) => g.scopes)
+                      .map((s: string) => label(s.replace("parent.", "")))
+                      .join(" · ")}
+                  </p>
+                </div>
+              ))}
+            </Card>
+          )}
+        </>
+      )}
+      {drawer && (
+        <AdminDrawerShell
+          title={
+            drawer.kind === "athlete"
+              ? childName(drawer.athleteId)
+              : drawer.kind === "waiver"
+                ? "Read and sign waiver"
+                : drawer.kind === "upload"
+                  ? "Upload document"
+                  : drawer.kind === "contact"
+                    ? "My telephone details"
+                    : "Send request to club"
+          }
+          busy={busy}
+          onClose={() => setDrawer(null)}
+        >
+          {error && (
+            <p role="alert" className="mb-4 text-red-300">
+              {error}
+            </p>
+          )}
+          {drawer.kind === "athlete" && (
+            <div className="space-y-5">
+              <Card title="Athlete record">
+                <p>{childName(drawer.athleteId)}</p>
+                <p className="text-sm">
+                  {
+                    data.athletes.find((a: Row) => a.id === drawer.athleteId)
+                      ?.person.birth_date
+                  }
+                </p>
+                <button
+                  className={button + " mt-3"}
+                  disabled={data.readOnly}
+                  onClick={() => request("identity", drawer.athleteId)}
+                >
+                  Request a profile correction
+                </button>
+              </Card>
+              <Card title="Programs, squads & registration">
+                {data.registrations
+                  .filter((r: Row) => r.athlete_id === drawer.athleteId)
+                  .map((r: Row) => (
+                    <div key={r.id} className="mb-3">
+                      <p>
+                        {data.programs.find((p: Row) => p.id === r.program_id)
+                          ?.name || "Program"}{" "}
+                        ·{" "}
+                        {
+                          data.seasons.find((s: Row) => s.id === r.season_id)
+                            ?.name
+                        }{" "}
+                        · {label(r.status)}
+                      </p>
+                      {data.requirements
+                        .filter(
+                          (q: Row) =>
+                            q.organization_id === r.organization_id &&
+                            (!q.program_id || q.program_id === r.program_id) &&
+                            (!q.season_id || q.season_id === r.season_id),
+                        )
+                        .map((q: Row) => (
+                          <p className="text-sm text-neutral-300" key={q.id}>
+                            {q.name}:{" "}
+                            {label(
+                              data.requirementStatus.find(
+                                (s: Row) =>
+                                  s.registration_id === r.id &&
+                                  s.requirement_id === q.id,
+                              )?.status || "not assessed",
+                            )}
+                          </p>
+                        ))}
+                    </div>
+                  ))}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className={button}
+                    disabled={data.readOnly}
+                    onClick={() => request("registration", drawer.athleteId)}
+                  >
+                    Request program registration
+                  </button>
+                  <button
+                    className={button}
+                    disabled={data.readOnly}
+                    onClick={() => request("squad_change", drawer.athleteId)}
+                  >
+                    Request squad change
+                  </button>
+                </div>
+              </Card>
+              <Card title="Competitions">
+                {data.competitions
+                  .filter((c: Row) => c.athlete_id === drawer.athleteId)
+                  .map((c: Row) => (
+                    <p className="mb-2" key={c.id}>
+                      {c.name}: {c.assessment.status}
+                    </p>
+                  ))}
+              </Card>
+            </div>
+          )}
+          {drawer.kind === "request" && (
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                action(
+                  "request",
+                  selectedAthlete,
+                  selectedOrg,
+                  requestId.current,
+                  { kind: drawer.requestKind, description: values.description },
+                );
+              }}
+            >
+              <fieldset disabled={busy || data.readOnly} className="space-y-4">
+                {picker}
+                <p className="text-sm">Request: {label(drawer.requestKind)}</p>
+                <label className="block">
+                  Tell the club what you need
+                  <textarea
+                    required
+                    minLength={3}
+                    maxLength={4000}
+                    rows={5}
+                    className={control}
+                    value={values.description || ""}
+                    onChange={(e) =>
+                      setValues({ ...values, description: e.target.value })
+                    }
+                  />
+                </label>
+                <button
+                  className={button}
+                  disabled={!selectedAthlete || !selectedOrg}
+                >
+                  Submit request
+                </button>
+              </fieldset>
+            </form>
+          )}
+          {drawer.kind === "contact" && (
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                action(
+                  "contact",
+                  selectedAthlete,
+                  selectedOrg,
+                  requestId.current,
+                  { ...values, expected_updated_at: data.viewer.updated_at },
+                );
+              }}
+            >
+              <fieldset disabled={busy || data.readOnly} className="space-y-4">
+                {picker}
+                {[
+                  ["phone", "Primary telephone"],
+                  ["phone_secondary", "Alternate telephone"],
+                ].map(([id, title]) => (
+                  <label key={id} className="block">
+                    {title}
+                    <input
+                      type="tel"
+                      maxLength={100}
+                      className={control}
+                      value={values[id] || ""}
+                      onChange={(e) =>
+                        setValues({ ...values, [id]: e.target.value })
+                      }
+                    />
+                  </label>
+                ))}
+                <button className={button}>Save changes</button>
+              </fieldset>
+            </form>
+          )}
+          {drawer.kind === "waiver" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const t = drawer.waiver.template;
+                action("sign", selectedAthlete, selectedOrg, drawer.waiver.id, {
+                  ...values,
+                  agree: String(values.agree || false),
+                  template_id: t.id,
+                  template_updated_at: t.updated_at,
+                  body: t.body_template,
+                });
+              }}
+            >
+              <fieldset disabled={busy || data.readOnly} className="space-y-4">
+                <h3 className="font-semibold">
+                  {drawer.waiver.definition.name} · Version{" "}
+                  {drawer.waiver.definition.version}
+                </h3>
+                <p className="max-h-96 overflow-auto whitespace-pre-wrap rounded border border-neutral-600 p-4">
+                  {drawer.waiver.template.body_template}
+                </p>
+                <label className="block">
+                  Your full name
+                  <input
+                    required
+                    minLength={3}
+                    className={control}
+                    value={values.signed_name || ""}
+                    onChange={(e) =>
+                      setValues({ ...values, signed_name: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={!!values.agree}
+                    onChange={(e) =>
+                      setValues({ ...values, agree: e.target.checked })
+                    }
+                  />
+                  I have read this version and agree on behalf of this athlete
+                  under my authorized guardian role.
+                </label>
+                <button className={button}>Sign this waiver</button>
+              </fieldset>
+            </form>
+          )}
+          {drawer.kind === "upload" && (
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (lock.current) return;
+                lock.current = true;
+                setBusy(true);
+                setError("");
+                const f = new FormData(e.currentTarget);
+                f.set("athleteId", selectedAthlete);
+                try {
+                  const r = await authenticatedFetch(
+                    "/api/parent-document" + query,
+                    { method: "POST", body: f },
+                  );
+                  const j = await r.json();
+                  if (!r.ok) throw Error(j.error);
+                  setDrawer(null);
+                  setNotice("Document uploaded for review.");
+                  await load();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Upload failed");
+                } finally {
+                  lock.current = false;
+                  setBusy(false);
+                }
+              }}
+            >
+              <fieldset disabled={busy || data.readOnly} className="space-y-4">
+                {picker}
+                <label className="block">
+                  Title
+                  <input
+                    name="title"
+                    required
+                    maxLength={200}
+                    className={control}
+                  />
+                </label>
+                <label className="block">
+                  Document type
+                  <select name="documentTypeId" required className={control}>
+                    <option value="">Choose type</option>
+                    {data.documentTypes.map((t: Row) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  PDF, PNG or JPEG · up to 4 MB
+                  <input
+                    name="file"
+                    type="file"
+                    required
+                    accept="application/pdf,image/png,image/jpeg"
+                    className={control}
+                  />
+                </label>
+                <button className={button}>Upload for review</button>
+              </fieldset>
+            </form>
+          )}
+        </AdminDrawerShell>
+      )}
+    </main>
+  );
 }

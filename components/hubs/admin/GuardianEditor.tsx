@@ -1,4 +1,5 @@
 "use client";
+import ParentAccessEditor from "./ParentAccessEditor";
 import { useEffect, useRef, useState } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 const input =
@@ -228,6 +229,14 @@ export default function GuardianEditor({
           </p>
         )}
       </form>
+      {guardian && options?.authorization.coaches && (
+        <ParentAccessEditor
+          key={guardian.person_id}
+          record={record}
+          guardian={guardian}
+          onSaved={onSaved}
+        />
+      )}
     </section>
   );
 }

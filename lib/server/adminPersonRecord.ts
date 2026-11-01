@@ -209,7 +209,7 @@ export async function readPersonRecord(
     rest(`family_members?select=family_id&person_id=eq.${personId}`),
     athlete
       ? rest(
-          `family_authority_assignments?select=id,family_id,person_id,relationship_type,status,valid_from,valid_until&tenant_id=eq.${tenant}&athlete_id=eq.${athlete.id}&status=eq.active`,
+          `family_authority_assignments?select=id,family_id,person_id,relationship_type,status,valid_from,valid_until,authority_scopes,restrictions,source_type&tenant_id=eq.${tenant}&athlete_id=eq.${athlete.id}&status=eq.active`,
         )
       : [],
     athlete

@@ -1,4 +1,5 @@
 'use client';
+import {parentNavigation} from '@/lib/parent/policy';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -33,16 +34,7 @@ const FALLBACKS: Record<string, NavigationSection[]> = {
       items: [{ id: 'overview', label: 'Overview', href: '/athlete' }],
     },
   ],
-  parent: [
-    {
-      id: 'parent-main',
-      label: 'PARENT',
-      items: [
-        { id: 'household', label: 'Household Overview', href: '/parent' },
-        { id: 'schedule', label: 'Schedules', href: '/parent?view=schedule' },
-      ],
-    },
-  ],
+  parent: [{id:'parent-main',label:'PARENT',items:parentNavigation.map(([id,label])=>({id,label,href:`/parent?view=${id}`}))}],
   admin: [
     {
       id: 'admin-main',
@@ -143,6 +135,7 @@ export function HubNavigation() {
     let cancelled = false;
 
     async function loadNavigation() {
+      if (activeHubId === "parent") {setSections(FALLBACKS.parent);setRefreshing(false);return;}
       if (activeHubId === "admin") { setSections([]); setRefreshing(false); return; }
       setRefreshing(true);
       setSections([]);
