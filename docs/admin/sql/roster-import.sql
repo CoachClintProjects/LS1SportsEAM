@@ -3,7 +3,7 @@ create or replace function public.admin_import_roster(p_tenant uuid,p_org uuid,p
 returns jsonb language plpgsql security invoker set search_path=public as $$
 declare r jsonb; n int:=0; errors jsonb:='[]'; results jsonb:='[]'; seen text[]:='{}'; identity_key text; dob date; team uuid; existing uuid; person_id uuid; athlete_id uuid; job uuid; created int:=0; skipped int:=0; err text; item jsonb; prior public.import_jobs;
 begin
- if p_actor_user is null or p_actor_person is null or p_key is null then raise exception 'Actor and import key required';end if;
+ if p_actor_user is null or p_key is null then raise exception 'Actor and import key required';end if;
  perform 1 from organizations where id=p_org and tenant_id=p_tenant for update;
  if not found then raise exception 'Club outside authorized tenant';end if;
  if jsonb_typeof(p_rows)<>'array' or jsonb_array_length(p_rows) not between 1 and 1000 then raise exception 'Supply 1–1,000 rows';end if;

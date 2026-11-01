@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const cache=new Map();
 function load(file){file=path.resolve(file);if(cache.has(file))return cache.get(file).exports;const m={exports:{}};cache.set(file,m);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(code,{module:m,exports:m.exports,require:n=>n.startsWith('@/')?load(n.slice(2)+'.ts'):n.startsWith('.')?load(path.resolve(path.dirname(file),n+'.ts')):require(n),process,console,URL});return m.exports;}
 const {teamManagerScope,squadMembers}=load('lib/server/teamManagerScope.ts');
-const {rosterScope}=load('lib/server/rosterAccess.ts');
+const {rosterScope,canImportRoster}=load('lib/server/rosterAccess.ts');
 const ctx={allowedHubs:['admin'],person:{id:'actor',tenant_id:'tenant'},roles:[{code:'TEAM_MANAGER',scope:{organization_id:'club',team_id:'team-a'}}],isPlatformSuperUser:false,rolePermissions:{TEAM_MANAGER:['rosters.read']}};
 const team={id:'team-a',organization_id:'club',code:'SQD_BANANA_01'};
 (async()=>{
@@ -12,6 +12,13 @@ const team={id:'team-a',organization_id:'club',code:'SQD_BANANA_01'};
  const treasurer={...ctx,roles:[{code:'TREASURER',scope:{organization_id:'club'}}],rolePermissions:{TREASURER:['finance.read']}};
  assert.equal(rosterScope(treasurer,'treasurer').orgs[0],'club');
  assert.throws(()=>rosterScope(treasurer,'org_admin'),e=>e.status===403);
+ const superuser={...ctx,person:null,isPlatformSuperUser:true,adminScope:{tenantId:'tenant',organizationId:'club'}};
+ assert.equal(canImportRoster(superuser,'org_admin'),true);
+ assert.equal(canImportRoster(superuser,'registrar'),true);
+ assert.equal(canImportRoster(superuser,'treasurer'),false);
+ assert.equal(canImportRoster(superuser,'team_manager'),false);
+ assert.equal(canImportRoster({...ctx,person:null},'org_admin'),false);
+ assert.equal(canImportRoster(treasurer,'treasurer'),false);
  const requests=[];const rest=async q=>{requests.push(q);return [team];};
  assert.equal((await teamManagerScope(rest,ctx)).team,'team-a');
  assert.match(requests[0],/organization_id=in\.\(club\)&status=eq.active/);

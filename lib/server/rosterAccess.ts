@@ -71,3 +71,13 @@ export async function rosterAccess(request: NextRequest, role: string) {
   if (!ctx) throw new PersonRecordError(401, "Sign in required.");
   return { ctx, ...rosterScope(ctx, role) };
 }
+
+export function canImportRoster(ctx: AccessContext, role: string) {
+  return (
+    ["org_admin", "registrar"].includes(role) &&
+    canUseAdminRoleContext(ctx, role) &&
+    can(ctx, role, "record.create") &&
+    can(ctx, role, "rosters.update") &&
+    (!!ctx.person?.id || ctx.isPlatformSuperUser)
+  );
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
-import { rosterAccess } from "@/lib/server/rosterAccess";
+import { rosterAccess, canImportRoster } from "@/lib/server/rosterAccess";
 import { recordRest as rest } from "@/lib/server/adminRecordAccess";
 import { hasAdminContextPermission as can } from "@/lib/server/accessControl";
 import { PersonRecordError } from "@/lib/server/adminPersonRecord";
@@ -127,11 +127,7 @@ export async function GET(req: NextRequest) {
           can(ctx, role, "record.create") &&
           can(ctx, role, "rosters.update") &&
           !!ctx.person?.id,
-        import:
-          ["org_admin", "registrar"].includes(role) &&
-          can(ctx, role, "record.create") &&
-          can(ctx, role, "rosters.update") &&
-          !!ctx.person?.id,
+        import: canImportRoster(ctx, role),
       },
     });
   } catch (e) {
@@ -148,12 +144,7 @@ export async function POST(req: NextRequest) {
     const b = await req.json(),
       role = String(b.role || "org_admin");
     const { ctx, tenant, orgs } = await rosterAccess(req, role);
-    if (
-      !["org_admin", "registrar"].includes(role) ||
-      !can(ctx, role, "record.create") ||
-      !can(ctx, role, "rosters.update") ||
-      !ctx.person?.id
-    )
+    if (!canImportRoster(ctx, role))
       throw new PersonRecordError(
         403,
         "Roster import requires athlete creation and roster editing permission.",
@@ -178,7 +169,7 @@ export async function POST(req: NextRequest) {
         p_tenant: tenant,
         p_org: b.organizationId,
         p_actor_user: ctx.user.id,
-        p_actor_person: ctx.person.id,
+        p_actor_person: ctx.person?.id || null,
         p_source: String(b.sourceFile || "roster.csv").slice(0, 200),
         p_key: `roster:${b.organizationId}:${digest}`,
         p_rows: b.rows,

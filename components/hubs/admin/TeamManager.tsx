@@ -55,14 +55,20 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
       <div className="mt-1 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-black">Roster</h1>
         <div className="flex gap-2">
-          {data.authorization?.import && (
+          {
             <button
-              className="rounded bg-blue-700 px-3 py-2 text-sm"
+              className="rounded bg-blue-700 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!data.authorization?.import}
+              title={
+                data.authorization?.import
+                  ? "Import roster from CSV"
+                  : "Import requires Organization Admin or Registrar athlete-creation and roster-editing permissions."
+              }
               onClick={() => setImporting(true)}
             >
               Import CSV
             </button>
-          )}
+          }
           {data.authorization?.onboard && (
             <button
               disabled={!data.authorization?.onboard}
