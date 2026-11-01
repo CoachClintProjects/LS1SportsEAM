@@ -26,7 +26,7 @@ export default function RecordWorkPanel({
       url: string;
     } | null>(null),
     [values, setValues] = useState<Record<string, string>>({}),
-    [operation, setOperation] = useState("team_add");
+    [operation, setOperation] = useState("team_move");
   const personId = record.person.id;
   const taskRequest = useRef<string | null>(null);
   const load = useCallback(
@@ -437,13 +437,7 @@ export default function RecordWorkPanel({
       {tab === "Competitions" && (
         <>
           <h3 className="font-semibold">Eligibility & deadlines</h3>
-          {record.competitions.map((competition: any) => {
-            const eligibility = data.eligibility.find(
-              (e: any) => e.competition_id === competition.id,
-            );
-            const expired =
-              eligibility?.expires_at &&
-              new Date(eligibility.expires_at).getTime() < Date.now();
+          {data.competitions.map((competition: any) => {
             const deadlines = data.deadlines.filter(
               (d: any) =>
                 d.competition_id === competition.id &&
@@ -456,17 +450,26 @@ export default function RecordWorkPanel({
               >
                 <h4 className="text-sm font-semibold">{competition.name}</h4>
                 <p
-                  className={`text-sm ${!eligibility || expired || ["blocked", "ineligible"].includes(eligibility.status) ? "text-amber-200" : "text-neutral-200"}`}
+                  className={
+                    competition.assessment.status === "Eligible"
+                      ? "text-emerald-300"
+                      : "text-amber-200"
+                  }
                 >
-                  Eligibility:{" "}
-                  {expired
-                    ? "Assessment expired — review required"
-                    : eligibility?.status || "Not assessed"}
+                  Eligibility: {competition.assessment.status}
                 </p>
-                {eligibility?.reason && (
-                  <p className="text-xs text-neutral-400">
-                    {eligibility.reason}
+                {competition.assessment.reason && (
+                  <p className="text-sm text-neutral-400">
+                    {competition.assessment.reason}
                   </p>
+                )}
+                {competition.assessment.checks.map(
+                  (check: any, index: number) => (
+                    <p key={index} className="text-sm">
+                      {check.name}: {check.status}
+                      {check.reason ? ` — ${check.reason}` : ""}
+                    </p>
+                  ),
                 )}
                 {deadlines.map((d: any) => (
                   <p key={d.id} className="text-sm">
@@ -482,10 +485,11 @@ export default function RecordWorkPanel({
               </article>
             );
           })}
-          {!record.competitions.length && (
+          {!data.competitions.length && (
             <p className="text-sm text-neutral-400">
-              No linked competitions. An empty list does not establish
-              eligibility.
+              No meets or competitions are available for this club. Eligibility
+              cannot be assessed until the competition and its rules are
+              available.
             </p>
           )}
         </>
@@ -720,7 +724,8 @@ export default function RecordWorkPanel({
                           ["coach_remove", "End squad coach assignment"],
                         ]
                       : []),
-                    ["team_add", "Add to squad / team"],
+                    ["team_move", "Move to another squad / group"],
+                    ["team_add", "Add to another squad (keep existing)"],
                     ["team_remove", "End squad membership"],
                     ["guardian_link", "Add / update guardian contact"],
                     ["guardian_remove", "Remove guardian contact"],
@@ -778,12 +783,12 @@ export default function RecordWorkPanel({
                   )}
                 </>
               )}
-              {operation === "team_add" &&
+              {["team_add", "team_move"].includes(operation) &&
                 choice("team_id", "Team", data.teamOptions)}
-              {operation === "team_remove" &&
+              {["team_remove", "team_move"].includes(operation) &&
                 choice(
                   "membership_id",
-                  "Membership",
+                  "Current squad / group",
                   record.memberships.filter((m: any) => m.status === "active"),
                   (m) =>
                     record.teams.find((t: any) => t.id === m.team_id)?.name ||

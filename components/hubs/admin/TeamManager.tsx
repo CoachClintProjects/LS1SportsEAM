@@ -1,10 +1,12 @@
 "use client";
 import { AdminDrawerShell } from "./AdminDrawerShell";
+import RosterImport from "./RosterImport";
 import RosterGrid from "./RosterGrid";
 import PersonRecordDrawer from "./PersonRecordDrawer";
 import { useCallback, useEffect, useState } from "react";
 import { authenticatedFetch } from "@/lib/client/authenticatedFetch";
 export function TeamManager({ role = "team_manager" }: { role?: string }) {
+  const [importing, setImporting] = useState(false);
   const [data, setData] = useState<any>(null),
     [error, setError] = useState(""),
     [selected, setSelected] = useState<any>(null),
@@ -23,7 +25,7 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       const r = await authenticatedFetch(
-        `/api/admin-command?role=${encodeURIComponent(role)}&section=roster`,
+        `/api/admin-roster?role=${encodeURIComponent(role)}`,
         { cache: "no-store", signal },
       );
       const j = await r.json();
@@ -52,22 +54,34 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
       </div>
       <div className="mt-1 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-black">Roster</h1>
-        <button
-          disabled={!data.authorization?.onboard}
-          onClick={() => {
-            setForm({
-              ...form,
-              organizationId:
-                data.controls.organizations.length === 1
-                  ? data.controls.organizations[0].id
-                  : "",
-            });
-            setCreating(true);
-          }}
-          className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
-        >
-          + Athlete
-        </button>
+        <div className="flex gap-2">
+          {data.authorization?.import && (
+            <button
+              className="rounded bg-blue-700 px-3 py-2 text-sm"
+              onClick={() => setImporting(true)}
+            >
+              Import CSV
+            </button>
+          )}
+          {data.authorization?.onboard && (
+            <button
+              disabled={!data.authorization?.onboard}
+              onClick={() => {
+                setForm({
+                  ...form,
+                  organizationId:
+                    data.controls.organizations.length === 1
+                      ? data.controls.organizations[0].id
+                      : "",
+                });
+                setCreating(true);
+              }}
+              className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
+            >
+              + Athlete
+            </button>
+          )}
+        </div>
       </div>
       <p className="mt-2 text-sm text-neutral-400">
         Manage athletes, family contacts and squads. Choose the columns you
@@ -75,6 +89,14 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
       </p>
       {error && <p className="mt-3 text-red-300">{error}</p>}
       <RosterGrid data={data} role={role} onOpen={setSelected} />
+      {importing && (
+        <RosterImport
+          role={role}
+          data={data}
+          onClose={() => setImporting(false)}
+          onSaved={load}
+        />
+      )}
       {creating && (
         <AdminDrawerShell
           title="Add athlete"
@@ -193,7 +215,7 @@ export function TeamManager({ role = "team_manager" }: { role?: string }) {
                 }}
                 className="rounded bg-[#FA4616] px-3 py-2 text-xs font-black text-black"
               >
-                Onboard
+                Save athlete
               </button>
             </div>
           </fieldset>

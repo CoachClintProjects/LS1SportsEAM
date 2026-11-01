@@ -2,7 +2,6 @@ import { equipmentBoundary } from "@/lib/equipmentPolicy";
 import { fundraisingBoundary } from "@/lib/fundraisingPolicy";
 import { communicationsBoundary } from "@/lib/communicationsPolicy";
 import { volunteerBoundary } from "@/lib/volunteerPolicy";
-import { competitionBoundary } from "@/lib/competitionPolicy";
 import { TriageError } from "./adminTriage";
 import {
   teamManagerScope,
@@ -38,13 +37,16 @@ export async function personRecordScope(
     throw new PersonRecordError(403, communicationsBoundary);
   if (role === "volunteer_coordinator")
     throw new PersonRecordError(403, volunteerBoundary);
-  if (role === "competition_manager")
-    throw new PersonRecordError(403, competitionBoundary);
+
   if (!uuid.test(personId))
     throw new PersonRecordError(400, "A valid person record is required.");
   if (
     !hasAdminContextPermission(ctx, role, "rosters.read") &&
-    role !== "org_admin"
+    role !== "org_admin" &&
+    !(
+      role === "treasurer" &&
+      hasAdminContextPermission(ctx, role, "finance.read")
+    )
   )
     throw new PersonRecordError(403, "Roster access denied.");
   if (role === "team_manager") {
@@ -53,7 +55,13 @@ export async function personRecordScope(
         throw new PersonRecordError(error.status, error.message);
       throw error;
     });
-    const members = await squadMembers(rest, scope.team);
+    const members = (
+      await Promise.all(
+        scope.availableTeams.map((team: { id: string }) =>
+          squadMembers(rest, team.id),
+        ),
+      )
+    ).flat();
     const athleteIds = members.map((m: { athlete_id: string }) => m.athlete_id);
     const matching = athleteIds.length
       ? await rest(
@@ -123,6 +131,59 @@ export async function readPersonRecord(
   personId: string,
 ) {
   const base = await personRecordScope(rest, ctx, role, tenant, orgs, personId);
+  if (role === "treasurer") {
+    const family = base.athlete?.primary_family_id;
+    const customers = hasAdminContextPermission(ctx, role, "finance.read")
+      ? await rest(
+          `customers?select=id,display_name&organization_id=${ids(orgs)}&or=(person_id.eq.${personId}${family ? `,family_id.eq.${family}` : ""})`,
+        )
+      : [];
+    const invoices = customers.length
+      ? await rest(
+          `invoices?select=id,customer_id,invoice_number,due_date,balance_due,currency,status&customer_id=${ids(customers.map((c: any) => c.id))}&order=due_date.desc&limit=1000`,
+        )
+      : [];
+    const { id, first_name, last_name, preferred_name, status, email, phone } =
+      base.person;
+    return {
+      ...base,
+      person: {
+        id,
+        first_name,
+        last_name,
+        preferred_name,
+        status,
+        email,
+        phone,
+      },
+      registrations: [],
+      programs: [],
+      seasons: [],
+      guardians: [],
+      authorities: [],
+      emergency: [],
+      coaches: [],
+      bookings: [],
+      sites: [],
+      competitions: [],
+      consents: [],
+      activity: [],
+      medical: null,
+      invoices: invoices.map((i: any) => ({
+        ...i,
+        account: customers.find((c: any) => c.id === i.customer_id)
+          ?.display_name,
+      })),
+      authorization: {
+        edit: false,
+        finance: true,
+        financeOnly: true,
+        medical: false,
+        editMedical: false,
+      },
+      organizationId: orgs.length === 1 ? orgs[0] : null,
+    };
+  }
   const { athlete, teams } = base,
     teamIds = teams.map((t: any) => t.id);
   const medicalAccess =
@@ -131,7 +192,7 @@ export async function readPersonRecord(
     hasAdminContextPermission(ctx, role, "record.update") &&
     ["org_admin", "registrar", "team_manager"].includes(role);
   const canFinance =
-    role !== "registrar" &&
+    ["org_admin", "treasurer"].includes(role) &&
     hasAdminContextPermission(ctx, role, "finance.read");
   const [
     familyLinks,

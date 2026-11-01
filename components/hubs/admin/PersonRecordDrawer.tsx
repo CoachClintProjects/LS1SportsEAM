@@ -8,7 +8,6 @@ import {
 } from "react";
 import RecordWorkPanel from "./RecordWorkPanel";
 import GuardianEditor from "./GuardianEditor";
-import { RecordLifecycle } from "./RecordLifecycle";
 import dynamic from "next/dynamic";
 const TransactionEngine = dynamic(() =>
   import("../superuser/TransactionEngine").then((m) => m.TransactionEngine),
@@ -303,16 +302,18 @@ export default function PersonRecordDrawer({
   }
   const p = data?.person,
     a = data?.athlete;
-  const tabs = [
-    "Overview",
-    "Activity & Tasks",
-    "Documents",
-    "Relationships",
-    "Registration",
-    "Competitions",
-    ...(data?.authorization.finance ? ["Fees"] : []),
-    "Medical & Consent",
-  ];
+  const tabs = data?.authorization.financeOnly
+    ? ["Overview", "Fees"]
+    : [
+        "Overview",
+        "Activity & Tasks",
+        ...(["org_admin", "registrar"].includes(role) ? ["Documents"] : []),
+        "Relationships",
+        "Registration",
+        "Competitions",
+        ...(data?.authorization.finance ? ["Fees"] : []),
+        ...(data?.authorization.medical ? ["Medical & Consent"] : []),
+      ];
   if (decision === "engine")
     return (
       <TransactionEngine
@@ -382,7 +383,11 @@ export default function PersonRecordDrawer({
           </div>
         </header>
         <div data-record-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
-          {p?.status && <RecordLifecycle status={p.status} />}
+          {p?.status && (
+            <p className="mb-4 text-sm text-slate-300">
+              Athlete status: {human(a?.athlete_status || p.status)}
+            </p>
+          )}
           {loading && (
             <p role="status">Loading record and linked information…</p>
           )}
@@ -434,7 +439,9 @@ export default function PersonRecordDrawer({
                     </div>
                   </div>
                   <dl>
-                    <Field label="Date of birth" value={date(p.birth_date)} />
+                    {!data.authorization.financeOnly && (
+                      <Field label="Date of birth" value={date(p.birth_date)} />
+                    )}
                     <Field label="Preferred name" value={p.preferred_name} />
                   </dl>
                 </Card>
@@ -516,18 +523,20 @@ export default function PersonRecordDrawer({
                     )}
                   </div>
                 </Card>
-                <Card title="Program & season">
-                  <dl>
-                    <Field
-                      label="Programs"
-                      value={data.programs.map((x: any) => x.name).join(", ")}
-                    />
-                    <Field
-                      label="Seasons"
-                      value={data.seasons.map((x: any) => x.name).join(", ")}
-                    />
-                  </dl>
-                </Card>
+                {!data.authorization.financeOnly && (
+                  <Card title="Program & season">
+                    <dl>
+                      <Field
+                        label="Programs"
+                        value={data.programs.map((x: any) => x.name).join(", ")}
+                      />
+                      <Field
+                        label="Seasons"
+                        value={data.seasons.map((x: any) => x.name).join(", ")}
+                      />
+                    </dl>
+                  </Card>
+                )}
               </div>
               <div className="min-w-0 space-y-4">
                 {guardianEditing && data && (
@@ -651,8 +660,30 @@ export default function PersonRecordDrawer({
                     </button>
                   ))}
                 </div>
-                {tab === "Overview" && (
+                {tab === "Overview" && data.authorization.financeOnly && (
+                  <Card title="Fees & invoices">
+                    <p className="mb-3 text-sm">
+                      Billing information for this athlete and their family.
+                    </p>
+                    <button
+                      className="rounded bg-blue-700 px-4 py-2"
+                      onClick={() => setTab("Fees")}
+                    >
+                      View invoices and balances
+                    </button>
+                  </Card>
+                )}
+                {tab === "Overview" && !data.authorization.financeOnly && (
                   <>
+                    <RecordWorkPanel
+                      tab="Competitions"
+                      record={data}
+                      role={role}
+                      onChanged={() => {
+                        load().catch((e) => setError(e.message));
+                        onSaved?.();
+                      }}
+                    />
                     <Card title="At a glance">
                       <div className="grid grid-cols-2 gap-3">
                         <Field
@@ -928,129 +959,146 @@ export default function PersonRecordDrawer({
                 )}
               </div>
               <div className="space-y-4">
-                <Card
-                  title="Parents & guardians"
-                  edit={
-                    a && role === "org_admin" && data.authorization.edit
-                      ? () => openGuardians()
-                      : undefined
-                  }
-                >
-                  {[
-                    ...data.authorities,
-                    ...data.guardians.filter(
-                      (g: any) =>
-                        !data.authorities.some(
-                          (a: any) => a.person_id === g.person_id,
-                        ),
-                    ),
-                  ].map((g: any) => (
-                    <div
-                      key={g.person_id}
-                      className="mb-3 border-b border-neutral-700 pb-3"
+                {!data.authorization.financeOnly && (
+                  <>
+                    <Card
+                      title="Parents & guardians"
+                      edit={
+                        a && role === "org_admin" && data.authorization.edit
+                          ? () => openGuardians()
+                          : undefined
+                      }
                     >
-                      <p className="text-sm font-semibold">
-                        {role === "org_admin" &&
-                          data.authorization.edit &&
-                          data.guardians.some(
-                            (member: any) =>
-                              member.person_id === g.person_id &&
-                              member.family_id === a?.primary_family_id,
-                          ) && (
-                            <button
-                              aria-label={`Edit parent or guardian ${name(g.person)}`}
-                              onClick={() =>
-                                openGuardians(
-                                  data.guardians.find(
-                                    (member: any) =>
-                                      member.person_id === g.person_id &&
-                                      member.family_id === a?.primary_family_id,
-                                  ),
-                                )
-                              }
-                              className="float-right text-blue-300"
+                      {[
+                        ...data.authorities,
+                        ...data.guardians.filter(
+                          (g: any) =>
+                            !data.authorities.some(
+                              (a: any) => a.person_id === g.person_id,
+                            ),
+                        ),
+                      ].map((g: any) => (
+                        <div
+                          key={g.person_id}
+                          className="mb-3 border-b border-neutral-700 pb-3"
+                        >
+                          <p className="text-sm font-semibold">
+                            {role === "org_admin" &&
+                              data.authorization.edit &&
+                              data.guardians.some(
+                                (member: any) =>
+                                  member.person_id === g.person_id &&
+                                  member.family_id === a?.primary_family_id,
+                              ) && (
+                                <button
+                                  aria-label={`Edit parent or guardian ${name(g.person)}`}
+                                  onClick={() =>
+                                    openGuardians(
+                                      data.guardians.find(
+                                        (member: any) =>
+                                          member.person_id === g.person_id &&
+                                          member.family_id ===
+                                            a?.primary_family_id,
+                                      ),
+                                    )
+                                  }
+                                  className="float-right text-blue-300"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              )}
+                            {name(g.person)}
+                          </p>
+                          <p className="text-xs text-neutral-400">
+                            {human(g.relationship_type)}
+                          </p>
+                          {g.person.email && (
+                            <a
+                              className="mt-1 block break-all text-xs text-blue-300"
+                              href={`mailto:${g.person.email}`}
                             >
-                              <Pencil size={13} />
-                            </button>
+                              {g.person.email}
+                            </a>
                           )}
-                        {name(g.person)}
-                      </p>
-                      <p className="text-xs text-neutral-400">
-                        {human(g.relationship_type)}
-                      </p>
-                      {g.person.email && (
-                        <a
-                          className="mt-1 block break-all text-xs text-blue-300"
-                          href={`mailto:${g.person.email}`}
-                        >
-                          {g.person.email}
-                        </a>
+                          {g.person.phone && (
+                            <a
+                              className="mt-1 block text-xs text-blue-300"
+                              href={`tel:${g.person.phone}`}
+                            >
+                              {g.person.phone}
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                      {!data.guardians.length && !data.authorities.length && (
+                        <Empty>No relationships recorded.</Empty>
                       )}
-                      {g.person.phone && (
-                        <a
-                          className="mt-1 block text-xs text-blue-300"
-                          href={`tel:${g.person.phone}`}
-                        >
-                          {g.person.phone}
-                        </a>
+                    </Card>
+                    <Card
+                      title="Emergency contacts"
+                      edit={
+                        a && data.authorization.edit
+                          ? () => begin("emergency")
+                          : undefined
+                      }
+                    >
+                      {data.emergency.map((c: any) => (
+                        <div key={c.contact_id} className="mb-3 text-sm">
+                          <p className="font-semibold">
+                            {data.authorization.edit && (
+                              <button
+                                aria-label={`Edit emergency contact ${c.name}`}
+                                onClick={() => begin("emergency", c)}
+                                className="float-right text-blue-300"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            )}
+                            {c.name}
+                            {c.is_primary ? " · Primary" : ""}
+                          </p>
+                          <p className="text-xs text-neutral-400">
+                            {human(c.relationship)}
+                          </p>
+                          {c.phone_primary && (
+                            <a
+                              className="text-blue-300"
+                              href={`tel:${c.phone_primary}`}
+                            >
+                              {c.phone_primary}
+                            </a>
+                          )}
+                          <p className="text-xs text-neutral-400">
+                            Pickup authorized: {c.can_pickup ? "Yes" : "No"}
+                          </p>
+                        </div>
+                      ))}
+                      {!data.emergency.length && (
+                        <Empty>No emergency contacts recorded.</Empty>
                       )}
-                    </div>
-                  ))}
-                  {!data.guardians.length && !data.authorities.length && (
-                    <Empty>No relationships recorded.</Empty>
-                  )}
-                </Card>
-                <Card
-                  title="Emergency contacts"
-                  edit={
-                    a && data.authorization.edit
-                      ? () => begin("emergency")
-                      : undefined
-                  }
-                >
-                  {data.emergency.map((c: any) => (
-                    <div key={c.contact_id} className="mb-3 text-sm">
-                      <p className="font-semibold">
-                        {data.authorization.edit && (
-                          <button
-                            aria-label={`Edit emergency contact ${c.name}`}
-                            onClick={() => begin("emergency", c)}
-                            className="float-right text-blue-300"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                        )}
-                        {c.name}
-                        {c.is_primary ? " · Primary" : ""}
-                      </p>
-                      <p className="text-xs text-neutral-400">
-                        {human(c.relationship)}
-                      </p>
-                      {c.phone_primary && (
-                        <a
-                          className="text-blue-300"
-                          href={`tel:${c.phone_primary}`}
-                        >
-                          {c.phone_primary}
-                        </a>
-                      )}
-                      <p className="text-xs text-neutral-400">
-                        Pickup authorized: {c.can_pickup ? "Yes" : "No"}
-                      </p>
-                    </div>
-                  ))}
-                  {!data.emergency.length && (
-                    <Empty>No emergency contacts recorded.</Empty>
-                  )}
-                </Card>
+                    </Card>
+                  </>
+                )}
                 <Card
                   title="Squad & coach"
                   edit={
-                    data.authorization.edit
+                    role === "org_admin" && data.authorization.edit
                       ? () => setTab("Relationships")
                       : undefined
                   }
                 >
+                  {role === "org_admin" && data.authorization.edit && (
+                    <button
+                      className="mb-3 rounded bg-blue-700 px-3 py-2 text-sm"
+                      onClick={() => {
+                        setTab("Relationships");
+                        setGuardianEditing(false);
+                        setEditing(null);
+                      }}
+                    >
+                      Move or add to a squad
+                    </button>
+                  )}
                   {data.teams.map((t: any) => (
                     <div key={t.id} className="mb-3">
                       <p className="flex items-center gap-2 text-sm font-semibold">
@@ -1074,36 +1122,38 @@ export default function PersonRecordDrawer({
                     <Empty>No team or squad assigned.</Empty>
                   )}
                 </Card>
-                <Card title="Training facilities">
-                  {data.bookings.map((b: any) => (
-                    <div
-                      key={b.id}
-                      className="mb-3 border-b border-neutral-700 pb-3"
-                    >
-                      <p className="flex items-center gap-2 text-sm">
-                        <Building2 size={14} />
-                        {b.facility?.name}
-                      </p>
-                      <p className="mt-1 text-xs text-neutral-400">
-                        {
-                          data.sites.find(
-                            (s: any) => s.id === b.facility?.site_id,
-                          )?.name
-                        }
-                      </p>
-                      <p className="mt-1 flex items-center gap-1 text-xs">
-                        <CalendarDays size={12} />
-                        {date(b.starts_at)} · {human(b.status)}
-                      </p>
-                    </div>
-                  ))}
-                  {!data.bookings.length && (
-                    <Empty>
-                      No upcoming facility bookings linked to the athlete’s
-                      team.
-                    </Empty>
-                  )}
-                </Card>
+                {!data.authorization.financeOnly && (
+                  <Card title="Training facilities">
+                    {data.bookings.map((b: any) => (
+                      <div
+                        key={b.id}
+                        className="mb-3 border-b border-neutral-700 pb-3"
+                      >
+                        <p className="flex items-center gap-2 text-sm">
+                          <Building2 size={14} />
+                          {b.facility?.name}
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-400">
+                          {
+                            data.sites.find(
+                              (s: any) => s.id === b.facility?.site_id,
+                            )?.name
+                          }
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 text-xs">
+                          <CalendarDays size={12} />
+                          {date(b.starts_at)} · {human(b.status)}
+                        </p>
+                      </div>
+                    ))}
+                    {!data.bookings.length && (
+                      <Empty>
+                        No upcoming facility bookings linked to the athlete’s
+                        team.
+                      </Empty>
+                    )}
+                  </Card>
+                )}
               </div>
             </div>
           )}

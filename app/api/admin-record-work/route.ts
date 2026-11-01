@@ -1,3 +1,4 @@
+import { competitionEligibility } from "@/lib/athleteEligibility";
 import { NextRequest, NextResponse } from "next/server";
 import {
   recordAccess,
@@ -21,6 +22,11 @@ export async function GET(request: NextRequest) {
     const role = request.nextUrl.searchParams.get("role") || "org_admin",
       personId = request.nextUrl.searchParams.get("personId") || "",
       { ctx, tenant, orgs, base } = await recordAccess(request, role, personId);
+    if (role === "treasurer")
+      throw new PersonRecordError(
+        403,
+        "Use the Fees tab for Treasurer records.",
+      );
     const section =
       request.nextUrl.searchParams.get("section") || "Activity & Tasks";
     const wantsRelationships = section === "Relationships";
@@ -58,7 +64,7 @@ export async function GET(request: NextRequest) {
         : [],
       wantsCompetitions
         ? rest(
-            `competitions?select=id,name,starts_at&organization_id=in.(${orgs.join(",")})`,
+            `competitions?select=id,name,starts_at,sport_id,status&status=not.in.(cancelled,archived)&organization_id=in.(${orgs.join(",")})`,
           )
         : [],
       wantsRelationships
@@ -111,9 +117,18 @@ export async function GET(request: NextRequest) {
     const eligibility =
       base.athlete && compIds.length
         ? await rest(
-            `eligibility_records?select=id,competition_id,status,reason,expires_at,evaluated_at&athlete_id=eq.${base.athlete.id}&competition_id=in.(${compIds.join(",")})&order=evaluated_at.desc`,
+            `eligibility_records?select=id,rule_id,competition_id,status,reason,expires_at,evaluated_at&athlete_id=eq.${base.athlete.id}&competition_id=in.(${compIds.join(",")})&order=evaluated_at.desc`,
           )
         : [];
+    const rules = wantsCompetitions
+      ? await rest(
+          "eligibility_rules?select=id,name,sport_id,status,effective_from,effective_to&status=eq.active",
+        )
+      : [];
+    const assessments = competitions.map((c: any) => ({
+      ...c,
+      assessment: competitionEligibility(c, rules, eligibility),
+    }));
     const deadlines = compIds.length
       ? await rest(
           `competition_deadlines?select=id,competition_id,name,due_at,status&competition_id=in.(${compIds.join(",")})&order=due_at.asc`,
@@ -127,7 +142,7 @@ export async function GET(request: NextRequest) {
       ),
       documents,
       documentTypes,
-      competitions,
+      competitions: assessments,
       eligibility,
       deadlines,
       teamOptions,
@@ -320,6 +335,7 @@ export async function POST(request: NextRequest) {
           "coach_remove",
           "team_add",
           "team_remove",
+          "team_move",
           "guardian_link",
           "guardian_remove",
           "athlete_inactivate",
@@ -335,18 +351,23 @@ export async function POST(request: NextRequest) {
       if (!String(b.values?.reason || "").trim())
         throw new PersonRecordError(400, "A reason is required.");
       return NextResponse.json(
-        await rest("rpc/admin_athlete_relationship", {
-          method: "POST",
-          body: JSON.stringify({
-            p_tenant: tenant,
-            p_org: orgs[0],
-            p_athlete: base.athlete.id,
-            p_actor_user: ctx.user.id,
-            p_actor_person: ctx.person?.id || null,
-            p_operation: b.operation,
-            p_values: b.values,
-          }),
-        }),
+        await rest(
+          b.operation === "team_move"
+            ? "rpc/admin_move_athlete_squad"
+            : "rpc/admin_athlete_relationship",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              p_tenant: tenant,
+              p_org: orgs[0],
+              p_athlete: base.athlete.id,
+              p_actor_user: ctx.user.id,
+              p_actor_person: ctx.person?.id || null,
+              p_operation: b.operation,
+              p_values: b.values,
+            }),
+          },
+        ),
       );
     }
     throw new PersonRecordError(400, "Unknown action");

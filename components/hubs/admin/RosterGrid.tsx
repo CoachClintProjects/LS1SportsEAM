@@ -45,6 +45,11 @@ export default function RosterGrid({
   role: string;
   onOpen: (athlete: any) => void;
 }) {
+  const availableColumns = data.authorization?.financeOnly
+    ? columns.filter(([k]) =>
+        ["name", "athlete_number", "squads", "status"].includes(k),
+      )
+    : columns;
   const [view, setView] = useState<View>(standard),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(1),
@@ -69,14 +74,20 @@ export default function RosterGrid({
           "name",
           ...Array.from(
             new Set<string>(
-              (v.columns || defaults).filter(
-                (k: string) => k !== "name" && columns.some((c) => c[0] === k),
+              (
+                v.columns ||
+                (data.authorization?.financeOnly
+                  ? ["name", "athlete_number", "squads", "status"]
+                  : defaults)
+              ).filter(
+                (k: string) =>
+                  k !== "name" && availableColumns.some((c) => c[0] === k),
               ),
             ),
           ),
         ],
       });
-      setView(stored.current ? clean(stored.current) : standard);
+      setView(clean(stored.current || {}));
       setSaved(
         Object.fromEntries(
           Object.entries(stored.views || {}).map(([n, v]) => [n, clean(v)]),
@@ -190,7 +201,7 @@ export default function RosterGrid({
   const pages = Math.max(1, Math.ceil(rows.length / 25)),
     current = Math.min(page, pages),
     visible = view.columns
-      .map((k) => columns.find((c) => c[0] === k)!)
+      .map((k) => availableColumns.find((c) => c[0] === k)!)
       .filter(Boolean);
   return (
     <section className="mt-5 rounded-xl border border-neutral-700 bg-[#0A0C10]">
@@ -422,7 +433,9 @@ export default function RosterGrid({
           </p>
           {[
             ...draft,
-            ...columns.map((c) => c[0]).filter((k) => !draft.includes(k)),
+            ...availableColumns
+              .map((c) => c[0])
+              .filter((k) => !draft.includes(k)),
           ].map((k) => {
             const i = draft.indexOf(k);
             return (

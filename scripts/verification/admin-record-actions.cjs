@@ -7,6 +7,7 @@ const rest = async (path,init) => {calls.push({path,init});return path.startsWit
 const moduleUnderTest = {exports:{}};
 const code = ts.transpileModule(fs.readFileSync('app/api/admin-record-work/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 vm.runInNewContext(code,{module:moduleUnderTest,exports:moduleUnderTest.exports,Date,Set,require(name){
+ if(name==='@/lib/athleteEligibility'){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/athleteEligibility.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:m,exports:m.exports,Date,Map});return m.exports;}
  if(name==='next/server') return {NextResponse:{json:(body,options={})=>({status:options.status||200,body})}};
  if(name.endsWith('/adminRecordAccess')) return {recordRest:rest,recordAccess:async()=>({ctx:{user:{id:null},person:null},tenant:'beb8f24e-fcd0-5dbe-ba1b-39c488ebaa4f',orgs:['c9032ebb-0507-5004-b1ad-0bca7cf3cc53'],base})};
  if(name.endsWith('/accessControl')) return {hasAdminContextPermission:(_ctx,_role,p)=>permissions.has(p)};
